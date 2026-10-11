@@ -1,0 +1,67 @@
+version: 1
+# keywords: lexical cues the context manager uses to rank evidence for a field.
+# field_type: research grouping; procedural memory learns one strategy per field type.
+# depends_on: fields whose resolved values are supplied as context (and, for derived
+#             fields, the inputs the rules engine computes from).
+fields:
+  - {key: city_name, field_type: city_identity, subject: city, type: text, keywords: [city, municipality, metropolitan]}
+  - {key: jurisdiction, field_type: city_identity, subject: city, type: text, keywords: [province, state, region, county, prefecture]}
+  - {key: country, field_type: city_identity, subject: city, type: text, keywords: [country, nation]}
+  - {key: city_latitude, field_type: city_identity, subject: city, type: coordinate, keywords: [latitude, coordinates, lat]}
+  - {key: city_longitude, field_type: city_identity, subject: city, type: coordinate, keywords: [longitude, coordinates, lon]}
+  - {key: city_population_millions, field_type: population, subject: city, type: number, keywords: [population, inhabitants, residents, census]}
+  - {key: city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [city_population_millions], keywords: [population, census, estimate]}
+  - {key: utility_reported_city_population_millions, field_type: population, subject: city, type: number, keywords: [population served, service population, customers, residents]}
+  - {key: utility_reported_city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [utility_reported_city_population_millions], keywords: [population served, service population, annual report]}
+  - {key: population_served_millions, field_type: population, subject: supply_record, type: number, keywords: [population served, people served, serves, customers]}
+  - key: percentage_total_population
+    field_type: population
+    subject: supply_record
+    type: percent
+    derived: true
+    depends_on: [population_served_millions, city_population_millions]
+    keywords: [percent, share, population served]
+  - {key: utility_name, field_type: utility, subject: supply_record, type: text, keywords: [utility, water authority, water board, water department, water company, water services, waterworks, drinking water, supplies]}
+  - {key: water_source, field_type: water_source, subject: supply_record, type: text, keywords: [source, lake, river, aquifer, reservoir, intake, wellfield, supplied by]}
+  - {key: water_system, field_type: water_source, subject: supply_record, type: text, keywords: [water system, supply system, distribution system, network]}
+  - key: water_type
+    field_type: source_type
+    subject: supply_record
+    type: enum
+    allowed: [Surface, Groundwater, Reclaimed, Desalination]
+    keywords: [surface water, groundwater, aquifer, wells, lake, river, desalination, seawater, reclaimed, recycled]
+  - {key: water_transfer_system, field_type: transfer_system, subject: supply_record, type: text, keywords: [aqueduct, transfer, pipeline, canal, tunnel, conveyance]}
+  - {key: seasonal_uses, field_type: water_source, subject: supply_record, type: text, keywords: [seasonal, summer, winter, drought, peak demand, backup]}
+  - {key: reservoir_names, field_type: water_source, subject: supply_record, type: text, keywords: [reservoir, dam, impoundment, storage]}
+  - {key: pod_latitude, field_type: point_of_diversion, subject: supply_record, type: coordinate, keywords: [intake, diversion, latitude, coordinates]}
+  - {key: pod_longitude, field_type: point_of_diversion, subject: supply_record, type: coordinate, keywords: [intake, diversion, longitude, coordinates]}
+  - key: pod_coordinate_method
+    field_type: point_of_diversion
+    subject: supply_record
+    type: enum
+    allowed: [Utility Source, Reported Database, Visual Estimation, Pour Point Estimation, City Epicenter]
+    depends_on: [pod_latitude, pod_longitude]
+    keywords: [intake, point of diversion, coordinates]
+  - {key: infrastructure_notes, field_type: infrastructure, subject: supply_record, type: text, keywords: [treatment plant, pumping station, intake, pipeline, filtration, infrastructure]}
+  - {key: total_city_water_withdrawals_m3_day, field_type: withdrawal, subject: city, type: number, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, cubic metres]}
+  - {key: total_city_water_withdrawals_year, field_type: withdrawal, subject: city, type: integer, depends_on: [total_city_water_withdrawals_m3_day], keywords: [withdrawal, production, annual report]}
+  - {key: past_total_city_water_withdrawals, field_type: withdrawal, subject: city, type: text, keywords: [historical, trend, withdrawal, production, previous years]}
+  - {key: source_withdrawal_contribution_m3_day, field_type: withdrawal, subject: supply_record, type: number, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, capacity]}
+  - {key: source_withdrawal_contribution_year, field_type: withdrawal, subject: supply_record, type: integer, depends_on: [source_withdrawal_contribution_m3_day], keywords: [withdrawal, production, annual report]}
+  - key: source_withdrawal_contribution_method
+    field_type: withdrawal
+    subject: supply_record
+    type: enum
+    allowed: [Reported Daily, Reported Annually, Remainder Allocated, Unknown]
+    depends_on: [source_withdrawal_contribution_m3_day]
+    keywords: [daily, annual, average, withdrawal]
+  - key: source_withdrawal_percentage
+    field_type: withdrawal
+    subject: supply_record
+    type: percent
+    derived: true
+    depends_on: [source_withdrawal_contribution_m3_day, total_city_water_withdrawals_m3_day]
+    keywords: [percent, share, withdrawal]
+  - {key: water_quality_notes, field_type: water_quality, subject: supply_record, type: text, keywords: [water quality, turbidity, contaminant, nitrate, lead, compliance, treatment]}
+  - {key: water_quality_year, field_type: water_quality, subject: supply_record, type: integer, depends_on: [water_quality_notes], keywords: [water quality report, annual report, sampling]}
+  - {key: references, field_type: references, subject: supply_record, type: text, keywords: [source, reference]}

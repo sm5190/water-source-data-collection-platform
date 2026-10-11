@@ -1,0 +1,48 @@
+[project]
+name = "water-source-research"
+version = "0.1.0"
+description = "Evidence-grounded research workflow for standardized global water-source data collection"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.12",
+  "fastapi>=0.115",
+  "httpx>=0.27",
+  "langgraph>=0.2",
+  "openai>=1.50",
+  "opentelemetry-api>=1.27",
+  "opentelemetry-sdk>=1.27",
+  "opentelemetry-exporter-otlp>=1.27",
+  "pgvector>=0.3",
+  "psycopg[binary]>=3.2",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "pyyaml>=6.0",
+  "sqlalchemy>=2.0",
+  "trafilatura>=1.12",
+  "uvicorn>=0.30",
+  "alembic>=1.13",
+  "langgraph-checkpoint-postgres>=3.1.2",
+]
+
+[project.optional-dependencies]
+docs = ["docling>=2.0"]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.7"]
+ui = [
+    "streamlit>=1.40",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/water_source_research"]
