@@ -5,8 +5,9 @@ Initial scaffold for an evidence-grounded, human-reviewed research workflow for 
 ## Included
 
 - LangGraph plan/execute workflow
-- OpenAI as the main reasoning/extraction model
-- VT LLM adapter for low-effort filtering/classification
+- LLM router with Virginia Tech's ARC LLM API as the default provider and OpenAI selectable by
+  configuration (see [LLM provider](#llm-provider))
+- Evidence-grounded structured extraction gateway (every claim cites a verified quote)
 - SearXNG + OpenAlex + Crossref + Semantic Scholar discovery adapters
 - Direct HTTP/HTML parsing first
 - Docling adapter for PDFs/documents
@@ -112,8 +113,64 @@ All `DiscoverySettings` fields can be set as `DISCOVERY__<FIELD>` (see `.env.exa
 | `DISCOVERY__SEMANTIC_SCHOLAR_RELATED_PER_ROUND` | `0` | `>0` adds related-paper expansion |
 | `DISCOVERY__<PROVIDER>_LIMITS__MAX_CONCURRENCY` / `__MIN_INTERVAL_SECONDS` | per provider | client-side rate limits |
 
+## LLM provider
+
+Every LLM call goes through `llm/router.py`, which uses exactly one provider at a time. There
+is no automatic fallback: if VT fails, the call fails (and the research queue retries the run);
+it never silently switches to paid OpenAI.
+
+| Operation | Where | Uses the router |
+|---|---|---|
+| Claim extraction (structured, cited) | `extract` node → `llm/extraction.py` | yes |
+| Procedure distillation | `procedures/llm_distiller.py` | yes |
+| Procedure embeddings | `procedures/` retrieval + merge | yes |
+| Query generation, ranking, source classification, validation | `discovery/`, `agents/` | no LLM (deterministic) |
+
+### VT ARC LLM API (default)
+
+1. Get a personal key at <https://llm.arc.vt.edu> → Settings → Account → API keys.
+2. In `.env`:
+   ```env
+   LLM_PROVIDER=vt
+   VT_LLM_BASE_URL=https://llm-api.arc.vt.edu/api/v1
+   VT_LLM_API_KEY=sk-...
+   VT_LLM_MODEL=gpt-oss-120b
+   ```
+3. **Connect to the VT Campus VPN** — the API answers `403 API access is restricted to the VT
+   Campus VPN` from anywhere else.
+4. Check it (free; about six small requests):
+   ```bash
+   uv run python scripts/llm_smoke.py
+   ```
+   It lists models, reports which structured-output mode VT accepts (set
+   `LLM__VT_STRUCTURED_MODE` accordingly), runs one grounded extraction and one embedding.
+
+### Switching to OpenAI later
+
+Set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`). No code
+changes. `scripts/llm_smoke.py` refuses to make paid calls unless run with `--allow-openai`.
+Procedure embeddings change model on the switch; stored vectors are re-embedded by
+`scripts/run_procedure_worker.py` and never compared across models meanwhile.
+
+### Rate limits, retries and caching
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `LLM__REQUESTS_PER_MINUTE` | `27` | sliding-window budget shared by all LLM calls in a process |
+| `LLM__MAX_CONCURRENCY` | `8` | requests in flight per process (VT allows 20 per user) |
+| `LLM__MAX_RETRIES` | `3` | retries for 429 / timeout / network / 5xx, with jittered exponential backoff honouring the server's wait hint; 401/403/400/404/413 fail at once |
+| `LLM__STRUCTURED_MAX_ATTEMPTS` | `2` | repair turns when output fails the response schema; then the call fails (nothing unvalidated is accepted) |
+| `LLM__CACHE_TTL_SECONDS` | `86400` | in-process response cache; key = provider, endpoint, model, task, prompt version, schema hash and prompts |
+| `LLM__MAX_OUTPUT_TOKENS` | `4000` | must stay ≤ 8000 on VT |
+
+Limits are per worker **process**: with several worker processes on one VT key, divide
+`REQUESTS_PER_MINUTE` and `MAX_CONCURRENCY` by the number of processes.
+
+Tests never touch a real API: `uv run pytest tests/test_llm_router.py
+tests/test_extraction_gateway.py tests/test_llm_embeddings.py` runs against mocked HTTP.
+
 ## Architecture principle
 
 The AI is not the source. Every accepted value should point back to supporting evidence from a utility, government, technical, regulatory, academic, or other approved source.
 
-The scaffold is intentionally incomplete at the provider-integration level so you can wire in the exact VT LLM endpoint, Firecrawl plan, Apify actors, and Computer Use workflow after access is approved.
+The scaffold is intentionally incomplete at the provider-integration level so you can wire in the exact Firecrawl plan, Apify actors, and Computer Use workflow after access is approved.

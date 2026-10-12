@@ -2,7 +2,7 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 from procedure_helpers import (
-    PRIMARY, FakeEmbedder, make_engine, recipe, seed_version, settings,
+    PRIMARY, FakeEmbedder, app_settings, make_engine, recipe, seed_version, settings,
 )
 from water_source_research.agents.graph import build_graph
 from water_source_research.api.main import create_app
@@ -171,9 +171,8 @@ def test_real_graph_runs_are_not_yet_distillable(engine, repo):
     real graph run has no successful research action for distillation to learn from."""
     run(graph_with(repo, recorder=RunRecorder(engine)),
         initial(chunks=[CHUNK], decisions=[{"field_key": PRIMARY, "decision": "APPROVED"}]))
-    services = build_procedure_services(type("S", (), {
-        "procedure_memory": settings(eligibility_min_resolved_ratio=0.1),
-        "openai_api_key": ""})(), engine, embedder=FakeEmbedder())
+    services = build_procedure_services(app_settings(eligibility_min_resolved_ratio=0.1),
+                                        engine, embedder=FakeEmbedder())
     results = services.worker.run_once(limit=20)
     withdrawal = [r for r in results if any("successful research action" in x
                                             for x in r.reasons)]
@@ -200,9 +199,7 @@ def test_plan_and_finalize_traces(engine, repo, spans):
 # --- API ------------------------------------------------------------------------------
 
 def test_procedure_api_lifecycle_and_provenance(engine, repo):
-    services = build_procedure_services(type("S", (), {
-        "procedure_memory": settings(), "openai_api_key": ""})(), engine,
-        embedder=FakeEmbedder())
+    services = build_procedure_services(app_settings(), engine, embedder=FakeEmbedder())
     waiting = seed_version(repo, recipe(), status=ProcedureStatus.AWAITING_APPROVAL)
     client = TestClient(create_app(procedures=services))
     listed = client.get("/procedures", params={"status": "AWAITING_APPROVAL"}).json()

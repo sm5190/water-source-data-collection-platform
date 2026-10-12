@@ -86,9 +86,10 @@ class ProcedureMemory:
                 vector_degraded = True
             else:
                 try:
-                    query_vec = self.embedder.embed([req.query_text()])[0]
+                    query_vec = self.embedder.embed_query(req.query_text())
                     similarities = self.repo.similarities(
-                        [c.rank_input.version_id for c in candidates], query_vec)
+                        [c.rank_input.version_id for c in candidates], query_vec,
+                        self.embedder.model)
                 except Exception as exc:  # noqa: BLE001 - soft dependency boundary
                     # Semantic search is optional; metadata + reliability still rank safely.
                     span.record_exception(exc)

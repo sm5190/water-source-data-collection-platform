@@ -5,8 +5,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from sqlalchemy import Engine
 from water_source_research.core.config import Settings
-from water_source_research.llm.embeddings import EmbeddingClient, OpenAIEmbeddingClient
-from water_source_research.llm.openai_reasoner import OpenAIStructuredClient, StructuredLLM
+from water_source_research.core.versions import LLM_DISTILLER_VERSION
+from water_source_research.llm.base import LLMError, LLMErrorKind, StructuredLLM
+from water_source_research.llm.embeddings import EmbeddingClient
+from water_source_research.llm.router import build_embedding_client, build_structured_llm
 from water_source_research.schemas.research import FieldDefinition
 from water_source_research.services.field_state import load_field_definitions
 from water_source_research.services.run_recorder import RunRecorder
@@ -33,21 +35,31 @@ def build_distiller(settings: Settings, fields: Mapping[str, FieldDefinition],
                     llm: StructuredLLM | None = None) -> Distiller:
     pm = settings.procedure_memory
     if pm.distiller == "llm":
-        if llm is None and settings.openai_api_key:
-            llm = OpenAIStructuredClient(settings.openai_api_key,
-                                         pm.distiller_model or settings.openai_model)
+        if llm is None:
+            try:
+                llm = build_structured_llm(settings, task="distill",
+                                           prompt_version=LLM_DISTILLER_VERSION,
+                                           model=pm.distiller_model)
+            except LLMError as exc:
+                if exc.kind is not LLMErrorKind.UNCONFIGURED:
+                    raise
+                logger.warning("procedure_memory.distiller=llm but the LLM provider is not "
+                               "configured (%s); using the deterministic distiller", exc)
         if llm is not None:
             return LLMDistiller(llm, fields, pm)
-        logger.warning("procedure_memory.distiller=llm but no OpenAI key is configured; "
-                       "using the deterministic distiller")
     return DeterministicDistiller(fields, pm)
 
 def build_procedure_services(settings: Settings, engine: Engine,
                              embedder: EmbeddingClient | None = None,
                              llm: StructuredLLM | None = None) -> ProcedureServices:
     pm = settings.procedure_memory
-    if embedder is None and settings.openai_api_key:
-        embedder = OpenAIEmbeddingClient(settings.openai_api_key, pm.embedding_model)
+    if embedder is None:
+        try:
+            embedder = build_embedding_client(settings)
+        except LLMError as exc:
+            if exc.kind is not LLMErrorKind.UNCONFIGURED:
+                raise
+            logger.info("procedure embeddings disabled: %s", exc)
     # Without an embedder, retrieval ranks on metadata + reliability (vector_degraded).
     fields = load_field_definitions()
     repo = ProcedureRepository(engine)

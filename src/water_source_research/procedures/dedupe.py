@@ -51,6 +51,7 @@ class MergeEvaluator:
         candidate: Recipe,
         candidate_embedding: list[float] | None,
         existing: list[VersionSnapshot],
+        embedding_model: str | None = None,
     ) -> MergeEvaluation:
         live = [v for v in existing if v.status in _MERGEABLE]
         if not existing:
@@ -66,8 +67,10 @@ class MergeEvaluator:
             if existing_recipe.capability_plan() != candidate.capability_plan():
                 continue  # defensive: same key implies same plan
             jaccard = _jaccard(cand_set, _content_set(existing_recipe))
-            cosine = (_cosine(candidate_embedding, v.embedding)
-                      if candidate_embedding is not None and v.embedding is not None else None)
+            comparable = (candidate_embedding is not None and v.embedding is not None
+                          and (embedding_model is None or v.embedding_model is None
+                               or v.embedding_model == embedding_model))
+            cosine = _cosine(candidate_embedding, v.embedding) if comparable else None
             if jaccard >= self.s.merge_min_jaccard and (
                 cosine is None or cosine >= self.s.merge_min_cosine
             ):

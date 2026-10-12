@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import create_engine, update
 from sqlalchemy.orm import Session
 from water_source_research.core.capabilities import Capability
+from water_source_research.core.config import Settings
 from water_source_research.db.models import utcnow
 from water_source_research.db.procedure_models import ProcedureVersionRecord
 from water_source_research.db.session import init_db
@@ -29,6 +30,9 @@ class FakeEmbedder:
         self.calls += 1
         return [self._vec(t) for t in texts]
 
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed([text])[0]
+
     @staticmethod
     def _vec(text: str) -> list[float]:
         v = [0.0] * EMBEDDING_DIMENSIONS
@@ -43,6 +47,9 @@ class FailingEmbedder:
     def embed(self, texts: list[str]) -> list[list[float]]:
         raise ConnectionError("embedding service down")
 
+    def embed_query(self, text: str) -> list[float]:
+        raise ConnectionError("embedding service down")
+
 def make_engine(tmp_path, name="proc.db"):
     engine = create_engine(f"sqlite:///{tmp_path / name}",
                            connect_args={"check_same_thread": False, "timeout": 30})
@@ -51,6 +58,11 @@ def make_engine(tmp_path, name="proc.db"):
 
 def settings(**overrides: Any) -> ProcedureMemorySettings:
     return ProcedureMemorySettings(**overrides)
+
+def app_settings(**pm: Any) -> Settings:
+    """App settings with no provider credentials (never reads .env): default provider is VT."""
+    return Settings(_env_file=None, vt_llm_base_url="", vt_llm_api_key="", vt_llm_model="",
+                    openai_api_key="", procedure_memory=settings(**pm))
 
 def recipe(field_type="withdrawal", water_type=None, sources=("utility_annual_report",),
            queries=("{utility} annual water report",),

@@ -67,6 +67,7 @@ class VersionSnapshot:
     last_success_at: datetime | None
     approved_at: datetime | None
     created_at: datetime
+    embedding_model: str | None = None  # vectors are only comparable within one model
 
 @dataclass(frozen=True, slots=True)
 class OriginSpec:
@@ -136,12 +137,19 @@ class ProcedureRepository:
                 ))
             return out
 
-    def similarities(self, version_ids: list[str], query_vec: list[float]) -> dict[str, float]:
-        """Cosine similarity for already-filtered versions only (bounded set)."""
+    def similarities(self, version_ids: list[str], query_vec: list[float],
+                     model: str | None = None) -> dict[str, float]:
+        """Cosine similarity for already-filtered versions only (bounded set).
+
+        With ``model``, only vectors from that embedding model are compared (vectors from
+        different models live in different spaces even when their widths match).
+        """
         if not version_ids:
             return {}
         ready = and_(V.id.in_(version_ids), V.embedding.is_not(None),
                      V.embedding_status == "READY")
+        if model is not None:
+            ready = and_(ready, V.embedding_model == model)
         with Session(self.engine) as session:
             if self.engine.dialect.name == "postgresql":
                 q = bindparam("q", query_vec, type_=Vector(EMBEDDING_DIMENSIONS))
@@ -441,10 +449,16 @@ class ProcedureRepository:
 
     # --- embeddings ---------------------------------------------------------------------
 
-    def pending_embeddings(self, limit: int) -> list[tuple[str, dict[str, Any]]]:
+    def pending_embeddings(self, limit: int,
+                           model: str | None = None) -> list[tuple[str, dict[str, Any]]]:
+        """Versions needing an embedding; with ``model``, also those embedded by another
+        model (re-embedded after switching embedding providers)."""
+        needed = V.embedding_status != "READY"
+        if model is not None:
+            needed = or_(needed, V.embedding_model.is_(None), V.embedding_model != model)
         with Session(self.engine) as session:
             rows = session.execute(
-                select(V.id, V.recipe_json).where(V.embedding_status != "READY",
+                select(V.id, V.recipe_json).where(needed,
                                                   V.status != ProcedureStatus.RETIRED.value)
                 .order_by(V.created_at).limit(limit)).all()
             return [(vid, recipe) for vid, recipe in rows]
@@ -565,7 +579,7 @@ def _snapshot(v: ProcedureVersionRecord, with_embedding: bool = True) -> Version
         success_count=v.success_count, failure_count=v.failure_count,
         recent_success_rate=v.recent_success_rate,
         human_correction_count=v.human_correction_count, last_success_at=v.last_success_at,
-        approved_at=v.approved_at, created_at=v.created_at,
+        approved_at=v.approved_at, created_at=v.created_at, embedding_model=v.embedding_model,
     )
 
 def _row_dict(row: Any) -> dict[str, Any]:

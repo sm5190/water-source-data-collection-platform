@@ -41,7 +41,7 @@ def test_metadata_filter_runs_before_similarity(repo, embedder):
                  status=ProcedureStatus.DEPRECATED, embedder=embedder)
     seen_ids = []
     original = repo.similarities
-    repo.similarities = lambda ids, vec: seen_ids.extend(ids) or original(ids, vec)
+    repo.similarities = lambda ids, *rest: seen_ids.extend(ids) or original(ids, *rest)
     result = memory(repo, embedder).retrieve(request())
     assert seen_ids == [wanted]  # similarity computed only for metadata survivors
     assert [m.procedure_version_id for m in result.matches] == [wanted]

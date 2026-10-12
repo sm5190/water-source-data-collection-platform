@@ -26,17 +26,24 @@ Optional:
 5. Computer Use for interactive portals
 
 ## LLM routing
-OpenAI:
-- planning
-- structured extraction
-- conflict resolution
-- validation
+All model calls go through one router (`llm/router.py`); `LLM_PROVIDER` selects exactly one
+provider, with no automatic fallback between them:
 
-VT LLM:
-- relevance filtering
-- classification
-- query generation
-- metadata cleanup
+- `vt` (default): Virginia Tech ARC LLM API — free, OpenAI-compatible Chat Completions,
+  `gpt-oss-120b`, embeddings `Qwen3-Embedding-4B`; reachable on the VT Campus VPN only.
+- `openai`: paid OpenAI API (Responses API with native schema enforcement); activated by
+  configuration only (`LLM_PROVIDER=openai` + `OPENAI_API_KEY`).
+
+Router-backed operations:
+- structured claim extraction (extraction gateway, LangGraph `extract` node)
+- procedure distillation (LLM distiller)
+- procedure embeddings (semantic retrieval / merge guard)
+
+Query generation, source ranking/classification, validation and human review are
+deterministic and call no model. The router owns rate limiting (27 requests/min per worker
+process, in-flight cap), response caching, retries for transient errors, and strict
+client-side schema validation with bounded repair; every accepted claim must cite a grounded
+quote from its evidence.
 
 ## Evidence model
 Source document -> artifact -> evidence span -> field claim -> resolution -> accepted data

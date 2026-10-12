@@ -162,7 +162,9 @@ class DistillationWorker:
             with tracer.start_as_current_span("procedure.dedupe") as s:
                 procedure_id = self.repo.get_or_create_procedure(pkey, recipe, None, None)
                 existing = self.repo.versions_for_procedure(procedure_id)
-                evaluation = self.merge.evaluate(recipe, embedding, existing)
+                evaluation = self.merge.evaluate(
+                    recipe, embedding, existing,
+                    self.embedder.model if self.embedder else None)
                 s.set_attribute("procedure.id", procedure_id)
                 s.set_attribute("procedure.merge_decision", evaluation.decision.value)
                 if evaluation.jaccard is not None:
@@ -216,7 +218,7 @@ class DistillationWorker:
         if self.embedder is None:
             return 0
         done = 0
-        for version_id, recipe_json in self.repo.pending_embeddings(limit):
+        for version_id, recipe_json in self.repo.pending_embeddings(limit, self.embedder.model):
             text = Recipe.model_validate(recipe_json).embedding_text()
             try:
                 vector = self.embedder.embed([text])[0]

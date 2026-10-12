@@ -65,14 +65,17 @@ class ProcedureMemorySettings(BaseModel):
     merge_min_jaccard: float = 0.6
     merge_min_cosine: float = 0.9
 
-    # Distillation execution. "llm" falls back to "deterministic" without an OpenAI key.
+    # Distillation execution. "llm" runs on the configured LLM_PROVIDER and falls back to
+    # "deterministic" when that provider has no credentials.
     distiller: Literal["llm", "deterministic"] = "llm"
-    distiller_model: str | None = None  # default: Settings.openai_model
+    # default: the active provider's model (VT_LLM_MODEL or OPENAI_MODEL). If set, it must be
+    # a model the active provider serves.
+    distiller_model: str | None = None
     max_recipe_chars: int = Field(default=4000, ge=500)
     distillation_max_attempts: int = Field(default=3, ge=1)
     distillation_lease_seconds: int = Field(default=300, ge=10)
 
-    # Embeddings
+    # Embeddings. Used with LLM_PROVIDER=openai; VT uses VT_LLM_EMBEDDING_MODEL.
     embedding_model: str = "text-embedding-3-small"
 
     constraints_by_field_type: dict[str, list[str]] = Field(

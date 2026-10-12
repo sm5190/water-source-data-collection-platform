@@ -1,8 +1,10 @@
 import json
 import pytest
 from procedure_helpers import (
-    FIELDS, FakeEmbedder, discovery, fetch, make_engine, make_worker, run_state, settings,
+    FIELDS, FakeEmbedder, app_settings, discovery, fetch, make_engine, make_worker, run_state,
+    settings,
 )
+from llm_helpers import openai_settings, vt_settings
 from pydantic import ValidationError
 from water_source_research.core.capabilities import Capability
 from water_source_research.procedures.distiller import DeterministicDistiller, DistillationError
@@ -194,15 +196,24 @@ def test_llm_outage_fails_job_for_retry(engine):
 # --- wiring ---------------------------------------------------------------------------
 
 def fake_settings(**pm):
-    return type("S", (), {"procedure_memory": settings(**pm), "openai_api_key": "",
-                          "openai_model": "gpt-test"})()
+    return app_settings(**pm)
 
 def test_build_distiller_selection():
     assert isinstance(build_distiller(fake_settings(), FIELDS, FakeLLM()), LLMDistiller)
-    # No key and no injected client: fall back rather than fail.
+    # Selected provider (VT) unconfigured and no injected client: fall back rather than fail.
     assert isinstance(build_distiller(fake_settings(), FIELDS), DeterministicDistiller)
     assert isinstance(build_distiller(fake_settings(distiller="deterministic"), FIELDS,
                                       FakeLLM()), DeterministicDistiller)
+
+@pytest.mark.parametrize("make, provider, model", [
+    (vt_settings, "vt", "gpt-oss-120b"), (openai_settings, "openai", "gpt-test")])
+def test_build_distiller_routes_through_the_configured_provider(make, provider, model):
+    distiller = build_distiller(make().model_copy(update={"procedure_memory": settings()}),
+                                FIELDS)
+    assert isinstance(distiller, LLMDistiller)
+    assert (distiller.llm.provider, distiller.llm.task, distiller.llm.model) == (
+        provider, "distill", model)
+    assert distiller.version == f"llm-1:{model}"
 
 def test_services_enqueue_with_the_workers_distiller_version(engine):
     services = build_procedure_services(fake_settings(), engine, embedder=FakeEmbedder(),
