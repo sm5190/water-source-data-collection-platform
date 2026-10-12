@@ -40,7 +40,9 @@ def test_iso_date_parts():
     ("https://www.ofwat.gov.uk/", "Ofwat regulator", "searxng", "REGULATORY"),
     ("https://www.dep.nyc.gov/", "Water supply", "searxng", "GOVERNMENT"),
     ("https://www.thameswater.co.uk/", "Home", "searxng", "UTILITY"),
-    ("https://example.com/", "Denver Water | About", "searxng", "UTILITY"),
+    ("https://www.denverwater.org/", "Denver Water | About", "searxng", "UTILITY"),
+    # A utility named in the title of someone else's site is not the utility.
+    ("https://example.com/", "Denver Water | About", "searxng", "OTHER"),
     ("https://www.sciencedirect.com/x", "Toronto Water", "searxng", "ACADEMIC"),
     ("https://en.wikipedia.org/wiki/x", "Toronto Water", "searxng", "OTHER"),
     ("https://news.example.com/a", "Toronto drinking water", "searxng", "OTHER"),
@@ -49,6 +51,77 @@ def test_iso_date_parts():
 ])
 def test_classify_source_type(url, title, provider, expected):
     assert classify_source_type(url, title, provider) == expected
+
+# Real SearXNG results (2026-10), Toronto/London/Denver/Sydney/Phoenix/Cape Town/Mumbai/Chicago.
+REAL_UTILITIES = [
+    ("Toronto", ("https://www.toronto.ca/city-government/accountability-operations-customer-"
+      "service/city-administration/staff-directory-divisions-and-customer-service/toronto-water/"),
+     "Toronto Water"),
+    ("London", "https://www.thameswater.co.uk/",
+     "Thames Water - The UK's largest water and wastewater company"),
+    ("London", ("https://www.thameswater.co.uk/about-us/performance/reservoir-levels-and-"
+      "rainfall-figures"), "Reservoir levels | About us - Thames Water"),
+    ("Denver", "https://www.denverwater.org/", "Denver Water: Home"),
+    ("Denver", "https://www.denverwater.org/tap/hows-water", "How's the water? - Denver Water"),
+    ("Denver", "https://www.cmwc.net/your-water/sources-storage-levels/",
+     "Water Sources and Storage Levels - Consolidated Mutual Water"),
+    ("Sydney", "https://www.sydneywater.com.au/education/drinking-water/water-sources.html",
+     "Water sources - Sydney Water"),
+    ("Sydney", ("https://www.waternsw.com.au/education/learning-about-water/the-water-supply-"
+      "system"), "The water supply system - WaterNSW"),
+    ("Chicago", "https://amwater.com/ilaw/", "Illinois American Water | We Keep Life Flowing"),
+    ("Chicago", "https://www.cityofchicagoheights.org/206/Water-Water-Billing-Department",
+     "Water Department | Chicago Heights, IL"),
+]
+NOT_UTILITIES = [
+    # retailers / service companies
+    ("Toronto", "https://www.wmcwater.com/water-treatment-toronto",
+     "Water Treatment Toronto | WMC Water"),
+    ("Toronto", ("https://www.homewater.com/blog/everything-you-need-to-know-about-toronto-"
+      "water-quality"), "Everything You Need to Know About Toronto Water Quality"),
+    ("Cape Town", ("https://tappwater.co/en-us/blogs/blog/can-i-drink-the-tap-water-in-cape-"
+      "town-what-is-the-best-water-filter"),
+     "Can I drink the tap water in Cape Town? What is the best water filter?"),
+    ("London", "https://www.bluewatergroup.com/en-us/blog/can-you-drink-tap-water-in-london",
+     "Can You Drink Tap Water in London? (2025) - Bluewater"),
+    ("Chicago", "https://www.chicagowaterquality.org/faq",
+     "Know your Water - DWM - Water Test Kit"),
+    ("Chicago", "https://www.johnsonwater.com/4-things-to-know-about-chicagoland-water/",
+     "4 Things to Know About Chicagoland Water"),
+    # news, blogs, NGOs and info sites
+    ("London", "https://www.cnn.com/2023/06/28/business/thames-water-london",
+     "Thames Water: Britain's biggest water supplier is in financial trouble"),
+    ("London", ("https://www.camelliawater.org/post/london-s-tap-water-where-does-it-come-"
+      "from-where-does-i"), "London's tap water: where does it come from, where does it go, and ..."),
+    ("Denver", "https://cleanwater.org/2012/12/13/dont-frack-denvers-water",
+     "Don't Frack Denver's Water | Clean Water Action"),
+    ("Cape Town", "https://www.hiddenhydrology.org/cape-towns-disappearing-water/",
+     "Cape Town's Disappearing Water - Hidden Hydrology"),
+    ("Phoenix", "https://www.arizonawaterfacts.com/news/phoenix-water-smart",
+     "Phoenix Water: Smart | Arizona Water Facts"),
+    ("Chicago", "https://www.tapwaterdata.com/zip/60654",
+     "Chicago, Illinois Tap Water Quality (ZIP 60654) - TapWaterData 2026"),
+    # third-party pages that name the utility
+    ("Sydney", "https://swan-forum.com/ecosystem/sydney-water/", "Sydney Water - SWAN Forum"),
+    ("Sydney", "https://www.anz.veolia.com/en-au/case-studies/water-management-sydney-water",
+     "Water Management | Sydney Water | Veolia ANZ"),
+    ("Sydney", "https://unglobalcompact.org.au/our-members/sydneywater/",
+     "Sydney Water - UN Global Compact Network Australia"),
+    ("Phoenix", "https://www.gpec.org/water/", ("Arizona Water | GPEC - Greater Phoenix Economic"
+      " Council")),
+]
+
+@pytest.mark.parametrize(("city", "url", "title"), REAL_UTILITIES)
+def test_real_utilities_are_utilities(city, url, title):
+    assert classify_source_type(url, title, "searxng", city=city) == "UTILITY"
+
+@pytest.mark.parametrize(("city", "url", "title"), NOT_UTILITIES)
+def test_retailers_news_and_third_party_pages_are_not_utilities(city, url, title):
+    assert classify_source_type(url, title, "searxng", city=city) != "UTILITY"
+
+def test_non_english_utility_hosts_still_count():
+    assert classify_source_type("https://site.sabesp.com.br/", "Início", "searxng") == "UTILITY"
+    assert classify_source_type("https://www.aguasandinas.cl/", "Inicio", "searxng") == "UTILITY"
 
 def test_city_domain_is_municipal_only_with_city():
     assert classify_source_type("https://www.toronto.ca/x", "Water", "searxng") == "OTHER"

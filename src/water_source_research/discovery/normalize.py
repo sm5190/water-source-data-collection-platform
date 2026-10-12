@@ -82,20 +82,37 @@ _MUNICIPAL_HOST = re.compile(r"(^|\.)(city|cityof|ville|stadt|comune|ayuntamient
                              r"prefeitura|council|county)[.-]")
 _REGULATORY = re.compile(r"\b(regulat\w*|ofwat|commission|authority|board of water|"
                          r"water services regulation|epa)\b", re.IGNORECASE)
-_UTILITY = re.compile(r"(water|wasser|agua|aguas|eau|acqua|acque|vatten|vesi|woda|"
+# Utility words anywhere in a host. English "water" is handled by _WATER_LABEL instead: as a
+# bare substring it also matches retailers and blogs (homewater, tappwater, wmcwater).
+_UTILITY = re.compile(r"(wasser|agua|aguas|eau|acqua|acque|vatten|vesi|woda|"
                       r"utility|utilities|sabesp|sanepar|sewer|waterworks|wasserwerk)",
                       re.IGNORECASE)
+# A host label that names a water utility by itself: thameswater, sydneywater, waternsw.
+_WATER_LABEL = re.compile(r"^([a-z]{2,}water|water[a-z]{2,4})$")
+_GENERIC_LABELS = frozenset({"com", "co", "org", "net", "gov", "edu", "ac", "info", "biz"})
+# Retail/service pages never count as the utility, whatever their name.
+_COMMERCIAL = re.compile(
+    r"\b(water (filters?|filtration systems?|softeners?|purifiers?|delivery|test kits?)|"
+    r"test kits?|reverse osmosis|best water filters?|buy|shop|free (quote|estimate)|near me|"
+    r"plumb(er|ers|ing))\b", re.IGNORECASE)
+# Blog posts, news articles and listicles: a "...water" host alone doesn't make them the utility.
+_EDITORIAL_PATH = re.compile(r"/(blogs?|posts?|news|articles?|stories)(/|$)|/(19|20)\d{2}/\d{1,2}/",
+                             re.IGNORECASE)
+_EDITORIAL_TITLE = re.compile(r"^\d+\s|\?|\b(everything you need to know|things to know|"
+                              r"guide to|can (i|you) drink|is it safe)\b", re.IGNORECASE)
+_TITLE_SEGMENTS = re.compile(r"\s*[|–—]\s*|\s+-\s+")
 _ACADEMIC_HOST = re.compile(
     r"(^|\.)(doi\.org|sciencedirect\.com|springer\.com|wiley\.com|tandfonline\.com|"
     r"mdpi\.com|nature\.com|iwaponline\.com|researchgate\.net|semanticscholar\.org|"
     r"openalex\.org|arxiv\.org|jstor\.org|sagepub\.com|frontiersin\.org|plos\.org|"
     r"ssrn\.com|ncbi\.nlm\.nih\.gov|scholar\.google\.com|elsevier\.com|acs\.org|ieee\.org|"
     r"copernicus\.org|cambridge\.org|oup\.com)$")
-# Organisation-style utility names in a title: "Toronto Water", "SA Water | Home",
-# "Denver Water Board" (proper-noun case), or generic utility phrases (any case).
+# An organisation-style utility name forming a whole title segment: "Toronto Water",
+# "SA Water | Home", "Denver Water Board". It only counts on the organisation's own host
+# (see _host_names_org): "Sydney Water - SWAN Forum" is a forum page about the utility.
 _UTILITY_ORG = re.compile(
-    r"(^|[|\-:–]\s*)(?:[A-Z][\w.'&]*\s+){1,3}Water(\s+(Utility|Authority|Board|Department|"
-    r"Services|Company|Works|District|Corporation|Commission))?\s*($|[|\-:–])")
+    r"^(?:[A-Z][\w.'&]*\s+){1,3}Water(\s+(Utility|Authority|Board|Department|"
+    r"Services|Company|Works|District|Corporation|Commission))?$")
 _UTILITY_PHRASE = re.compile(
     r"\b(water|wastewater) (utility|authority|board|department|district|corporation)\b"
     r"|\bwaterworks\b|\bwasserwerke?\b", re.IGNORECASE)
@@ -127,9 +144,7 @@ def classify_source_type(url: str | None, title: str | None = None, provider: st
         return "ACADEMIC"
     if host and _ACADEMIC_TLD.search(host):
         return "ACADEMIC"
-    if host and _UTILITY.search(host.removeprefix("www.")):
-        return "UTILITY"
-    if _UTILITY_ORG.search(title) or _UTILITY_PHRASE.search(title):
+    if _is_utility(url or "", host, title, city):
         return "UTILITY"
     if host and city and _is_city_domain(host, city):
         return "GOVERNMENT"
@@ -138,6 +153,44 @@ def classify_source_type(url: str | None, title: str | None = None, provider: st
     if _TECHNICAL.search(title) or (url or "").lower().split("?")[0].endswith(".pdf"):
         return "TECHNICAL"
     return "OTHER"
+
+def _is_utility(url: str, host: str, title: str, city: str | None) -> bool:
+    path = urlsplit(url).path if url else ""
+    page = f"{title} {path.replace('-', ' ').replace('_', ' ')}"
+    if _COMMERCIAL.search(page):
+        return False
+    if city and re.search(rf"\bwater (treatment|filtration|softening)( services?)? (in )?"
+                          rf"{re.escape(city)}\b", page, re.IGNORECASE):
+        return False  # local-service landing page ("Water Treatment Toronto | WMC Water")
+    labels = [label.replace("-", "") for label in host.removeprefix("www.").split(".")[:-1]
+              if label not in _GENERIC_LABELS]
+    # A named utility in the title, corroborated by its own host.
+    for segment in _TITLE_SEGMENTS.split(title.strip()):
+        if _UTILITY_ORG.match(segment) and _host_names_org(segment, labels):
+            return True
+    if _EDITORIAL_PATH.search(path) or _EDITORIAL_TITLE.search(title):
+        return False
+    return (any(_WATER_LABEL.match(label) for label in labels)
+            or bool(host and _UTILITY.search(host.removeprefix("www.")))
+            or bool(_UTILITY_PHRASE.search(title)))
+
+def _host_names_org(org: str, labels: list[str]) -> bool:
+    """Does a host label spell the organisation: in full (sydneywater ~ "Sydney Water"), by
+    initials (cmwc ~ "Consolidated Mutual Water Company"), or abbreviated before "water"
+    (amwater ~ "Illinois American Water")?"""
+    words = _NON_ALNUM.sub(" ", fold(org)).split()
+    compact = "".join(words)
+    initials = "".join(w[0] for w in words)
+    for label in labels:
+        if len(label) >= 4 and (label in compact or compact in label):
+            return True
+        if len(initials) >= 3 and label.startswith(initials):
+            return True
+        prefix = label.removesuffix("water")
+        if prefix != label and len(prefix) >= 2 and any(w.startswith(prefix)
+                                                         for w in words[:-1]):
+            return True
+    return False
 
 def _is_city_domain(host: str, city: str) -> bool:
     compact = _NON_ALNUM.sub("", fold(city))
