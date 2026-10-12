@@ -52,13 +52,17 @@ def available_capabilities(settings: "Settings") -> frozenset[Capability]:
     A stand-in for real provider health / circuit-breaker state until a tool gateway exists.
     """
     available = {
-        Capability.SOURCE_DISCOVERY,
-        Capability.SCHOLARLY_DISCOVERY,
         Capability.STATIC_DOCUMENT_FETCH,
         Capability.RESOLVE_DEPENDENCY,
         Capability.CLAIM_EXTRACTION,
         Capability.CLAIM_VALIDATION,
     }
+    discovery = settings.discovery
+    if discovery.enabled:
+        if "searxng" in discovery.providers and settings.searxng_url:
+            available.add(Capability.SOURCE_DISCOVERY)
+        if {"openalex", "semantic_scholar", "crossref"} & set(discovery.providers):
+            available.add(Capability.SCHOLARLY_DISCOVERY)
     if importlib.util.find_spec("docling") is not None:
         available.add(Capability.DOCUMENT_PARSING)
     if settings.firecrawl_api_key or settings.apify_api_token:

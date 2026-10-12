@@ -1,16 +1,10 @@
 """Trajectory -> candidate Recipe.
 
-The deterministic V1 distiller only restates what the trajectory shows the system did
-successfully, so it cannot invent history. An LLM distiller may implement the same
-``Distiller`` protocol later; its output must pass the same schema, grounding and safety
-checks before it can be persisted.
-
-flagging------need LLM distiller layer!
-
-SearXNG
-OpenAlex
-Crossref
-Semantic Scholar
+The deterministic distiller only restates what the trajectory shows the system did
+successfully, so it cannot invent history. ``LLMDistiller`` (``llm_distiller.py``) writes the
+recipe with a model instead, choosing only from the observed facts computed here; every
+distiller's output must pass the same schema, grounding and safety checks before it can be
+persisted.
 """
 
 import re
@@ -20,7 +14,9 @@ from typing import Protocol
 from water_source_research.core.capabilities import DISCOVERY_CAPABILITIES, Capability
 from water_source_research.core.versions import DISTILLER_VERSION
 from water_source_research.schemas.events import EventKind, EventResult
-from water_source_research.schemas.procedures import Recipe, RecipeStep, Trajectory
+from water_source_research.schemas.procedures import (
+    Recipe, RecipeStep, Trajectory, TrajectoryStep,
+)
 from water_source_research.schemas.research import FieldDefinition
 from .config import GENERIC_CONSTRAINTS, ProcedureMemorySettings
 from .trajectory import template_query
@@ -104,6 +100,51 @@ def dependency_resolved_first(t: Trajectory) -> bool:
                 and s.field_key == "utility_name" and s.attrs.get("to_status") == "RESOLVED"]
     return first_search is not None and any(seq < first_search for seq in resolved)
 
+def research_tool_steps(t: Trajectory) -> list[TrajectoryStep]:
+    return [s for s in t.steps if s.kind == EventKind.TOOL_CALL and s.capability
+            and s.field_key in t.field_keys]
+
+def successful_capabilities(t: Trajectory) -> list[Capability]:
+    """Capabilities that succeeded, in order of first success."""
+    out: list[Capability] = []
+    for s in research_tool_steps(t):
+        if s.result == EventResult.SUCCESS and Capability(s.capability) not in out:
+            out.append(Capability(s.capability))
+    return out
+
+def observed_fallbacks(t: Trajectory) -> list[Capability]:
+    """Capabilities that succeeded after a different capability failed for the same field."""
+    tool = research_tool_steps(t)
+    out: list[Capability] = []
+    for s in tool:
+        if s.result != EventResult.SUCCESS:
+            continue
+        failed_before = any(f.result == EventResult.FAILURE and f.seq < s.seq
+                            and f.capability != s.capability and f.field_key == s.field_key
+                            for f in tool)
+        cap = Capability(s.capability)
+        if failed_before and cap not in out:
+            out.append(cap)
+    return out
+
+def observed_providers(t: Trajectory) -> dict[str, list[str]]:
+    providers: dict[str, list[str]] = {}
+    for s in research_tool_steps(t):
+        if s.result == EventResult.SUCCESS and s.provider:
+            names = providers.setdefault(s.capability, [])
+            if s.provider not in names:
+                names.append(s.provider)
+    return {k: sorted(v) for k, v in providers.items()}
+
+def accepted_source_types(t: Trajectory) -> list[str]:
+    """Source types behind accepted evidence, most frequent first."""
+    counts = Counter(e["source_type"] for evs in t.accepted_evidence.values()
+                     for e in evs if e.get("source_type"))
+    return [st for st, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+def default_constraints(t: Trajectory, settings: ProcedureMemorySettings) -> list[str]:
+    return (settings.constraints_by_field_type.get(t.field_type, []) + GENERIC_CONSTRAINTS)[:6]
+
 class DeterministicDistiller:
     version = DISTILLER_VERSION
 
@@ -113,22 +154,11 @@ class DeterministicDistiller:
         self.s = settings
 
     def distill(self, t: Trajectory) -> Recipe:
-        tool = [s for s in t.steps if s.kind == EventKind.TOOL_CALL and s.capability
-                and s.field_key in t.field_keys]
-        success = [s for s in tool if s.result == EventResult.SUCCESS]
-        if not success:
+        capabilities = successful_capabilities(t)
+        if not capabilities:
             raise DistillationError("trajectory has no successful research steps")
 
-        capabilities: list[Capability] = []
-        for s in success:
-            cap = Capability(s.capability)
-            if cap not in capabilities:
-                capabilities.append(cap)
-
-        source_counts = Counter(e["source_type"] for evs in t.accepted_evidence.values()
-                                for e in evs if e.get("source_type"))
-        source_types = [st for st, _ in sorted(source_counts.items(),
-                                               key=lambda kv: (-kv[1], kv[0]))][:6]
+        source_types = accepted_source_types(t)[:6]
         queries = observed_query_templates(t, query_vocab(self.fields, t.field_type))[:8]
 
         steps: list[RecipeStep] = []
@@ -143,33 +173,15 @@ class DeterministicDistiller:
                 source_preferences=source_types[:4] if cap in DISCOVERY_CAPABILITIES else [],
             ))
 
-        fallbacks: list[Capability] = []
-        for s in success:
-            failed_before = any(f.result == EventResult.FAILURE and f.seq < s.seq
-                                and f.capability != s.capability and f.field_key == s.field_key
-                                for f in tool)
-            cap = Capability(s.capability)
-            if failed_before and cap not in fallbacks:
-                fallbacks.append(cap)
-
-        providers: dict[str, list[str]] = {}
-        for s in success:
-            if s.provider:
-                providers.setdefault(s.capability, [])
-                if s.provider not in providers[s.capability]:
-                    providers[s.capability].append(s.provider)
-
         label = t.field_type.replace("_", " ")
         plan = " → ".join(c.value for c in capabilities)
         prefer = f", preferring {', '.join(source_types[:3])}" if source_types else ""
-        constraints = (self.s.constraints_by_field_type.get(t.field_type, [])
-                       + GENERIC_CONSTRAINTS)[:6]
         return Recipe(
             task_type=t.task_type, field_type=t.field_type, water_type=t.water_type,
             title=f"{label.capitalize()} research via {plan}"[:160],
             summary=(f"For {label} research, use {plan}{prefer}; "
                      f"search with field-specific terminology.")[:600],
             recommended_steps=steps, query_patterns=queries,
-            preferred_source_types=source_types, fallback_capabilities=fallbacks[:5],
-            constraints=constraints, provider_metadata={k: sorted(v) for k, v in providers.items()},
+            preferred_source_types=source_types, fallback_capabilities=observed_fallbacks(t)[:5],
+            constraints=default_constraints(t, self.s), provider_metadata=observed_providers(t),
         )

@@ -12,6 +12,7 @@ import signal
 from water_source_research.agents.graph import build_graph
 from water_source_research.core.config import get_settings
 from water_source_research.db.session import get_engine
+from water_source_research.discovery.service import build_discovery_service
 from water_source_research.procedures.services import build_procedure_services
 from water_source_research.research_queue.checkpointing import open_checkpointer, run_async
 from water_source_research.research_queue.queue import ResearchQueue
@@ -39,6 +40,7 @@ async def main(once: bool, concurrency: int | None) -> None:
             usage_tracker=procedures.usage if procedures else None,
             run_recorder=procedures.recorder if procedures else None,
             checkpointer=checkpointer,
+            discovery=build_discovery_service(settings),
         )
         worker = ResearchWorker(ResearchQueue(engine, queue_settings), graph, queue_settings,
                                 on_success=distill)

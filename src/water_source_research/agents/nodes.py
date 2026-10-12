@@ -1,7 +1,12 @@
 import asyncio
+import logging
 from collections.abc import Mapping
 from uuid import uuid4
 from water_source_research.core.capabilities import Capability
+from water_source_research.discovery.base import SearchResult
+from water_source_research.discovery.queries import build_queries, previous_queries
+from water_source_research.discovery.ranking import merge_and_rank
+from water_source_research.discovery.service import DiscoveryService
 from water_source_research.llm.gateway import LLMGateway
 from water_source_research.observability.otel import get_tracer
 from water_source_research.procedures.retrieval import ProcedureMemory
@@ -22,6 +27,8 @@ from .procedure_guidance import (
     apply_selected_procedures, finalize_post_processing, plan_with_procedures,
 )
 from .state import GraphState
+
+log = logging.getLogger(__name__)
 
 def make_plan_node(
     fields: Mapping[str, FieldDefinition],
@@ -50,17 +57,79 @@ def make_plan_node(
             return {**state, **guidance}
     return plan_node
 
-def make_discover_node(usage_tracker: UsageTracker | None = None):
+def make_discover_node(
+    usage_tracker: UsageTracker | None = None,
+    discovery: DiscoveryService | None = None,
+    fields: Mapping[str, FieldDefinition] | None = None,
+):
     async def discover_node(state: GraphState) -> GraphState:
-        # TODO: execute discovery capabilities for state["fields_needing_evidence"], using
-        # state["planned_queries"] as advisory input.
-        return {
-            **state,
-            **apply_selected_procedures(state, usage_tracker),
-            "candidate_urls": state.get("candidate_urls", []),
-            "discovery_rounds": state.get("discovery_rounds", 0) + 1,
-        }
+        state = {**state, **apply_selected_procedures(state, usage_tracker)}
+        rounds = state.get("discovery_rounds", 0) + 1
+        if discovery is None:  # no providers configured: nothing to discover
+            return {**state, "candidate_urls": state.get("candidate_urls", []),
+                    "discovery_rounds": rounds}
+        with get_tracer().start_as_current_span("graph.discover") as span:
+            span.set_attribute("graph.run_id", state.get("run_id", ""))
+            span.set_attribute("graph.discovery_round", rounds)
+            updates = await _discover(discovery, fields or {}, state)
+            span.set_attribute("graph.discovery_candidates",
+                               len(updates.get("discovery_candidates", [])))
+        return {**state, **updates, "discovery_rounds": rounds}
     return discover_node
+
+async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefinition],
+                    state: GraphState) -> GraphState:
+    """One discovery round for the fields that still need evidence. Never raises."""
+    if "fields_needing_evidence" in state:
+        targets = list(state["fields_needing_evidence"])
+    else:
+        targets = list(state.get("unresolved_fields", []))
+    research = CityResearchState.model_validate(state["research_state"])
+    utility = research.fields.get("utility_name")
+    events = list(state.get("events", []))
+    settings = discovery.settings
+    queries = build_queries(
+        city=research.city_name, country=research.country,
+        utility=str(utility.selected_claim.value) if utility and utility.selected_claim
+        and utility.status is FieldResolutionStatus.RESOLVED else None,
+        field_keys=targets, fields=fields, planned_queries=state.get("planned_queries"),
+        already_run=previous_queries(events), max_per_kind=settings.max_queries_per_round)
+    status = dict(state.get("discovery_provider_status", {}))
+    if not queries:
+        return {"events": events, "discovery_provider_status": status,
+                "candidate_urls": state.get("candidate_urls", [])}
+    try:
+        outcome = await discovery.discover(queries, city=research.city_name,
+                                           country=research.country)
+    except Exception:  # discovery must never fail the run
+        log.warning("discovery round failed", exc_info=True)
+        events = append_event(events, kind=EventKind.NODE, node="discover",
+                              strategy="discovery:error", result=EventResult.FAILURE)
+        status["discovery"] = "error"
+        return {"events": events, "discovery_provider_status": status,
+                "candidate_urls": state.get("candidate_urls", [])}
+
+    for call in outcome.calls:
+        attrs: dict[str, object] = {"sources_found": call.sources_found,
+                                    "sources_retained": call.sources_retained,
+                                    "duration_ms": call.duration_ms}
+        if call.query:
+            attrs["query"] = call.query
+        events = append_event(events, kind=EventKind.TOOL_CALL, node="discover",
+                              field_key=call.field_key, capability=call.capability,
+                              provider=call.provider, strategy=call.strategy,
+                              result=EventResult(call.result), attrs=attrs)
+    previous = [SearchResult.from_dict(c) for c in state.get("discovery_candidates", [])]
+    candidates = merge_and_rank(previous + outcome.candidates, research.city_name,
+                                max_per_host=settings.max_results_per_host,
+                                limit=settings.max_candidates_total)
+    status.update(outcome.provider_status)
+    return {
+        "events": events,
+        "discovery_candidates": [c.to_dict() for c in candidates],
+        "candidate_urls": [c.url for c in candidates],
+        "discovery_provider_status": status,
+    }
 
 async def acquire_node(state: GraphState) -> GraphState:
     return {**state, "evidence_chunks": state.get("evidence_chunks", [])}

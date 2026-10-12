@@ -4,6 +4,7 @@ Loaded as ``Settings.procedure_memory`` (env: ``PROCEDURE_MEMORY__<FIELD>``) and
 settings are constructed, so a bad configuration fails at startup.
 """
 
+from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 from water_source_research.schemas.procedures import ProcedureStatus
 
@@ -64,7 +65,9 @@ class ProcedureMemorySettings(BaseModel):
     merge_min_jaccard: float = 0.6
     merge_min_cosine: float = 0.9
 
-    # Distillation execution
+    # Distillation execution. "llm" falls back to "deterministic" without an OpenAI key.
+    distiller: Literal["llm", "deterministic"] = "llm"
+    distiller_model: str | None = None  # default: Settings.openai_model
     max_recipe_chars: int = Field(default=4000, ge=500)
     distillation_max_attempts: int = Field(default=3, ge=1)
     distillation_lease_seconds: int = Field(default=300, ge=10)

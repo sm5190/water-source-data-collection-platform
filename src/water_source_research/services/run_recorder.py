@@ -23,9 +23,12 @@ from water_source_research.services.field_state import load_field_definitions
 
 class RunRecorder:
     def __init__(self, engine: Engine,
-                 field_definitions: Mapping[str, FieldDefinition] | None = None) -> None:
+                 field_definitions: Mapping[str, FieldDefinition] | None = None,
+                 distiller_version: str = DISTILLER_VERSION) -> None:
         self.engine = engine
         self.fields = dict(field_definitions or load_field_definitions())
+        # Must match the worker's distiller: it is part of each job's distillation key.
+        self.distiller_version = distiller_version
 
     def persist(self, state: Mapping[str, Any]) -> int:
         """Upsert the run row and insert any events not yet stored. Returns events inserted."""
@@ -83,13 +86,13 @@ class RunRecorder:
         for field_type in field_types:
             task_type = task_type_for(field_type)
             tid = trajectory_id(run_id, task_type, field_type, WORKFLOW_VERSION)
-            key = distillation_key(tid, DISTILLER_VERSION)
+            key = distillation_key(tid, self.distiller_version)
             try:
                 with Session(self.engine) as session, session.begin():
                     session.add(DistillationJobRecord(
                         distillation_key=key, trajectory_id=tid, run_id=run_id,
                         task_type=task_type, field_type=field_type,
-                        workflow_version=WORKFLOW_VERSION, distiller_version=DISTILLER_VERSION,
+                        workflow_version=WORKFLOW_VERSION, distiller_version=self.distiller_version,
                     ))
             except IntegrityError:
                 pass  # already enqueued (retry or duplicate finalize)

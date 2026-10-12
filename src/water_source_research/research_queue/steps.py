@@ -10,6 +10,9 @@ from typing import Any
 # Expected order of a run without discovery loops; used for progress display.
 NODE_ORDER = ("plan", "discover", "acquire", "extract", "validate", "human_review", "finalize")
 MAX_EVENTS_PER_STEP = 100
+MAX_TOP_CANDIDATES = 20
+TOP_CANDIDATE_KEYS = ("title", "url", "providers", "source_type", "doi", "doi_verified",
+                      "published_date", "score")
 
 def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -> dict[str, Any]:
     new_events = state.get("events", [])[len(previous.get("events", [])):]
@@ -27,9 +30,15 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
             fields_to_research=len(state.get("unresolved_fields", [])),
         )
     elif node == "discover":
+        candidates = state.get("discovery_candidates", [])
         summary.update(discovery_round=state.get("discovery_rounds", 0),
                        planned_queries=state.get("planned_queries", {}),
-                       candidate_urls=len(state.get("candidate_urls", [])))
+                       candidate_urls=len(state.get("candidate_urls", [])),
+                       provider_status=state.get("discovery_provider_status", {}),
+                       new_candidates=max(0, len(candidates)
+                                          - len(previous.get("discovery_candidates", []))),
+                       top_candidates=[{k: c.get(k) for k in TOP_CANDIDATE_KEYS}
+                                       for c in candidates[:MAX_TOP_CANDIDATES]])
     elif node == "acquire":
         chunks = state.get("evidence_chunks", [])
         summary.update(evidence_chunks=len(chunks),

@@ -8,6 +8,8 @@ WORKFLOW_VERSION = 2
 
 # Procedural memory.
 DISTILLER_VERSION = "deterministic-1"
+# Prompt/response-schema version of LLMDistiller; its full version also names the model.
+LLM_DISTILLER_VERSION = "llm-1"
 RECIPE_SCHEMA_VERSION = 1
 PROCEDURE_RETRIEVAL_POLICY_VERSION = "1"
 EMBEDDING_VERSION = "1"

@@ -1,0 +1,17 @@
+# SearXNG settings for local discovery (mounted by docker-compose at /etc/searxng/settings.yml).
+# Only overrides are listed; everything else comes from SearXNG's defaults.
+use_default_settings: true
+
+server:
+  # Overridden by the SEARXNG_SECRET environment variable (see docker-compose.yml / .env).
+  secret_key: "replace-me-via-SEARXNG_SECRET"
+  # The bot limiter needs Valkey/Redis and blocks API clients; this instance is local-only.
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  # The JSON format is disabled by default; the discovery adapter needs it (403 otherwise).
+  formats:
+    - html
+    - json

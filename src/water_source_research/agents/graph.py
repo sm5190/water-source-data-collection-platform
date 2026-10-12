@@ -2,6 +2,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from water_source_research.core.capabilities import Capability, available_capabilities
 from water_source_research.core.config import get_settings
+from water_source_research.discovery.service import DiscoveryService
 from water_source_research.llm.gateway import LLMGateway, UnconfiguredGateway
 from water_source_research.procedures.retrieval import ProcedureMemory
 from water_source_research.procedures.usage import UsageTracker
@@ -39,9 +40,11 @@ def build_graph(
     run_recorder: RunRecorder | None = None,
     capability_availability: frozenset[Capability] | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
+    discovery: DiscoveryService | None = None,
 ):
     """Procedure memory, usage tracking and run recording are optional soft dependencies:
-    without them the graph runs its default strategy and skips post-processing."""
+    without them the graph runs its default strategy and skips post-processing.
+    Without ``discovery`` (see ``build_discovery_service``) the discover step finds nothing."""
     settings = get_settings()
     if max_discovery_rounds is None:
         max_discovery_rounds = settings.max_discovery_rounds_per_city
@@ -54,7 +57,7 @@ def build_graph(
     g = StateGraph(GraphState)
     g.add_node("plan", make_plan_node(fields, procedure_memory, usage_tracker,
                                       capability_availability))
-    g.add_node("discover", make_discover_node(usage_tracker))
+    g.add_node("discover", make_discover_node(usage_tracker, discovery, fields))
     g.add_node("acquire", acquire_node)
     g.add_node("extract", make_extract_node(
         context_service or ContextService(), gateway or UnconfiguredGateway(),

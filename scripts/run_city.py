@@ -2,11 +2,12 @@ import asyncio
 import sys
 from uuid import uuid4
 from water_source_research.agents.graph import build_graph
+from water_source_research.discovery.service import build_discovery_service
 from water_source_research.services.field_state import initialize_city_state, unresolved_fields
 
 async def main(city_name: str) -> None:
     state = initialize_city_state(city_name)
-    result = await build_graph().ainvoke({
+    result = await build_graph(discovery=build_discovery_service()).ainvoke({
         "run_id": str(uuid4()),
         "city_name": city_name,
         "research_state": state.model_dump(mode="json"),

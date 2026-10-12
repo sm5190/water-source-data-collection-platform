@@ -6,7 +6,10 @@ class GraphState(TypedDict, total=False):
     country: str | None
     research_state: dict  # serialized CityResearchState; the run's field-level state
     unresolved_fields: list[str]
-    candidate_urls: list[str]
+    candidate_urls: list[str]  # ranked URLs of discovery_candidates
+    # Discovery: serialized discovery.base.SearchResult, deduped and ranked across rounds.
+    discovery_candidates: list[dict]
+    discovery_provider_status: dict[str, str]  # provider -> ok | no_results | <error kind>
     evidence_chunks: list[dict]  # serialized EvidenceChunk
     seen_evidence: list[list[str]]  # [chunk_id, field_key] pairs already sent to the LLM
     fields_needing_evidence: list[str]  # set by extract; non-empty routes back to discover

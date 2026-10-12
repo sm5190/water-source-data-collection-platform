@@ -24,8 +24,13 @@ services:
 
   searxng:
     image: searxng/searxng:latest
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-local-only}
     ports:
       - "8080:8080"
+    volumes:
+      - ./config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
     profiles: ["discovery"]
 
 volumes:

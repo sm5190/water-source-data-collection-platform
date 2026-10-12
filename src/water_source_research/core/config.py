@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from water_source_research.discovery.config import DiscoverySettings
 from water_source_research.procedures.config import ProcedureMemorySettings
 from water_source_research.research_queue.config import ResearchQueueSettings
 
@@ -14,6 +15,9 @@ class Settings(BaseSettings):
     vt_llm_api_key: str = ""
     vt_llm_model: str = ""
     searxng_url: str = "http://localhost:8080"
+    openalex_api_key: str = ""
+    semantic_scholar_api_key: str = ""
+    crossref_mailto: str = ""  # contact email for Crossref's "polite" pool (not a key)
     firecrawl_api_key: str = ""
     apify_api_token: str = ""
     otel_service_name: str = "water-source-research"
@@ -22,6 +26,7 @@ class Settings(BaseSettings):
     max_openai_output_tokens_per_city: int = 40_000
     max_firecrawl_credits_per_city: int = 100
     max_discovery_rounds_per_city: int = 3
+    discovery: DiscoverySettings = Field(default_factory=DiscoverySettings)
     procedure_memory: ProcedureMemorySettings = Field(default_factory=ProcedureMemorySettings)
     research_queue: ResearchQueueSettings = Field(default_factory=ResearchQueueSettings)
 
