@@ -24,11 +24,14 @@ from water_source_research.services.field_state import load_field_definitions
 class RunRecorder:
     def __init__(self, engine: Engine,
                  field_definitions: Mapping[str, FieldDefinition] | None = None,
-                 distiller_version: str = DISTILLER_VERSION) -> None:
+                 distiller_version: str = DISTILLER_VERSION,
+                 enqueue_distillation_jobs: bool = True) -> None:
         self.engine = engine
         self.fields = dict(field_definitions or load_field_definitions())
         # Must match the worker's distiller: it is part of each job's distillation key.
         self.distiller_version = distiller_version
+        # False: record runs/events as an audit trail only (procedure memory disabled).
+        self.enqueue_distillation_jobs = enqueue_distillation_jobs
 
     def persist(self, state: Mapping[str, Any]) -> int:
         """Upsert the run row and insert any events not yet stored. Returns events inserted."""
@@ -74,7 +77,7 @@ class RunRecorder:
 
     def enqueue_distillation(self, state: Mapping[str, Any]) -> list[str]:
         """One job per field type with at least one accepted field. Idempotent per key."""
-        if not state.get("finalized"):
+        if not state.get("finalized") or not self.enqueue_distillation_jobs:
             return []
         run_id = state["run_id"]
         fields = (state.get("research_state") or {}).get("fields", {})

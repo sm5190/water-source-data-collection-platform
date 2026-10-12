@@ -28,6 +28,9 @@ class FieldDefinition(BaseModel):
     type: str
     allowed: list[str] = Field(default_factory=list)
     derived: bool = False
+    # Several distinct values can be true at once (e.g. a city drawing on two rivers): each
+    # is extracted as its own candidate claim instead of being merged into one string.
+    multi_valued: bool = False
     depends_on: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
 

@@ -9,6 +9,14 @@ server:
   limiter: false
   image_proxy: false
 
+# Extra general web engines (off by default). The defaults (brave, duckduckgo, google cse)
+# rate-limit or CAPTCHA a busy research host; these keep discovery working when they do.
+engines:
+  - name: yahoo
+    disabled: false
+  - name: yep
+    disabled: false
+
 search:
   safe_search: 0
   # The JSON format is disabled by default; the discovery adapter needs it (403 otherwise).

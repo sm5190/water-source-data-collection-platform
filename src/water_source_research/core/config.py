@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from water_source_research.acquisition.config import AcquisitionSettings, ArtifactSettings
 from water_source_research.discovery.config import DiscoverySettings
 from water_source_research.llm.config import LLMSettings
 from water_source_research.procedures.config import ProcedureMemorySettings
@@ -33,6 +34,8 @@ class Settings(BaseSettings):
     max_firecrawl_credits_per_city: int = 100
     max_discovery_rounds_per_city: int = 3
     discovery: DiscoverySettings = Field(default_factory=DiscoverySettings)
+    acquisition: AcquisitionSettings = Field(default_factory=AcquisitionSettings)
+    artifacts: ArtifactSettings = Field(default_factory=ArtifactSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     procedure_memory: ProcedureMemorySettings = Field(default_factory=ProcedureMemorySettings)
     research_queue: ResearchQueueSettings = Field(default_factory=ResearchQueueSettings)

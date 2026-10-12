@@ -32,6 +32,7 @@ PROVIDER_CAPABILITIES: dict[str, Capability] = {
     "semantic_scholar": Capability.SCHOLARLY_DISCOVERY,
     "direct_http": Capability.STATIC_DOCUMENT_FETCH,
     "docling": Capability.DOCUMENT_PARSING,
+    "pdfium": Capability.DOCUMENT_PARSING,
     "firecrawl": Capability.DYNAMIC_DOCUMENT_ACQUISITION,
     "apify": Capability.DYNAMIC_DOCUMENT_ACQUISITION,
     "computer_use": Capability.INTERACTIVE_PORTAL_ACQUISITION,
@@ -63,7 +64,7 @@ def available_capabilities(settings: "Settings") -> frozenset[Capability]:
             available.add(Capability.SOURCE_DISCOVERY)
         if {"openalex", "semantic_scholar", "crossref"} & set(discovery.providers):
             available.add(Capability.SCHOLARLY_DISCOVERY)
-    if importlib.util.find_spec("docling") is not None:
+    if importlib.util.find_spec("pypdfium2") or importlib.util.find_spec("docling"):
         available.add(Capability.DOCUMENT_PARSING)
     if settings.firecrawl_api_key or settings.apify_api_token:
         available.add(Capability.DYNAMIC_DOCUMENT_ACQUISITION)

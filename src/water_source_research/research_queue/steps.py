@@ -41,8 +41,22 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
                                        for c in candidates[:MAX_TOP_CANDIDATES]])
     elif node == "acquire":
         chunks = state.get("evidence_chunks", [])
+        docs = state.get("acquired_documents", [])
+        new_docs = docs[len(previous.get("acquired_documents", [])):]
+        failures: dict[str, int] = {}
+        for d in new_docs:
+            if d.get("error_kind"):
+                failures[d["error_kind"]] = failures.get(d["error_kind"], 0) + 1
         summary.update(evidence_chunks=len(chunks),
-                       sources=sorted({c.get("url", "") for c in chunks})[:50])
+                       sources=sorted({c.get("url", "") for c in chunks})[:50],
+                       documents_attempted=len(new_docs),
+                       documents_ok=sum(d.get("status") == "OK" for d in new_docs),
+                       documents_failed=sum(d.get("status") == "FAILED" for d in new_docs),
+                       failure_kinds=failures,
+                       documents=[{k: d.get(k) for k in ("requested_url", "status",
+                                                         "source_type", "error_kind",
+                                                         "chunks")}
+                                  for d in new_docs][:MAX_TOP_CANDIDATES])
     elif node == "extract":
         new_claims = state.get("claims", [])[len(previous.get("claims", [])):]
         summary.update(

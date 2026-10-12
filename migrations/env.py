@@ -2,7 +2,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from water_source_research.core.config import get_settings
-from water_source_research.db import procedure_models, research_models  # noqa: F401 - registers tables on Base.metadata
+from water_source_research.db import evidence_models, procedure_models, research_models  # noqa: F401 - registers tables on Base.metadata
 from water_source_research.db.models import Base, include_object_for
 from sqlalchemy.engine import make_url
 

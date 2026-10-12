@@ -19,6 +19,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel, ValidationError
 from water_source_research.discovery.http import ResponseCache
@@ -199,7 +200,7 @@ class ReliableStructuredLLM:
             span.set_attribute("llm.model", self.model)
             span.set_attribute("llm.task", self.task)
             span.set_attribute("llm.prompt_version", self.prompt_version)
-            stats = _CallStats(span)
+            stats = _CallStats(span, self.provider, self.model)
             try:
                 yield stats
             finally:
@@ -207,6 +208,7 @@ class ReliableStructuredLLM:
 
     def _cached(self, key: str, schema: type[T], stats: "_CallStats") -> T | None:
         cached = self.cache.get(key)
+        stats.cache_hit = cached is not None
         stats.span.set_attribute("llm.cache_hit", cached is not None)
         return schema.model_validate(cached) if cached is not None else None
 
@@ -279,8 +281,11 @@ class ReliableStructuredLLM:
 class _CallStats:
     """Per-call telemetry, written to the ``llm.call`` span (provider/model/tokens/latency)."""
 
-    def __init__(self, span) -> None:
+    def __init__(self, span, provider: str = "", model: str = "") -> None:
         self.span = span
+        self.provider = provider
+        self.model = model
+        self.cache_hit = False
         self.attempts = 0
         self.repairs = 0
         self.latency_ms = 0
@@ -313,6 +318,19 @@ class _CallStats:
         for name, value in values.items():
             if value is not None:
                 self.span.set_attribute(name, value)
+        log = llm_call_log.get()
+        if log is not None:
+            log.append({"provider": self.provider, "model": self.model,
+                        "cache_hit": self.cache_hit, "requests": self.attempts,
+                        "repairs": self.repairs, "latency_ms": self.latency_ms,
+                        "prompt_tokens": self.prompt_tokens or 0,
+                        "completion_tokens": self.completion_tokens or 0,
+                        "error": self.error})
+
+# Optional per-task log of model calls: a caller (e.g. a graph node) sets a list here to learn
+# what its calls cost; each structured call appends one record when it finishes.
+llm_call_log: ContextVar[list[dict[str, Any]] | None] = ContextVar("llm_call_log",
+                                                                   default=None)
 
 def _messages(system: str, user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

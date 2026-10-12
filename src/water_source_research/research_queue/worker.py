@@ -29,7 +29,9 @@ log = logging.getLogger(__name__)
 RESULT_KEYS = ("finalized", "events", "context_bundle_ids", "procedure_selections",
                "planned_queries", "needs_human_review", "review_reason", "fields_needing_evidence",
                "research_state", "claims", "discovery_rounds", "procedure_memory_degraded",
-               "post_processing_errors", "distillation_jobs")
+               "post_processing_errors", "distillation_jobs", "acquired_documents",
+               "unresolved_fields", "discovery_provider_status", "discovery_candidates",
+               "candidate_urls")
 
 class _Stop(Exception):
     def __init__(self, reason: str) -> None:
@@ -234,5 +236,5 @@ class ResearchWorker:
             "city_name": job.city_name,
             "country": job.country,
             "research_state": research.model_dump(mode="json"),
-            "unresolved_fields": unresolved_fields(research),
+            "unresolved_fields": unresolved_fields(research, job.field_keys),
         }

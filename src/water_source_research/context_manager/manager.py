@@ -31,7 +31,7 @@ from water_source_research.services.field_state import load_field_definitions
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "1"
+RETRIEVAL_POLICY_VERSION = "2"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"

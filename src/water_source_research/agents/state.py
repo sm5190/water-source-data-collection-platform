@@ -10,7 +10,10 @@ class GraphState(TypedDict, total=False):
     # Discovery: serialized discovery.base.SearchResult, deduped and ranked across rounds.
     discovery_candidates: list[dict]
     discovery_provider_status: dict[str, str]  # provider -> ok | no_results | <error kind>
-    evidence_chunks: list[dict]  # serialized EvidenceChunk
+    # Acquisition: one record per attempted URL (any status); de-duplication across rounds
+    # and provenance (source type, acquisition method, source date, raw object key).
+    acquired_documents: list[dict]
+    evidence_chunks: list[dict]  # serialized EvidenceChunk (fetched document text only)
     seen_evidence: list[list[str]]  # [chunk_id, field_key] pairs already sent to the LLM
     fields_needing_evidence: list[str]  # set by extract; non-empty routes back to discover
     discovery_rounds: int

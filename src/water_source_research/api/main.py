@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from water_source_research.core.config import get_settings
 from water_source_research.procedures.services import ProcedureServices, build_procedure_services
 from water_source_research.reporting.run_views import field_provenance, human_review_log
@@ -8,18 +8,27 @@ from water_source_research.research_queue.queue import JobStatus, ResearchQueue
 from water_source_research.schemas.procedures import ProcedureStatus
 from water_source_research.research_queue.steps import NODE_ORDER
 from water_source_research.services.city_catalog import load_city_catalog
-from water_source_research.services.field_state import load_field_definitions
+from water_source_research.services.evidence_store import EvidenceRepository
+from water_source_research.services.field_state import load_field_definitions, select_fields
 
 class RunCityRequest(BaseModel):
     city_name: str
     country: str | None = None
     priority: int = 0
+    # Optional subset of field keys to research (e.g. a test run); omitted = all fields.
+    field_keys: list[str] | None = None
+
+    @field_validator("field_keys")
+    @classmethod
+    def _known_fields(cls, keys: list[str] | None) -> list[str] | None:
+        return select_fields(keys)
 
 class ReviewRequest(BaseModel):
     reviewer: str
 
 def create_app(queue: ResearchQueue | None = None,
-               procedures: ProcedureServices | None = None) -> FastAPI:
+               procedures: ProcedureServices | None = None,
+               evidence: EvidenceRepository | None = None) -> FastAPI:
     """City runs are asynchronous: the API enqueues, workers execute
     (``scripts/run_research_worker.py``), clients poll ``/research/runs/{run_id}``."""
     settings = get_settings()  # validates all configuration at startup
@@ -29,6 +38,8 @@ def create_app(queue: ResearchQueue | None = None,
             queue = ResearchQueue(get_engine(), settings.research_queue)
         if procedures is None and settings.procedure_memory.enabled:
             procedures = build_procedure_services(settings, get_engine())
+    if evidence is None:
+        evidence = EvidenceRepository(queue.engine)
     app = FastAPI(title="Water Source Research Platform", version="0.1.0")
 
     @app.get("/health")
@@ -39,7 +50,8 @@ def create_app(queue: ResearchQueue | None = None,
 
     @app.post("/research/city", status_code=202)
     async def submit_city(request: RunCityRequest):
-        submitted = queue.submit(request.city_name, request.country, request.priority)
+        submitted = queue.submit(request.city_name, request.country, request.priority,
+                                 request.field_keys)
         body = {**submitted.job.public(), "created": submitted.created,
                 "status_url": f"/research/runs/{submitted.job.run_id}"}
         # 202 for a new run; 200 when an active run for this city already existed.
@@ -91,6 +103,37 @@ def create_app(queue: ResearchQueue | None = None,
         if result is None:
             return {"available": False, "fields": []}
         return {"available": True, "fields": field_provenance(result, load_field_definitions())}
+
+    @app.get("/research/runs/{run_id}/discovery")
+    async def get_discovery(run_id: str):
+        """Every ranked discovery candidate (pointers to sources, never evidence)."""
+        require_run(run_id)
+        result = queue.result(run_id)
+        if result is None:
+            return {"available": False, "candidates": []}
+        return {"available": True,
+                "provider_status": result.get("discovery_provider_status") or {},
+                "discovery_rounds": result.get("discovery_rounds"),
+                "candidates": result.get("discovery_candidates") or []}
+
+    @app.get("/research/runs/{run_id}/evidence")
+    async def get_evidence(run_id: str):
+        """Every URL the run tried to acquire, with status, provenance and raw object key."""
+        require_run(run_id)
+        return {"documents": evidence.documents(run_id), "counts": evidence.counts(run_id)}
+
+    @app.get("/research/runs/{run_id}/evidence/chunks")
+    async def get_evidence_chunks(run_id: str, document_id: int | None = None,
+                                  limit: int = 200):
+        require_run(run_id)
+        return {"chunks": evidence.chunks(run_id, document_id, min(limit, 1000))}
+
+    @app.get("/research/runs/{run_id}/claims")
+    async def get_claims(run_id: str):
+        """Stored candidate/selected claims with their exact quotes and source documents."""
+        require_run(run_id)
+        return {"field_states": evidence.field_states(run_id),
+                "claims": evidence.claims(run_id)}
 
     def require_run(run_id: str):
         job = queue.get(run_id)

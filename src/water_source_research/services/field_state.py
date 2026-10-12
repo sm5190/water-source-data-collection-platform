@@ -23,10 +23,24 @@ def initialize_city_state(city_name: str, country: str | None = None) -> CityRes
         },
     )
 
-def unresolved_fields(state: CityResearchState) -> list[str]:
+def select_fields(keys: list[str] | None,
+                  fields: dict[str, FieldDefinition] | None = None) -> list[str] | None:
+    """Validate a field subset (order kept, duplicates dropped). None/empty = every field.
+
+    The global schema is unchanged: a subset only narrows what a run researches."""
+    if not keys:
+        return None
+    fields = fields if fields is not None else load_field_definitions()
+    unknown = [k for k in keys if k not in fields]
+    if unknown:
+        raise ValueError(f"Unknown field key(s): {', '.join(unknown)}")
+    return list(dict.fromkeys(keys))
+
+def unresolved_fields(state: CityResearchState,
+                      only: list[str] | None = None) -> list[str]:
     return [
         key for key, field in state.fields.items()
-        if field.status in {
+        if (only is None or key in only) and field.status in {
             FieldResolutionStatus.UNRESOLVED,
             FieldResolutionStatus.CONFLICT,
             FieldResolutionStatus.HITL_REQUIRED,

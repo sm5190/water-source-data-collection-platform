@@ -58,6 +58,7 @@ class Job:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    field_keys: list[str] | None = None  # field subset for this run; None = every field
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -65,7 +66,7 @@ class Job:
                 "max_attempts": self.max_attempts, "cancel_requested": self.cancel_requested,
                 "resumed": self.resumed, "last_error": self.last_error,
                 "created_at": _iso(self.created_at), "started_at": _iso(self.started_at),
-                "finished_at": _iso(self.finished_at)}
+                "finished_at": _iso(self.finished_at), "field_keys": self.field_keys}
 
 @dataclass(frozen=True, slots=True)
 class SubmitResult:
@@ -91,7 +92,9 @@ class ResearchQueue:
 
     # --- producers ----------------------------------------------------------------------
 
-    def submit(self, city_name: str, country: str | None = None, priority: int = 0) -> SubmitResult:
+    def submit(self, city_name: str, country: str | None = None, priority: int = 0,
+               field_keys: list[str] | None = None) -> SubmitResult:
+        """Enqueue a city run (``field_keys``: optional, already-validated field subset)."""
         key = city_key(city_name, country)
         with get_tracer().start_as_current_span("research_queue.submit") as span:
             existing = self._active_for(key)
@@ -103,7 +106,8 @@ class ResearchQueue:
                         session.add(J(run_id=run_id, city_name=city_name, country=country,
                                       city_key=key, status=JobStatus.QUEUED.value,
                                       priority=priority, max_attempts=self.s.max_attempts,
-                                      available_at=now, created_at=now, updated_at=now))
+                                      available_at=now, created_at=now, updated_at=now,
+                                      field_keys=list(field_keys) if field_keys else None))
                     job = self.get(run_id)
                     assert job is not None
                     result = SubmitResult(job, True)
@@ -345,7 +349,8 @@ def _job(r: ResearchJobRecord) -> Job:
                max_attempts=r.max_attempts, lease_owner=r.lease_owner,
                lease_until=r.lease_until, cancel_requested=r.cancel_requested,
                resumed=r.resumed, last_error=r.last_error, created_at=r.created_at,
-               started_at=r.started_at, finished_at=r.finished_at)
+               started_at=r.started_at, finished_at=r.finished_at,
+               field_keys=list(r.field_keys) if r.field_keys else None)
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

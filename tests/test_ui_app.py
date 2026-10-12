@@ -1,6 +1,7 @@
 """Streamlit dashboard, driven headlessly with AppTest and a fake API client."""
 
 from pathlib import Path
+from typing import ClassVar
 import pytest
 
 pytest.importorskip("streamlit")
@@ -144,3 +145,50 @@ def test_running_run_renders_and_can_be_cancelled():
 def test_unreachable_api_stops_with_error():
     at = app(FakeClient(healthy=False))
     assert any("API not reachable" in e.value for e in at.error)
+
+class TwoRunClient(FakeClient):
+    """Toronto has an older run with only UNRESOLVED fields and a newer one with CANDIDATE
+    fields: the filters must not carry the first run's selection over to the second."""
+
+    RUNS: ClassVar[dict[str, str]] = {"run-old": "UNRESOLVED", "run-new": "CANDIDATE"}
+
+    def runs(self, city=None, country=None, limit=50):
+        if city != "Toronto":
+            return []
+        return [{**self._run(), "run_id": rid, "created_at": f"2026-10-0{i}T10:00:00+00:00"}
+                for i, rid in enumerate(self.RUNS, start=1)]
+
+    def review(self, run_id):
+        status = self.RUNS[run_id]
+        code = "AWAITING_VALIDATION" if status == "CANDIDATE" else "NO_SUFFICIENT_EVIDENCE"
+        items = [{"field_key": "water_type", "field_type": "source_type",
+                  "field_status": "UNRESOLVED", "reason_code": "NO_SUFFICIENT_EVIDENCE",
+                  "reason": "No sufficient evidence", "decision": None, "citations": []}]
+        if status == "CANDIDATE":
+            items.append({"field_key": "utility_name", "field_type": "utility",
+                          "field_status": "CANDIDATE", "reason_code": code,
+                          "reason": "Candidate claim awaiting reviewer validation",
+                          "decision": None, "citations": []})
+        return {"available": True, "items": items}
+
+    def fields(self, run_id):
+        base = super().fields(run_id)["fields"][0]
+        rows = [{**base, "field_key": "water_type", "field_type": "source_type",
+                 "status": "UNRESOLVED", "value": None, "citations": []}]
+        if self.RUNS[run_id] == "CANDIDATE":
+            rows.append({**base, "status": "CANDIDATE", "value": None, "citations": []})
+        return {"available": True, "fields": rows}
+
+def test_filters_reset_when_switching_runs():
+    at = app(TwoRunClient())
+    run_box = next(s for s in at.selectbox if s.label == "Run")
+    run_box.set_value("run-old").run()  # first view: only UNRESOLVED / NO_SUFFICIENT_EVIDENCE
+    run_box = next(s for s in at.selectbox if s.label == "Run")
+    run_box.set_value("run-new").run()
+    assert not at.exception, at.exception
+    statuses = next(m for m in at.multiselect if m.label == "Status")
+    reasons = next(m for m in at.multiselect if m.label == "Reason")
+    assert statuses.value == ["CANDIDATE", "UNRESOLVED"]
+    assert reasons.value == ["AWAITING_VALIDATION", "NO_SUFFICIENT_EVIDENCE"]
+    shown = next(df.value for df in at.dataframe if "candidates" in df.value.columns)
+    assert sorted(shown["field"]) == ["utility_name", "water_type"]

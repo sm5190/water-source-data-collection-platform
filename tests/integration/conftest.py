@@ -50,5 +50,7 @@ def clean(request):
     with engine.begin() as conn:
         conn.execute(text("TRUNCATE procedure_usages, procedure_origins, procedure_versions, "
                           "procedures, distillation_jobs, trajectories, run_events, "
-                          "research_runs, context_bundles, research_jobs CASCADE"))
+                          "research_runs, context_bundles, research_jobs, claim_citations, "
+                          "field_claims, run_field_states, evidence_chunks, source_documents "
+                          "CASCADE"))
     yield

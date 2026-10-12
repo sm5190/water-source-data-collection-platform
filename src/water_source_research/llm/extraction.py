@@ -48,7 +48,8 @@ Rules:
   as given; CALCULATED when you converted units or computed it from reported numbers;
   ESTIMATED only when the source itself calls the figure an estimate.
 - Keep reference years with the value they belong to. Return several claims only when the
-  sources disagree or report different years.
+  sources disagree or report different years, or when the instructions say the field can
+  have several distinct values.
 - confidence (0-1) reflects how directly and authoritatively the quote supports the value."""
 
 class _Strict(BaseModel):
@@ -166,6 +167,10 @@ def user_prompt(bundle: ContextBundle, field: FieldDefinition,
              f"Target field: {field.key} ({kind})."]
     if field.keywords:
         lines.append("Related terms: " + ", ".join(field.keywords) + ".")
+    if field.multi_valued:
+        lines.append("This field can have several distinct values: if the evidence names more "
+                     "than one (e.g. several distinct sources), return one claim per distinct "
+                     "value, each with its own citation; never combine them into one string.")
     lines.append("Cite only these sources: " + ", ".join(sorted(passages, key=_source_order))
                  + ".")
     return "\n".join(lines)
@@ -202,6 +207,10 @@ def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[s
     return claims, rejected_citations, rejected_claims
 
 _SPACE = re.compile(r"\s+")
+
+def normalize_quote(text: str) -> str:
+    """The comparison form used to check a quote against a passage."""
+    return _normalize(text)
 
 def _normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).casefold()

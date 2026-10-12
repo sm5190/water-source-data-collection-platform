@@ -1,6 +1,7 @@
 version: 1
 # keywords: lexical cues the context manager uses to rank evidence for a field.
 # field_type: research grouping; procedural memory learns one strategy per field type.
+# multi_valued: distinct values (e.g. several natural sources) become separate claims.
 # depends_on: fields whose resolved values are supplied as context (and, for derived
 #             fields, the inputs the rules engine computes from).
 fields:
@@ -22,7 +23,7 @@ fields:
     depends_on: [population_served_millions, city_population_millions]
     keywords: [percent, share, population served]
   - {key: utility_name, field_type: utility, subject: supply_record, type: text, keywords: [utility, water authority, water board, water department, water company, water services, waterworks, drinking water, supplies]}
-  - {key: water_source, field_type: water_source, subject: supply_record, type: text, keywords: [source, lake, river, aquifer, reservoir, intake, wellfield, supplied by]}
+  - {key: water_source, field_type: water_source, subject: supply_record, type: text, multi_valued: true, keywords: [source, lake, river, aquifer, reservoir, intake, wellfield, supplied by]}
   - {key: water_system, field_type: water_source, subject: supply_record, type: text, keywords: [water system, supply system, distribution system, network]}
   - key: water_type
     field_type: source_type
@@ -32,7 +33,7 @@ fields:
     keywords: [surface water, groundwater, aquifer, wells, lake, river, desalination, seawater, reclaimed, recycled]
   - {key: water_transfer_system, field_type: transfer_system, subject: supply_record, type: text, keywords: [aqueduct, transfer, pipeline, canal, tunnel, conveyance]}
   - {key: seasonal_uses, field_type: water_source, subject: supply_record, type: text, keywords: [seasonal, summer, winter, drought, peak demand, backup]}
-  - {key: reservoir_names, field_type: water_source, subject: supply_record, type: text, keywords: [reservoir, dam, impoundment, storage]}
+  - {key: reservoir_names, field_type: water_source, subject: supply_record, type: text, multi_valued: true, keywords: [reservoir, dam, impoundment, storage]}
   - {key: pod_latitude, field_type: point_of_diversion, subject: supply_record, type: coordinate, keywords: [intake, diversion, latitude, coordinates]}
   - {key: pod_longitude, field_type: point_of_diversion, subject: supply_record, type: coordinate, keywords: [intake, diversion, longitude, coordinates]}
   - key: pod_coordinate_method

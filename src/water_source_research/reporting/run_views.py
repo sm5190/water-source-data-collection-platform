@@ -8,6 +8,8 @@ from collections.abc import Mapping
 from typing import Any
 from water_source_research.schemas.research import FieldDefinition
 
+NO_REVIEW_STATUSES = ("RESOLVED", "NOT_APPLICABLE")
+
 def human_review_log(result: Mapping[str, Any],
                      fields: Mapping[str, FieldDefinition]) -> list[dict[str, Any]]:
     """One entry per field that needed (or received) human attention, with reason and citations."""
@@ -57,6 +59,8 @@ def field_provenance(result: Mapping[str, Any],
     research = (result.get("research_state") or {}).get("fields", {})
     events = result.get("events") or []
     bundles = result.get("context_bundle_ids") or {}
+    documents = _documents_by_url(result.get("acquired_documents") or [])
+    researched = set(result.get("unresolved_fields") or fields)
     missing = set(result.get("fields_needing_evidence") or [])
     strategy_by_type = {
         s["field_type"]: f"procedure {s['procedure_id']} v{s['version']}"
@@ -74,20 +78,26 @@ def field_provenance(result: Mapping[str, Any],
         selected = state.get("selected_claim") or {}
         candidates = state.get("candidate_claims") or []
         field_events = by_field.get(key, [])
+        status = state.get("status", "UNRESOLVED")
         rows.append({
             "field_key": key,
             "field_type": d.field_type,
             "derived": d.derived,
             "depends_on": d.depends_on,
-            "status": state.get("status", "UNRESOLVED"),
+            "status": status,
+            "researched": key in researched,
+            # Nothing is accepted until a reviewer approves it (human_review -> RESOLVED).
+            "review_required": key in researched and not d.derived
+            and status not in NO_REVIEW_STATUSES,
             "value": selected.get("value"),
             "value_origin": selected.get("value_origin"),
             "value_status": selected.get("value_status"),
             "confidence": selected.get("confidence"),
-            "citations": _citations(selected) if selected else [],
+            "citations": _citations(selected, documents) if selected else [],
             "candidates": [{"value": c.get("value"), "confidence": c.get("confidence"),
                             "value_origin": c.get("value_origin"),
-                            "citations": _citations(c)} for c in candidates],
+                            "value_status": c.get("value_status"),
+                            "citations": _citations(c, documents)} for c in candidates],
             "needs_evidence": key in missing,
             "strategy": strategy_by_type.get(d.field_type, "default"),
             "context_bundle_id": bundles.get(key),
@@ -108,10 +118,28 @@ def field_provenance(result: Mapping[str, Any],
         })
     return rows
 
-def _citations(claim: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return [{"url": ev.get("url"), "title": ev.get("title"), "page_number": ev.get("page_number"),
-             "passage": ev.get("passage"), "retrieved_at": ev.get("retrieved_at")}
-            for ev in claim.get("evidence") or []]
+def _documents_by_url(records: list[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
+    out: dict[str, Mapping[str, Any]] = {}
+    for r in records:
+        if r.get("status") != "OK":
+            continue
+        for url in (r.get("final_url"), r.get("requested_url")):
+            if url:
+                out.setdefault(url, r)
+    return out
+
+def _citations(claim: Mapping[str, Any],
+               documents: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+    out = []
+    for ev in claim.get("evidence") or []:
+        doc = (documents or {}).get(ev.get("url") or "", {})
+        out.append({"url": ev.get("url"), "title": ev.get("title"),
+                    "page_number": ev.get("page_number"), "passage": ev.get("passage"),
+                    "retrieved_at": ev.get("retrieved_at"),
+                    "source_type": doc.get("source_type"),
+                    "acquisition_method": doc.get("acquisition_method"),
+                    "source_date": doc.get("source_date")})
+    return out
 
 def _claims_citations(claims: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     out = []

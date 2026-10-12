@@ -112,6 +112,8 @@ class ResearchJobRecord(Base):
     resumed: Mapped[bool] = mapped_column(Boolean, default=False)  # last attempt resumed a checkpoint
     last_error: Mapped[str | None] = mapped_column(String(2000))
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    # Optional field subset for this run (None = every field); test runs / partial research.
+    field_keys: Mapped[list[str] | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

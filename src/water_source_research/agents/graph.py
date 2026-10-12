@@ -1,5 +1,6 @@
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from water_source_research.acquisition.service import AcquisitionService
 from water_source_research.core.capabilities import Capability, available_capabilities
 from water_source_research.core.config import get_settings
 from water_source_research.discovery.service import DiscoveryService
@@ -7,11 +8,12 @@ from water_source_research.llm.gateway import LLMGateway, UnconfiguredGateway
 from water_source_research.procedures.retrieval import ProcedureMemory
 from water_source_research.procedures.usage import UsageTracker
 from water_source_research.context_manager import ContextService
+from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import load_field_definitions
 from water_source_research.services.run_recorder import RunRecorder
 from .state import GraphState
 from .nodes import (
-    acquire_node, human_review_node, make_discover_node, make_extract_node,
+    acquire_node, human_review_node, make_acquire_node, make_discover_node, make_extract_node,
     make_finalize_node, make_plan_node, validate_node,
 )
 
@@ -41,10 +43,16 @@ def build_graph(
     capability_availability: frozenset[Capability] | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
     discovery: DiscoveryService | None = None,
+    acquisition: AcquisitionService | None = None,
+    evidence_store: EvidenceRepository | None = None,
 ):
     """Procedure memory, usage tracking and run recording are optional soft dependencies:
     without them the graph runs its default strategy and skips post-processing.
-    Without ``discovery`` (see ``build_discovery_service``) the discover step finds nothing."""
+    Without ``discovery`` (see ``build_discovery_service``) the discover step finds nothing;
+    without ``acquisition`` (``build_acquisition_service``) acquire fetches nothing and only
+    caller-supplied ``evidence_chunks`` are used. ``evidence_store`` persists documents,
+    chunks, claims and field states; once given it is a hard dependency (a failed write
+    fails the run, which the research queue retries)."""
     settings = get_settings()
     if max_discovery_rounds is None:
         max_discovery_rounds = settings.max_discovery_rounds_per_city
@@ -58,13 +66,15 @@ def build_graph(
     g.add_node("plan", make_plan_node(fields, procedure_memory, usage_tracker,
                                       capability_availability))
     g.add_node("discover", make_discover_node(usage_tracker, discovery, fields))
-    g.add_node("acquire", acquire_node)
+    g.add_node("acquire", make_acquire_node(acquisition, evidence_store)
+               if acquisition is not None else acquire_node)
     g.add_node("extract", make_extract_node(
         context_service or ContextService(), gateway or UnconfiguredGateway(),
     ))
     g.add_node("validate", validate_node)
     g.add_node("human_review", human_review_node)
-    g.add_node("finalize", make_finalize_node(fields, run_recorder, usage_tracker))
+    g.add_node("finalize", make_finalize_node(fields, run_recorder, usage_tracker,
+                                              evidence_store))
     g.add_edge(START, "plan")
     g.add_edge("plan", "discover")
     g.add_edge("discover", "acquire")

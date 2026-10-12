@@ -39,6 +39,7 @@ ALLOWED_ATTRS = frozenset({
     "query", "sources_found", "sources_retained", "source_type", "url", "duration_ms", "cost",
     "from_status", "to_status", "bundle_status", "claims", "chunks", "anchor_value",
     "correction_category", "procedure_id", "procedure_version", "planned_queries",
+    "llm_requests", "cache_hits", "prompt_tokens", "completion_tokens", "model",
 })
 MAX_ATTR_CHARS = 300
 

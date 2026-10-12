@@ -13,7 +13,7 @@ LLM_DISTILLER_VERSION = "llm-1"
 RECIPE_SCHEMA_VERSION = 1
 # Prompt/response-schema version of the extraction gateway (llm/extraction.py). Part of the LLM
 # cache key: bump it whenever the extraction prompt or claim schema changes.
-EXTRACTION_PROMPT_VERSION = "extract-1"
+EXTRACTION_PROMPT_VERSION = "extract-2"
 PROCEDURE_RETRIEVAL_POLICY_VERSION = "1"
 EMBEDDING_VERSION = "1"
 # Fixed by the pgvector column type; changing it requires a migration and re-embedding.

@@ -2,12 +2,14 @@ import asyncio
 import logging
 from collections.abc import Mapping
 from uuid import uuid4
+from water_source_research.acquisition.service import AcquisitionService, DocStatus
 from water_source_research.core.capabilities import Capability
 from water_source_research.discovery.base import SearchResult
 from water_source_research.discovery.queries import build_queries, previous_queries
 from water_source_research.discovery.ranking import merge_and_rank
 from water_source_research.discovery.service import DiscoveryService
 from water_source_research.llm.gateway import LLMGateway
+from water_source_research.llm.router import llm_call_log
 from water_source_research.observability.otel import get_tracer
 from water_source_research.procedures.retrieval import ProcedureMemory
 from water_source_research.procedures.usage import UsageTracker
@@ -21,6 +23,7 @@ from water_source_research.schemas.research import (
 from water_source_research.context_manager import (
     ContextBundle, ContextPurpose, ContextService, ContextStatus,
 )
+from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import initialize_city_state
 from water_source_research.services.run_recorder import RunRecorder
 from .procedure_guidance import (
@@ -131,8 +134,63 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
         "discovery_provider_status": status,
     }
 
-async def acquire_node(state: GraphState) -> GraphState:
-    return {**state, "evidence_chunks": state.get("evidence_chunks", [])}
+def make_acquire_node(acquisition: AcquisitionService | None = None,
+                      evidence_store: EvidenceRepository | None = None):
+    async def acquire_node(state: GraphState) -> GraphState:
+        if acquisition is None:  # no acquirer configured: evidence only from the caller
+            return {**state, "evidence_chunks": state.get("evidence_chunks", [])}
+        with get_tracer().start_as_current_span("graph.acquire") as span:
+            span.set_attribute("graph.run_id", state.get("run_id", ""))
+            updates, attempted, new_chunks = await _acquire(acquisition, evidence_store, state)
+            span.set_attribute("graph.documents_attempted", attempted)
+            span.set_attribute("graph.new_chunks", new_chunks)
+        return {**state, **updates}
+    return acquire_node
+
+# No acquirer: evidence comes only from the caller (tests patch this to inject chunks).
+acquire_node = make_acquire_node()
+
+async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepository | None,
+                   state: GraphState) -> tuple[GraphState, int, int]:
+    """Fetch new candidate documents and turn them into evidence chunks.
+
+    Individual fetch failures are recorded, never raised; a failure to *persist* evidence
+    does raise, so the run is retried rather than recorded without it."""
+    previous = list(state.get("acquired_documents", []))
+    outcome = await acquisition.acquire_round(state.get("discovery_candidates", []), previous,
+                                              round_no=state.get("discovery_rounds", 1))
+    chunks = list(state.get("evidence_chunks", []))
+    known = {c["chunk_id"] for c in chunks}
+    new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]
+    chunks.extend(c.model_dump(mode="json") for c in new_chunks)
+    events = list(state.get("events", []))
+    for rec in outcome.records:
+        attrs: dict[str, object] = {"url": rec["requested_url"],
+                                    "chunks": rec.get("chunks") or 0,
+                                    "duration_ms": rec.get("duration_ms") or 0.0}
+        if rec.get("source_type"):
+            attrs["source_type"] = rec["source_type"]
+        ok = rec["status"] == DocStatus.OK
+        strategy = "fetch:" + rec["status"].lower()
+        if rec.get("error_kind"):
+            strategy += ":" + rec["error_kind"].lower()
+        events = append_event(events, kind=EventKind.TOOL_CALL, node="acquire",
+                              capability=Capability.STATIC_DOCUMENT_FETCH,
+                              provider="direct_http", strategy=strategy,
+                              result=EventResult.SUCCESS if ok else EventResult.FAILURE,
+                              attrs=attrs)
+        if ok and rec.get("acquisition_method") == "DIRECT_HTTP_PDF":
+            events = append_event(events, kind=EventKind.TOOL_CALL, node="acquire",
+                                  capability=Capability.DOCUMENT_PARSING, provider="pdfium",
+                                  strategy="pdf_text", result=EventResult.SUCCESS,
+                                  attrs={"url": rec["requested_url"],
+                                         "chunks": rec.get("chunks") or 0})
+    if evidence_store is not None and outcome.records:
+        await asyncio.to_thread(evidence_store.save_documents, state["run_id"],
+                                outcome.records, outcome.chunks)
+    updates: GraphState = {"acquired_documents": previous + outcome.records,
+                           "evidence_chunks": chunks, "events": events}
+    return updates, len(outcome.records), len(new_chunks)
 
 def make_extract_node(context_service: ContextService, gateway: LLMGateway):
     async def extract_node(state: GraphState) -> GraphState:
@@ -158,7 +216,7 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             bundle_ids = dict(state.get("context_bundle_ids", {}))
             events = list(state.get("events", []))
             needing: list[str] = []
-            for field_key, bundle, new_claims in results:
+            for field_key, bundle, new_claims, calls in results:
                 if bundle.bundle_id:
                     bundle_ids[field_key] = bundle.bundle_id
                 if bundle.status is ContextStatus.NOT_NEEDED:
@@ -166,7 +224,8 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
                 events = append_event(events, kind=EventKind.NODE, node="extract",
                                       field_key=field_key, strategy=bundle.status.value,
                                       attrs={"bundle_status": bundle.status.value,
-                                             "claims": len(new_claims)})
+                                             "claims": len(new_claims),
+                                             **llm_usage(calls)})
                 if bundle.status is ContextStatus.NO_SUFFICIENT_EVIDENCE:
                     needing.append(field_key)
                     continue
@@ -204,17 +263,32 @@ async def _extract_field(
     state: GraphState,
     run_id: str,
     field_key: str,
-) -> tuple[str, ContextBundle, list[FieldClaim]]:
+) -> tuple[str, ContextBundle, list[FieldClaim], list[dict]]:
     bundle = await context_service.get_context(
         run_id=run_id, field_key=field_key, operation=ContextPurpose.EXTRACT, graph_state=state,
     )
     if bundle.status is not ContextStatus.READY:
-        return field_key, bundle, []
+        return field_key, bundle, [], []
+    calls: list[dict] = []  # model calls made for this field (set in this task's context)
+    llm_call_log.set(calls)
     claims = await gateway.extract(bundle, run_id=run_id, field_key=field_key)
     wrong = sorted({c.field_key for c in claims if c.field_key != field_key})
     if wrong:
         raise ValueError(f"Gateway returned claims for {wrong} when extracting {field_key!r}")
-    return field_key, bundle, claims
+    return field_key, bundle, claims, calls
+
+def llm_usage(calls: list[dict]) -> dict[str, object]:
+    """Model usage of one extraction for its trusted event: real model requests (a response
+    cache hit makes 0), tokens and latency, so a run's LLM usage is auditable in run_events.
+    Recorded on the NODE event (not a TOOL_CALL), so procedure eligibility is unchanged."""
+    if not calls:
+        return {}
+    return {"llm_requests": sum(c["requests"] for c in calls),
+            "cache_hits": sum(1 for c in calls if c["cache_hit"]),
+            "prompt_tokens": sum(c["prompt_tokens"] for c in calls),
+            "completion_tokens": sum(c["completion_tokens"] for c in calls),
+            "duration_ms": sum(c["latency_ms"] for c in calls),
+            "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
 
 async def validate_node(state: GraphState) -> GraphState:
     missing = state.get("fields_needing_evidence") or []
@@ -282,12 +356,17 @@ def make_finalize_node(
     fields: Mapping[str, FieldDefinition],
     run_recorder: RunRecorder | None = None,
     usage_tracker: UsageTracker | None = None,
+    evidence_store: EvidenceRepository | None = None,
 ):
     async def finalize_node(state: GraphState) -> GraphState:
-        # The scientific result is complete here; everything below is soft post-processing.
         state = {**state, "finalized": True}
         with get_tracer().start_as_current_span("graph.finalize") as span:
             span.set_attribute("research.run_id", state.get("run_id", ""))
+            if evidence_store is not None:  # part of the result: a failure fails the run
+                await asyncio.to_thread(
+                    evidence_store.save_results, state["run_id"], state["research_state"],
+                    state.get("fields_needing_evidence"), state.get("unresolved_fields"))
+            # The scientific result is complete here; everything below is soft post-processing.
             post = await asyncio.to_thread(finalize_post_processing, state, run_recorder,
                                            usage_tracker, fields)
             span.set_attribute("research.post_processing_errors",

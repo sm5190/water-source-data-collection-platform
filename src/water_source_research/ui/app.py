@@ -154,7 +154,8 @@ def render_review(data: dict[str, Any]) -> None:
         st.success("No fields required human review.")
         return
     reasons = sorted({i["reason_code"] for i in items})
-    picked = st.multiselect("Reason", reasons, default=reasons, key="review_reasons")
+    picked = st.multiselect("Reason", reasons, default=reasons,
+                            key=f"review_reasons:{run_id}")
     rows = [i for i in items if i["reason_code"] in picked]
     st.dataframe(pd.DataFrame([{
         "field": i["field_key"], "field type": i["field_type"], "status": i["field_status"],
@@ -193,8 +194,10 @@ def render_fields(data: dict[str, Any]) -> None:
     for i, status in enumerate(statuses):
         c[i].metric(status.title(), sum(f["status"] == status for f in fields))
     f1, f2 = st.columns(2)
-    pick_types = f1.multiselect("Field type", types, default=types, key="field_types")
-    pick_status = f2.multiselect("Status", statuses, default=statuses, key="field_statuses")
+    pick_types = f1.multiselect("Field type", types, default=types,
+                                key=f"field_types:{run_id}")
+    pick_status = f2.multiselect("Status", statuses, default=statuses,
+                                 key=f"field_statuses:{run_id}")
     shown = [f for f in fields if f["field_type"] in pick_types and f["status"] in pick_status]
     st.dataframe(pd.DataFrame([{
         "field": f["field_key"], "type": f["field_type"], "status": f["status"],
@@ -207,7 +210,7 @@ def render_fields(data: dict[str, Any]) -> None:
     if not shown:
         return
     key = st.selectbox("Provenance for field", [f["field_key"] for f in shown],
-                       key="provenance_field")
+                       key=f"provenance_field:{run_id}")
     f = next(x for x in shown if x["field_key"] == key)
     a, b = st.columns(2)
     with a:
