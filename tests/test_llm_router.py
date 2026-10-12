@@ -317,3 +317,16 @@ def test_settings_validation():
         LLMSettings(max_concurrency=21)  # VT allows 20 requests in flight per user
     with pytest.raises(ValueError):
         LLMSettings(backoff_base_seconds=10, backoff_max_seconds=1)
+
+def test_async_clients_survive_separate_event_loops():
+    # Scripts and tests call asyncio.run repeatedly; a client bound to a closed loop must
+    # not be reused ("Event loop is closed").
+    server = Server(chat_json(GOOD))
+    llm = make_llm(server, cache=_LockedCache(0, 1))
+    assert acall(llm, "one") == acall(llm, "two") == Answer(**GOOD)
+    backend = make_llm(server).backend
+    clients = [asyncio.run(_current(backend)) for _ in range(2)]
+    assert clients[0] is not clients[1]
+
+async def _current(backend):
+    return backend._async.get()

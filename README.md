@@ -166,8 +166,23 @@ Procedure embeddings change model on the switch; stored vectors are re-embedded 
 Limits are per worker **process**: with several worker processes on one VT key, divide
 `REQUESTS_PER_MINUTE` and `MAX_CONCURRENCY` by the number of processes.
 
-Tests never touch a real API: `uv run pytest tests/test_llm_router.py
-tests/test_extraction_gateway.py tests/test_llm_embeddings.py` runs against mocked HTTP.
+`uv run pytest` never touches a real API (LLM and discovery tests use mocked HTTP).
+
+### Live tests (real APIs)
+
+`tests/live/` runs source discovery against the real OpenAlex, Crossref, Semantic Scholar and
+SearXNG APIs, and the router, extraction gateway and embeddings against the real VT LLM API
+(including discovered sources fed into VT extraction). Opt in explicitly:
+
+```bash
+RUN_LIVE_TESTS=1 uv run pytest tests/live -v -rs          # bash
+$env:RUN_LIVE_TESTS=1; uv run pytest tests/live -v -rs    # PowerShell
+```
+
+They always use VT for LLM calls (never paid OpenAI, whatever `LLM_PROVIDER` says) and skip,
+with the reason, any provider that is unreachable: VT off the VT Campus VPN, SearXNG when its
+container isn't running, Semantic Scholar when it rate-limits keyless clients. A full run
+takes about 2–3 minutes and a dozen VT requests.
 
 ## Architecture principle
 

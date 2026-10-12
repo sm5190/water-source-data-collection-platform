@@ -38,7 +38,7 @@ CHUNK = EvidenceChunk(
     chunk_id="smoke", url="https://www.toronto.ca/services-payments/water-environment/",
     title="Toronto Water", source_type="UTILITY",
     text="Toronto Water treats drinking water drawn from Lake Ontario, a surface water source, "
-         "and delivers it to 3.6 million residents and businesses in Toronto and York Region.")
+         "and serves 3.6 million residents and businesses in Toronto and York Region.")
 
 def with_llm(settings: Settings, **llm) -> Settings:
     # No caching and no repair turns: each probe must succeed on its own.

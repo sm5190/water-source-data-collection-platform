@@ -4,7 +4,10 @@ Both providers (VT ARC and OpenAI) are reached through the ``openai`` SDK, so on
 turns SDK exceptions into a typed ``LLMError`` that the router retries (or not) by kind.
 """
 
-from collections.abc import Mapping
+import asyncio
+import threading
+import weakref
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, TypeVar
@@ -54,6 +57,27 @@ class LLMError(Exception):
     @property
     def retryable(self) -> bool:
         return self.kind in RETRYABLE
+
+class PerLoop[C]:
+    """One object per running event loop.
+
+    Async HTTP clients pool connections bound to the loop that opened them; reusing one after
+    that loop closes (e.g. a second ``asyncio.run``) fails with "Event loop is closed".
+    """
+
+    def __init__(self, factory: Callable[[], C]) -> None:
+        self._factory = factory
+        self._items: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, C] = \
+            weakref.WeakKeyDictionary()
+        self._lock = threading.Lock()
+
+    def get(self) -> C:
+        loop = asyncio.get_running_loop()
+        with self._lock:
+            item = self._items.get(loop)
+            if item is None:
+                item = self._items[loop] = self._factory()
+            return item
 
 @dataclass(slots=True)
 class Completion:

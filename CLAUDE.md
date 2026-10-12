@@ -18,6 +18,7 @@ docker compose up -d postgres minio            # pgvector Postgres 16 + MinIO
 docker compose --profile discovery up -d searxng  # optional, SearXNG on :8080 (config/searxng/settings.yml enables JSON)
 uv run python scripts/discovery_smoke.py Toronto --country Canada  # manual check against the REAL discovery APIs
 uv run python scripts/llm_smoke.py             # manual check against the REAL LLM provider (VT: needs VT VPN; refuses OpenAI without --allow-openai)
+RUN_LIVE_TESTS=1 uv run pytest tests/live -v -rs   # REAL discovery APIs + REAL VT LLM (forced to VT, never paid OpenAI); skipped otherwise, unreachable providers skip with the reason
 uv sync --all-extras                           # dev (pytest/ruff), docs (docling), ui (streamlit)
 uv run pytest                                  # all tests
 uv run pytest tests/test_rules_engine.py::test_percentage   # single test

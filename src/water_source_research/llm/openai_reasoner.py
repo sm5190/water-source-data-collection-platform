@@ -4,7 +4,8 @@ from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel
 from water_source_research.core.config import get_settings
 from .base import (
-    Completion, LLMError, LLMErrorKind, StructuredLLM, classify_openai_error, usage_tokens,
+    Completion, LLMError, LLMErrorKind, PerLoop, StructuredLLM, classify_openai_error,
+    usage_tokens,
 )
 from .config import LLMSettings
 
@@ -80,9 +81,9 @@ class OpenAIResponsesBackend:
         self._sync = OpenAIStructuredClient(api_key, model, max_retries=0,
                                             timeout=settings.timeout_seconds,
                                             http_client=http_client)
-        self._async = OpenAIReasoner(api_key, model, max_retries=0,
-                                     timeout=settings.timeout_seconds,
-                                     http_client=async_http_client)
+        self._async = PerLoop(lambda: OpenAIReasoner(api_key, model, max_retries=0,
+                                                     timeout=settings.timeout_seconds,
+                                                     http_client=async_http_client))
         self.base_url = str(self._sync.client.base_url).rstrip("/")
 
     def complete(self, messages: list[dict[str, str]], schema: type[BaseModel]) -> Completion:
@@ -95,7 +96,7 @@ class OpenAIResponsesBackend:
     async def acomplete(self, messages: list[dict[str, str]],
                         schema: type[BaseModel]) -> Completion:
         try:
-            response = await self._async.parse(messages, schema)
+            response = await self._async.get().parse(messages, schema)
         except openai.OpenAIError as exc:
             raise classify_openai_error(PROVIDER, exc) from None
         return _completion(response)

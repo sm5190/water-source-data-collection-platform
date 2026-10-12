@@ -11,7 +11,9 @@ import re
 from typing import Any
 import openai
 from pydantic import BaseModel
-from .base import Completion, LLMError, LLMErrorKind, classify_openai_error, usage_tokens
+from .base import (
+    Completion, LLMError, LLMErrorKind, PerLoop, classify_openai_error, usage_tokens,
+)
 from .config import VT_MAX_OUTPUT_TOKENS, LLMSettings
 
 PROVIDER = "vt"
@@ -37,7 +39,9 @@ class VTChatBackend:
         self._http_client = http_client
         self._async_http_client = async_http_client
         self._sync: openai.OpenAI | None = None
-        self._async: openai.AsyncOpenAI | None = None
+        self._async = PerLoop(lambda: openai.AsyncOpenAI(
+            api_key=self._api_key, base_url=self.base_url, max_retries=0,
+            timeout=self.settings.timeout_seconds, http_client=self._async_http_client))
 
     def complete(self, messages: list[dict[str, str]], schema: type[BaseModel]) -> Completion:
         if self._sync is None:
@@ -52,12 +56,8 @@ class VTChatBackend:
 
     async def acomplete(self, messages: list[dict[str, str]],
                         schema: type[BaseModel]) -> Completion:
-        if self._async is None:
-            self._async = openai.AsyncOpenAI(
-                api_key=self._api_key, base_url=self.base_url, max_retries=0,
-                timeout=self.settings.timeout_seconds, http_client=self._async_http_client)
         try:
-            response = await self._async.chat.completions.create(
+            response = await self._async.get().chat.completions.create(
                 **self._request(messages, schema))
         except openai.OpenAIError as exc:
             raise classify_openai_error(PROVIDER, exc) from None
