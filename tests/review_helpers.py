@@ -30,7 +30,7 @@ ANSWERS = {
 class World:
     """Queue, API client, review-enabled graph sharing one checkpointer (a 'database')."""
 
-    def __init__(self, engine, clock=None) -> None:
+    def __init__(self, engine, clock=None, fields=None) -> None:
         self.engine = engine
         self.queue = make_queue(engine, clock)
         self.checkpoints = InMemorySaver()
@@ -40,7 +40,7 @@ class World:
         self.client = TestClient(create_app(queue=self.queue, evidence=self.evidence,
                                             reviews=self.reviews, records=self.records))
         self.run_id = self.client.post("/research/city", json={
-            "city_name": "Toronto", "country": "Canada", "field_keys": FIELDS}).json()["run_id"]
+            "city_name": "Toronto", "country": "Canada", "field_keys": fields or FIELDS}).json()["run_id"]
 
     def graph(self):
         gateway, _ = make_gateway(ModelScript(answers=ANSWERS), structured_max_attempts=1)

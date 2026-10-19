@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
+from water_source_research.api.evaluation import evaluation_router
 from water_source_research.core.config import get_settings
 from water_source_research.procedures.services import ProcedureServices, build_procedure_services
 from water_source_research.reporting.run_views import field_provenance, human_review_log
@@ -394,6 +395,8 @@ def create_app(queue: ResearchQueue | None = None,
     async def deprecate(version_id: str):
         return _transition(require().lifecycle.deprecate(version_id))
 
+    # Evaluation of saved research runs (reads research data only).
+    app.include_router(evaluation_router(queue.engine))
     return app
 
 def _latest_by_item(decisions: list[dict]) -> dict[str, dict]:

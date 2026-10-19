@@ -31,10 +31,11 @@ from .reference import ReferenceValue
 
 Status = Literal["MATCH", "MISMATCH", "PARTIAL_MATCH", "MISSING_PREDICTION",
                  "MISSING_REFERENCE", "TEMPORAL_MISMATCH", "SCOPE_MISMATCH", "NOT_COMPARABLE",
-                 "NEEDS_REVIEW"]
-# Statuses that count as correct / as a comparable outcome in metrics.
+                 "NEEDS_REVIEW", "NOT_RESEARCHED"]
+# Statuses that count as correct / as a comparable outcome in metrics. NOT_RESEARCHED: the run
+# researched a field subset that excludes this field (and produced nothing for it).
 CORRECT = frozenset({"MATCH"})
-NOT_SCORED = frozenset({"MISSING_REFERENCE", "NOT_COMPARABLE"})
+NOT_SCORED = frozenset({"MISSING_REFERENCE", "NOT_COMPARABLE", "NOT_RESEARCHED"})
 
 class Prediction(BaseModel):
     """A value produced by the pipeline at some stage (a claim, a resolution, an export)."""

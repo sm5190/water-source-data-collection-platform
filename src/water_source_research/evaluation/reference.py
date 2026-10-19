@@ -89,10 +89,11 @@ class ReferenceDataset(BaseModel):
     def city(self, city: str, country: str | None = None) -> ReferenceCity | None:
         key = city_key(city, country)
         exact = next((c for c in self.cities if c.city_key == key), None)
-        if exact is not None or country:
+        if exact is not None:
             return exact
-        return next((c for c in self.cities if c.city_key.split("|")[0] == name_key(city)),
-                    None)
+        # Country names vary ("USA" / "United States of America"): a unique city name decides.
+        same_name = [c for c in self.cities if c.city_key.split("|")[0] == name_key(city)]
+        return same_name[0] if len(same_name) == 1 else None
 
 def city_key(city: str, country: str | None) -> str:
     return f"{name_key(city)}|{name_key(country or '')}"
