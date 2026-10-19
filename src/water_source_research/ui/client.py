@@ -87,6 +87,45 @@ class ResearchApiClient:
         filename = disposition.split("filename=")[-1].strip('"') or f"export.{fmt}"
         return r.content, filename, r.headers.get("content-type", "application/octet-stream")
 
+    # --- evaluation (separate from research review) ---------------------------------------
+
+    def eval_references(self) -> list[dict[str, Any]]:
+        return self._get("/evaluation/references")
+
+    def eval_overview(self) -> list[dict[str, Any]]:
+        return self._get("/evaluation/overview")
+
+    def eval_runs(self, research_run_id: str | None = None) -> list[dict[str, Any]]:
+        return self._get("/evaluation/runs", research_run_id=research_run_id)
+
+    def eval_run(self, eval_id: str) -> dict[str, Any]:
+        return self._get(f"/evaluation/runs/{eval_id}")
+
+    def evaluate(self, research_run_id: str, dataset_id: str | None = None) -> dict[str, Any]:
+        return self._post("/evaluation/runs", {"research_run_id": research_run_id,
+                                               "dataset_id": dataset_id})
+
+    def eval_fields(self, eval_id: str) -> list[dict[str, Any]]:
+        return self._get(f"/evaluation/runs/{eval_id}/fields")
+
+    def eval_field(self, eval_id: str, field_key: str) -> dict[str, Any]:
+        return self._get(f"/evaluation/runs/{eval_id}/fields/{field_key}")
+
+    def eval_diagnoses(self, eval_id: str) -> list[dict[str, Any]]:
+        return self._get(f"/evaluation/runs/{eval_id}/diagnoses")
+
+    def adjudicate(self, eval_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return self._post(f"/evaluation/runs/{eval_id}/adjudications", body)
+
+    def eval_report(self, eval_id: str, kind: str, fmt: str) -> tuple[bytes, str, str]:
+        r = self.http.get(f"/evaluation/runs/{eval_id}/report",
+                          params={"kind": kind, "format": fmt})
+        if r.status_code >= 400:
+            raise ApiError(f"report -> {r.status_code}: {r.text[:300]}")
+        disposition = r.headers.get("content-disposition", "")
+        filename = disposition.split("filename=")[-1].strip('"') or f"report.{fmt}"
+        return r.content, filename, r.headers.get("content-type", "application/octet-stream")
+
     def _post(self, path: str, body: dict[str, Any]) -> Any:
         r = self.http.post(path, json=body)
         if r.status_code >= 400:

@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.ui.client import ApiError, ResearchApiClient
+from water_source_research.ui.evaluation import render_evaluation
 
 ACTIVE = {"QUEUED", "RUNNING"}
 STATUS_ICON = {"QUEUED": "⏳", "RUNNING": "🔄", "AWAITING_REVIEW": "🧑‍⚖️", "SUCCEEDED": "✅",
@@ -34,6 +35,8 @@ with st.sidebar:
     # Recorded with every review decision (there is no login; this is the audit identity).
     reviewer = st.text_input("Reviewer", key="reviewer",
                              help="Your name or email, recorded with each review decision")
+    mode = st.radio("Mode", ["Research", "Evaluation"], horizontal=True, key="mode",
+                    help="Evaluation compares saved research runs with the reference workbook")
 client: Any = st.session_state.get("client") or ResearchApiClient(api_url)
 
 with st.sidebar:
@@ -52,6 +55,10 @@ with st.sidebar:
     else:
         st.error(f"API not reachable at {api_url}")
         st.stop()
+
+if mode == "Evaluation":
+    render_evaluation(client, reviewer)
+    st.stop()
 
 st.title("💧 Water Source Research")
 
