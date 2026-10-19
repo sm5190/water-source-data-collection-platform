@@ -1,0 +1,7 @@
+# Known names for the same entity, used when comparing utilities, water sources and other
+# named things (evaluation/compare.py). Only add names that denote the same entity; similar
+# spelling alone is never treated as a match. Canonical name -> other names.
+aliases:
+  Hyderabad Metropolitan Water Supply and Sewerage Board: [HMWSSB]
+  Canal de Isabel II: [Canal de Isabel Segunda]
+  Houston Public Works: [City of Houston Public Works]

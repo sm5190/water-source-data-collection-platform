@@ -1,0 +1,17 @@
+# Evaluation comparison policy (src/water_source_research/evaluation/policy.py).
+# Changing anything here changes evaluation outcomes: bump COMPARE_POLICY_VERSION in policy.py
+# so earlier evaluation runs stay attributable to the rules they used.
+
+numeric_tolerance: 0.02          # relative, default for numbers and percentages
+field_tolerance:
+  city_population_millions: 0.02
+  utility_reported_city_population_millions: 0.02
+  population_served_millions: 0.02
+  total_city_water_withdrawals_m3_day: 0.05
+  source_withdrawal_contribution_m3_day: 0.05
+  percentage_total_population: 0.01
+  source_withdrawal_percentage: 0.01
+city_point_km: 25                # city centre coordinates
+pod_point_km: 2                  # point of diversion / intake
+placeholders: ["HYBAS ID"]       # reference cells that are labels, not values
+scope_flags: [GEOGRAPHIC_SCOPE, MEASUREMENT_BASIS, APPROXIMATE_VALUE]
