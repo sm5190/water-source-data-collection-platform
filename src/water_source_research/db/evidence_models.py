@@ -98,6 +98,7 @@ class FieldClaimRecord(Base):
     qualifiers: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
     validation_outcome: Mapped[str | None] = mapped_column(String(24))
     validation: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
+    review_status: Mapped[str | None] = mapped_column(String(16))  # REJECTED | CORRECTED
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 class ClaimCitationRecord(Base):
@@ -135,4 +136,5 @@ class FieldResolutionRecord(Base):
     candidate_claim_uids: Mapped[list[str]] = mapped_column(JSONType, default=list)
     decided_by: Mapped[str] = mapped_column(String(16))  # RULES | REVIEWER
     policy_version: Mapped[str] = mapped_column(String(32))
+    review_decision_id: Mapped[int | None] = mapped_column(Integer)  # REVIEWER rows
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

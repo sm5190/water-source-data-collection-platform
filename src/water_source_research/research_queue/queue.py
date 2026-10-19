@@ -7,6 +7,9 @@
 - heartbeat / complete / fail / release are fenced by ``lease_owner``: a worker that lost its
   lease (e.g. stalled past the deadline) can no longer change the job.
 - fail retries with exponential backoff until ``max_attempts``, then FAILED.
+- await_review parks a paused run (human review) as AWAITING_REVIEW: no lease, no worker,
+  checkpoint kept; resume_review puts it back in the queue with a fresh attempt budget once
+  the review round's decisions are in. A run waiting for review is still the city's active run.
 
 Lease timing uses the application clock, so worker hosts need synchronized clocks (NTP).
 """
@@ -35,11 +38,12 @@ _GLOBAL_CAP_LOCK = 0x5754_5251  # arbitrary advisory-lock key for the global run
 class JobStatus(StrEnum):
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
+    AWAITING_REVIEW = "AWAITING_REVIEW"  # paused for human review; not failed, not done
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
 
-ACTIVE = (JobStatus.QUEUED.value, JobStatus.RUNNING.value)
+ACTIVE = (JobStatus.QUEUED.value, JobStatus.RUNNING.value, JobStatus.AWAITING_REVIEW.value)
 
 @dataclass(frozen=True, slots=True)
 class Job:
@@ -59,6 +63,7 @@ class Job:
     started_at: datetime | None
     finished_at: datetime | None
     field_keys: list[str] | None = None  # field subset for this run; None = every field
+    review_round: int = 0  # human review round awaited (AWAITING_REVIEW) or last resumed
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -66,7 +71,8 @@ class Job:
                 "max_attempts": self.max_attempts, "cancel_requested": self.cancel_requested,
                 "resumed": self.resumed, "last_error": self.last_error,
                 "created_at": _iso(self.created_at), "started_at": _iso(self.started_at),
-                "finished_at": _iso(self.finished_at), "field_keys": self.field_keys}
+                "finished_at": _iso(self.finished_at), "field_keys": self.field_keys,
+                "review_round": self.review_round}
 
 @dataclass(frozen=True, slots=True)
 class SubmitResult:
@@ -125,11 +131,12 @@ class ResearchQueue:
             return result
 
     def cancel(self, run_id: str) -> Job | None:
-        """QUEUED -> CANCELLED immediately; RUNNING -> cancel requested (worker stops it)."""
+        """QUEUED / AWAITING_REVIEW -> CANCELLED immediately; RUNNING -> cancel requested
+        (the worker stops it)."""
         now = self.clock()
         with Session(self.engine) as session, session.begin():
-            session.execute(update(J).where(J.run_id == run_id,
-                                            J.status == JobStatus.QUEUED.value)
+            session.execute(update(J).where(J.run_id == run_id, J.status.in_(
+                (JobStatus.QUEUED.value, JobStatus.AWAITING_REVIEW.value)))
                             .values(status=JobStatus.CANCELLED.value, finished_at=now,
                                     updated_at=now))
             session.execute(update(J).where(J.run_id == run_id,
@@ -208,6 +215,31 @@ class ResearchQueue:
                 last_error=None)).rowcount
         if n:
             telemetry.jobs_finished.add(1, {"status": JobStatus.SUCCEEDED.value})
+        return bool(n)
+
+    def await_review(self, run_id: str, worker_id: str, round_no: int,
+                     result: dict[str, Any]) -> bool:
+        """RUNNING -> AWAITING_REVIEW (fenced): the graph paused on human review round
+        ``round_no``. The partial result is stored so the run's views work while it waits."""
+        now = self.clock()
+        with Session(self.engine) as session, session.begin():
+            n = session.execute(update(J).where(*self._owned(run_id, worker_id)).values(
+                status=JobStatus.AWAITING_REVIEW.value, review_round=round_no, result=result,
+                lease_owner=None, lease_until=None, updated_at=now, last_error=None)).rowcount
+        if n:
+            telemetry.jobs_finished.add(1, {"status": JobStatus.AWAITING_REVIEW.value})
+        return bool(n)
+
+    def resume_review(self, run_id: str, round_no: int) -> bool:
+        """AWAITING_REVIEW (for this round) -> QUEUED with a fresh attempt budget. False if
+        the run isn't waiting on that round (already resumed, cancelled, or stale)."""
+        now = self.clock()
+        with Session(self.engine) as session, session.begin():
+            n = session.execute(update(J).where(
+                J.run_id == run_id, J.status == JobStatus.AWAITING_REVIEW.value,
+                J.review_round == round_no,
+            ).values(status=JobStatus.QUEUED.value, available_at=now, attempts=0,
+                     cancel_requested=False, updated_at=now)).rowcount
         return bool(n)
 
     def fail(self, run_id: str, worker_id: str, error: str,
@@ -350,7 +382,8 @@ def _job(r: ResearchJobRecord) -> Job:
                lease_until=r.lease_until, cancel_requested=r.cancel_requested,
                resumed=r.resumed, last_error=r.last_error, created_at=r.created_at,
                started_at=r.started_at, finished_at=r.finished_at,
-               field_keys=list(r.field_keys) if r.field_keys else None)
+               field_keys=list(r.field_keys) if r.field_keys else None,
+               review_round=r.review_round or 0)
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

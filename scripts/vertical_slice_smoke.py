@@ -189,8 +189,11 @@ def main() -> int:
         st.report("worker", False, f"{type(exc).__name__}: {str(exc)[:300]}")
         return RUN
     job = queue.get(run_id)
-    st.report("worker", job.status is JobStatus.SUCCEEDED,
-              f"{processed} run(s) processed; {run_id} is {job.status.value}",
+    done = (JobStatus.SUCCEEDED, JobStatus.AWAITING_REVIEW)  # waiting for review isn't failure
+    st.report("worker", job.status in done,
+              f"{processed} run(s) processed; {run_id} is {job.status.value}"
+              + (f" (review round {job.review_round})"
+                 if job.status is JobStatus.AWAITING_REVIEW else ""),
               time.perf_counter() - t)
 
     print("\nStages (from research_run_steps):")
@@ -227,7 +230,7 @@ def main() -> int:
             detail = f"post-processing errors: {summary.get('post_processing_errors')}"
         st.report(node, True, detail, (s.get("duration_ms") or 0) / 1000)
 
-    if job.status is not JobStatus.SUCCEEDED:
+    if job.status not in done:
         error = job.last_error or "unknown"
         print(f"\nRun failed: {error[:500]}")
         return LLM if "LLMError" in error or "llm" in error.lower() else RUN

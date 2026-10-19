@@ -81,17 +81,18 @@ class DistillationJobRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+ACTIVE_WHERE = "status IN ('QUEUED', 'RUNNING', 'AWAITING_REVIEW')"
+
 class ResearchJobRecord(Base):
     """A queued city run. The queue row is the source of truth for run status."""
 
     __tablename__ = "research_jobs"
     __table_args__ = (
         Index("ix_research_jobs_claim", "status", "available_at", "priority"),
-        # At most one QUEUED/RUNNING job per city: duplicate submissions return it instead.
+        # At most one active job per city: duplicate submissions return it instead.
         Index(
             "uq_research_jobs_active_city", "city_key", unique=True,
-            postgresql_where=text("status IN ('QUEUED', 'RUNNING')"),
-            sqlite_where=text("status IN ('QUEUED', 'RUNNING')"),
+            postgresql_where=text(ACTIVE_WHERE), sqlite_where=text(ACTIVE_WHERE),
         ),
     )
 
@@ -99,7 +100,7 @@ class ResearchJobRecord(Base):
     city_name: Mapped[str] = mapped_column(String(255))
     country: Mapped[str | None] = mapped_column(String(255))
     city_key: Mapped[str] = mapped_column(String(512))  # normalized city|country
-    # QUEUED | RUNNING | SUCCEEDED | FAILED | CANCELLED
+    # QUEUED | RUNNING | AWAITING_REVIEW | SUCCEEDED | FAILED | CANCELLED
     status: Mapped[str] = mapped_column(String(16), default="QUEUED")
     priority: Mapped[int] = mapped_column(Integer, default=0)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
@@ -114,6 +115,8 @@ class ResearchJobRecord(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     # Optional field subset for this run (None = every field); test runs / partial research.
     field_keys: Mapped[list[str] | None] = mapped_column(JSONType)
+    # Human review round the run is waiting on (AWAITING_REVIEW) or last resumed from.
+    review_round: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

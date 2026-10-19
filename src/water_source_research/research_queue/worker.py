@@ -3,7 +3,10 @@
 Concurrency: at most ``worker_concurrency`` runs in flight per process (plus the optional
 global cap enforced at claim time). Each run:
   claim (lease) -> resume-or-start the checkpointed graph -> heartbeat while running
-  -> complete / retry-with-backoff / fail / cancel.
+  -> complete / pause for human review / retry-with-backoff / fail / cancel.
+A run that pauses on human review (LangGraph interrupt) is parked as AWAITING_REVIEW with its
+checkpoint kept, freeing the worker; once the API resumes it, the next worker to claim it
+continues the graph with ``Command(resume=...)``.
 A heartbeat that finds the lease gone stops the run (fencing); on shutdown, in-flight runs
 get ``shutdown_grace_seconds`` and are then released back to the queue.
 """
@@ -16,6 +19,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
+from langgraph.types import Command
 from opentelemetry.trace import Status, StatusCode
 from water_source_research.observability.otel import get_tracer
 from water_source_research.services.field_state import initialize_city_state, unresolved_fields
@@ -31,7 +35,7 @@ RESULT_KEYS = ("finalized", "events", "context_bundle_ids", "procedure_selection
                "research_state", "claims", "discovery_rounds", "procedure_memory_degraded",
                "post_processing_errors", "distillation_jobs", "acquired_documents",
                "unresolved_fields", "discovery_provider_status", "discovery_candidates",
-               "candidate_urls", "resolution_log", "fields_requiring_review")
+               "candidate_urls", "resolution_log", "fields_requiring_review", "review_round")
 
 class _Stop(Exception):
     def __init__(self, reason: str) -> None:
@@ -119,7 +123,8 @@ class ResearchWorker:
             stop_reason: dict[str, str] = {}
             heartbeat = asyncio.create_task(self._heartbeat(job, run_task, stop_reason))
             try:
-                state, resumed = await asyncio.wait_for(run_task, self.s.max_run_seconds)
+                state, resumed, paused = await asyncio.wait_for(run_task,
+                                                                self.s.max_run_seconds)
             except asyncio.CancelledError:
                 if "reason" not in stop_reason:
                     # Worker shutdown: hand the job back without consuming an attempt.
@@ -133,23 +138,36 @@ class ResearchWorker:
                 span.record_exception(exc)
                 await self._failed(job, f"{type(exc).__name__}: {exc}", span)
             else:
-                await self._succeeded(job, state, resumed, span)
+                if paused is not None:
+                    await self._paused(job, state, paused, span)
+                else:
+                    await self._succeeded(job, state, resumed, span)
             finally:
                 heartbeat.cancel()
                 telemetry.run_duration_seconds.record(time.perf_counter() - started)
 
-    async def _run_graph(self, job: Job) -> tuple[dict[str, Any], bool]:
+    async def _run_graph(self, job: Job) -> tuple[dict[str, Any], bool, int | None]:
+        """(final values, resumed from a checkpoint, review round the graph paused on)."""
         config = {"configurable": {"thread_id": job.run_id}}
         snapshot = await self.graph.aget_state(config)
-        if snapshot.next:  # crashed/failed mid-graph earlier: continue from the checkpoint
+        if snapshot.next:
+            paused = paused_round(snapshot)
+            if paused is not None and paused > job.review_round:
+                # Paused earlier but never recorded as waiting (crash): park it again.
+                return dict(snapshot.values), True, paused
             telemetry.runs_resumed.add(1)
-            return await self._stream(job, None, config, dict(snapshot.values)), True
+            # Resumed review round (the node reads the decisions from the database), or a
+            # run that crashed/failed mid-graph: continue from the checkpoint.
+            graph_input = Command(resume={"round": paused}) if paused is not None else None
+            final = await self._stream(job, graph_input, config, dict(snapshot.values))
+            return dict(final.values), True, paused_round(final)
         if snapshot.values:  # graph finished but the job was never marked complete
-            return dict(snapshot.values), True
-        return await self._stream(job, self._initial_input(job), config, {}), False
+            return dict(snapshot.values), True, None
+        final = await self._stream(job, self._initial_input(job), config, {})
+        return dict(final.values), False, paused_round(final)
 
-    async def _stream(self, job: Job, graph_input: dict[str, Any] | None,
-                      config: dict[str, Any], previous: dict[str, Any]) -> dict[str, Any]:
+    async def _stream(self, job: Job, graph_input: Any, config: dict[str, Any],
+                      previous: dict[str, Any]) -> Any:
         """Run the graph step by step, recording each completed step for progress views."""
         seq = 0
         started = time.perf_counter()
@@ -169,8 +187,7 @@ class ResearchWorker:
                     log.warning("could not record step %s for %s", node, job.run_id,
                                 exc_info=True)
                 started, previous = now, state
-        final = await self.graph.aget_state(config)
-        return dict(final.values)
+        return await self.graph.aget_state(config)
 
     async def _heartbeat(self, job: Job, run_task: asyncio.Task,
                          stop_reason: dict[str, str]) -> None:
@@ -207,6 +224,15 @@ class ResearchWorker:
             except Exception:  # post-run hooks never affect the result
                 log.warning("post-run hook failed for %s", job.run_id, exc_info=True)
 
+    async def _paused(self, job: Job, state: dict[str, Any], round_no: int, span) -> None:
+        """The graph is waiting for human review: park the job, keep the checkpoint."""
+        result = {k: state.get(k) for k in RESULT_KEYS if k in state}
+        recorded = await asyncio.to_thread(self.queue.await_review, job.run_id,
+                                           self.worker_id, round_no, result)
+        span.set_attribute("research_queue.outcome",
+                           "awaiting_review" if recorded else "lease_lost")
+        span.set_attribute("review.round", round_no)
+
     async def _failed(self, job: Job, error: str, span) -> None:
         status = await asyncio.to_thread(self.queue.fail, job.run_id, self.worker_id, error)
         span.set_status(Status(StatusCode.ERROR, error[:200]))
@@ -238,3 +264,11 @@ class ResearchWorker:
             "research_state": research.model_dump(mode="json"),
             "unresolved_fields": unresolved_fields(research, job.field_keys),
         }
+
+def paused_round(snapshot: Any) -> int | None:
+    """Review round a checkpointed graph is paused on (human_review interrupt), if any."""
+    for item in getattr(snapshot, "interrupts", ()) or ():
+        value = getattr(item, "value", None)
+        if isinstance(value, dict) and isinstance(value.get("round"), int):
+            return value["round"]
+    return None

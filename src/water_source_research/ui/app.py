@@ -5,6 +5,7 @@ Needs the API (uvicorn) and at least one worker (scripts/run_research_worker.py)
 Set RESEARCH_API_URL if the API isn't on http://localhost:8000.
 """
 
+import hashlib
 import json
 import os
 from typing import Any
@@ -13,10 +14,11 @@ import streamlit as st
 from water_source_research.ui.client import ApiError, ResearchApiClient
 
 ACTIVE = {"QUEUED", "RUNNING"}
-STATUS_ICON = {"QUEUED": "⏳", "RUNNING": "🔄", "SUCCEEDED": "✅", "FAILED": "❌",
-               "CANCELLED": "🚫"}
+STATUS_ICON = {"QUEUED": "⏳", "RUNNING": "🔄", "AWAITING_REVIEW": "🧑‍⚖️", "SUCCEEDED": "✅",
+               "FAILED": "❌", "CANCELLED": "🚫"}
 NODE_LABEL = {"plan": "Plan", "discover": "Discover sources", "acquire": "Acquire documents",
-              "extract": "Extract claims", "validate": "Validate", "human_review": "Human review",
+              "extract": "Extract claims", "validate": "Validate claims",
+              "resolve": "Resolve fields", "human_review": "Human review",
               "finalize": "Finalize"}
 
 st.set_page_config(page_title="Water Source Research", page_icon="💧", layout="wide")
@@ -28,6 +30,9 @@ with st.sidebar:
     api_url = st.text_input("API URL", os.environ.get("RESEARCH_API_URL",
                                                       "http://localhost:8000"))
     refresh_seconds = st.slider("Auto-refresh (seconds)", 2, 30, 3)
+    # Recorded with every review decision (there is no login; this is the audit identity).
+    reviewer = st.text_input("Reviewer", key="reviewer",
+                             help="Your name or email, recorded with each review decision")
 client: Any = st.session_state.get("client") or ResearchApiClient(api_url)
 
 with st.sidebar:
@@ -93,7 +98,12 @@ run_id = st.selectbox(
                                  f"{(r['created_at'] or '')[:19].replace('T', ' ')} · {rid[:8]}"
                                  for r in runs if r["run_id"] == rid))
 st.session_state["run_id"] = run_id
-is_active = next(r for r in runs if r["run_id"] == run_id)["status"] in ACTIVE
+selected_run = next(r for r in runs if r["run_id"] == run_id)
+is_active = selected_run["status"] in ACTIVE
+if selected_run["status"] == "AWAITING_REVIEW":
+    st.warning(f"🧑‍⚖️ This run is waiting for human review (round "
+               f"{selected_run.get('review_round')}). Decide the open items in the "
+               "**Review queue** tab, then resume the run.")
 
 # --- dashboard -------------------------------------------------------------------------
 
@@ -120,7 +130,7 @@ def render_progress(data: dict[str, Any]) -> None:
     st.progress(fraction, text=label)
     if run.get("last_error"):
         st.error(f"Last error: {run['last_error']}")
-    if run["status"] in ACTIVE and st.button("🚫 Cancel run"):
+    if run["status"] in ACTIVE | {"AWAITING_REVIEW"} and st.button("🚫 Cancel run"):
         client.cancel(run["run_id"])
         st.rerun()
 
@@ -241,11 +251,167 @@ def render_fields(data: dict[str, Any]) -> None:
                              f"(confidence {cand['confidence']})"):
                 render_citations(cand["citations"])
 
+DECISION_LABEL = {
+    "APPROVE": "Approve / select claim(s)", "REJECT": "Reject claim(s)",
+    "CORRECT": "Correct the value (with evidence)", "ASSIGN_SOURCE": "Assign to a water source",
+    "MARK_UNKNOWN": "Mark Unknown (applies, not found)", "MARK_NA": "Mark N/A (does not apply)",
+    "DEFER": "Defer (finalize as Unknown for now)",
+}
+CLAIM_DECISIONS = {"APPROVE", "REJECT", "ASSIGN_SOURCE"}
+
+def render_decisions(run: dict[str, Any]) -> None:
+    """Review queue: pending items of the round the run is waiting on, and decision forms."""
+    if run["status"] != "AWAITING_REVIEW":
+        st.info(f"This run is {run['status']}: nothing is waiting for review.")
+        render_history()
+        return
+    pending = client.review_pending(run_id)
+    items = pending["items"]
+    decided = sum(1 for i in items if i.get("decision"))
+    st.markdown(f"**Review round {pending['round']}** · {len(items)} item(s) · "
+                f"{decided} decided")
+    if not reviewer:
+        st.warning("Enter your name or email as **Reviewer** in the sidebar to decide.")
+    for item in items:
+        render_item(item)
+    st.divider()
+    if st.button("✅ Submit decisions & resume the run", type="primary",
+                 disabled=not reviewer or decided < len(items)):
+        try:
+            client.resume_review(run_id, reviewer)
+            st.success("Run resumed: it is back in the queue.")
+            st.rerun()
+        except ApiError as exc:
+            st.error(str(exc))
+    if decided < len(items):
+        st.caption("Every item needs a decision before the run can resume.")
+    render_history()
+
+def render_item(item: dict[str, Any]) -> None:
+    p = item["payload"]
+    entity = p["entity"].get("label") or p["entity"]["key"]
+    current = item.get("decision")
+    title = (f"{'✅' if current else '⏳'} {item['field_key']} · {entity} · "
+             f"{', '.join(item['reason_codes'])}")
+    with st.expander(title, expanded=not current):
+        if current:
+            st.success(f"Current decision: **{current['decision']}** by {current['reviewer']}"
+                       + (f" — {current['reason']}" if current.get("reason") else ""))
+        candidates = p.get("candidates", [])
+        if candidates:
+            cols = st.columns(len(candidates))
+            for col, cand in zip(cols, candidates, strict=True):
+                with col:
+                    render_candidate(cand)
+        else:
+            st.caption("No candidate claim: nothing in the acquired evidence supported this "
+                       "field.")
+        decision_form(item, candidates)
+
+def render_candidate(cand: dict[str, Any]) -> None:
+    v = cand.get("validation") or {}
+    badge = {"VALID": "🟢", "VALID_WITH_WARNINGS": "🟡", "INVALID": "🔴"}.get(
+        v.get("outcome"), "⚪")
+    st.markdown(f"{badge} **{cand['value']}**  \n`{cand['claim_uid']}`")
+    q = cand.get("qualifiers") or {}
+    st.caption(f"normalized: {cand.get('normalized_value')} · origin: {cand['value_origin']} · "
+               f"year: {q.get('reference_year') or '—'} · sources: "
+               f"{', '.join(q.get('source_types') or []) or '—'} · "
+               f"confidence: {cand['confidence']}")
+    for check in v.get("checks", []):
+        if check["result"] != "PASS":
+            st.caption(f"{'❌' if check['result'] == 'FAIL' else '⚠️'} {check['code']}: "
+                       f"{check.get('detail') or ''}")
+    for cite in cand.get("citations", []):
+        page = f", p. {cite['page_number']}" if cite.get("page_number") is not None else ""
+        st.markdown(f"[{cite.get('title') or cite['url']}]({cite['url']}){page} · "
+                    f"{cite.get('source_type') or '—'} · {cite.get('source_date') or 'n.d.'}")
+        st.markdown("> " + (cite.get("quote") or "").replace("\n", " ")[:600])
+        st.link_button("Open source", cite["url"])
+
+def decision_form(item: dict[str, Any], candidates: list[dict[str, Any]]) -> None:
+    p = item["payload"]
+    allowed = p.get("allowed_decisions", [])
+    with st.form(f"decide:{item['id']}"):
+        kind = st.radio("Decision", allowed, format_func=lambda d: DECISION_LABEL.get(d, d),
+                        key=f"kind:{item['id']}")
+        labels = {c["claim_uid"]: f"{c['value']} ({c['claim_uid'][:8]})" for c in candidates}
+        claims = st.multiselect("Claim(s) — for approve / reject / assign", list(labels),
+                                format_func=labels.get, key=f"claims:{item['id']}")
+        sources = {s["key"]: s["label"] for s in p.get("sources") or []}
+        target = st.selectbox("Water source — for assign", [""] + list(sources),
+                              format_func=lambda k: sources.get(k, "—"),
+                              key=f"target:{item['id']}")
+        value = st.text_input("Corrected value", key=f"value:{item['id']}")
+        origin = st.selectbox("Value origin", ["REPORTED", "CALCULATED", "ESTIMATED",
+                                               "ALLOCATED"], key=f"origin:{item['id']}")
+        category = st.text_input("Correction category (optional)", key=f"cat:{item['id']}")
+        reason = st.text_area("Reason (required for correct / unknown / N/A / defer)",
+                              key=f"reason:{item['id']}")
+        chunks = sorted({c["chunk_id"] for cand in candidates for c in cand["citations"]
+                         if c.get("chunk_id")})
+        source_kind = st.radio("Evidence for a correction",
+                               ["Quote from the run's evidence", "Reviewer-supplied source"],
+                               horizontal=True, key=f"evkind:{item['id']}")
+        chunk_id = st.selectbox("Evidence chunk", [""] + chunks, key=f"chunk:{item['id']}")
+        quote = st.text_area("Verbatim quote from that chunk", key=f"quote:{item['id']}")
+        url = st.text_input("Source URL", key=f"url:{item['id']}")
+        source_title = st.text_input("Source title", key=f"title:{item['id']}")
+        note = st.text_input("What the source says (note)", key=f"note:{item['id']}")
+        if not st.form_submit_button("Save decision", disabled=not reviewer):
+            return
+    body: dict[str, Any] = {"item_id": item["id"], "round": item["round"], "decision": kind,
+                            "reason": reason or None,
+                            "correction_category": category or None}
+    if kind in CLAIM_DECISIONS:
+        body["claim_uids"] = claims
+    if kind == "ASSIGN_SOURCE":
+        body["entity_key"] = target or None
+    if kind == "CORRECT":
+        body.update(value=parse_value(value), value_origin=origin, claim_uids=claims)
+        body["evidence"] = ({"chunk_id": chunk_id or None, "quote": quote}
+                            if source_kind.startswith("Quote")
+                            else {"url": url, "title": source_title or None,
+                                  "note": note or None})
+    # Same content -> same key: a double-click doesn't record two decisions.
+    body["decision_key"] = hashlib.sha1(
+        json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:32]
+    try:
+        client.submit_decisions(run_id, reviewer, [body])
+        st.success("Decision saved.")
+        st.rerun()
+    except ApiError as exc:
+        st.error(str(exc))
+
+def parse_value(text: str) -> Any:
+    """Numbers as numbers ("980000" -> 980000), anything else as text."""
+    try:
+        value = json.loads(text)
+        return value if isinstance(value, int | float) else text
+    except ValueError:
+        return text
+
+def render_history() -> None:
+    history = client.review_history(run_id)
+    if not history["decisions"]:
+        return
+    st.markdown("**Review history (append-only)**")
+    st.dataframe(pd.DataFrame([{
+        "round": d["round"], "at": (d["created_at"] or "")[:19].replace("T", " "),
+        "reviewer": d["reviewer"], "field": d["field_key"], "entity": d["entity_key"],
+        "decision": d["decision"], "from": json.dumps(d["original_value"]),
+        "to": json.dumps(d["reviewed_value"]), "reason": d["reason"] or "",
+        "supersedes": d["supersedes_id"] or "",
+    } for d in history["decisions"]]), hide_index=True, width="stretch")
+
 def dashboard() -> None:
-    progress_tab, review_tab, fields_tab = st.tabs(
-        ["📈 Progress & step outputs", "🧑‍⚖️ Human review log", "🧬 Field tracking & provenance"])
+    progress_tab, queue_tab, review_tab, fields_tab = st.tabs(
+        ["📈 Progress & step outputs", "✍️ Review queue", "🧑‍⚖️ Human review log",
+         "🧬 Field tracking & provenance"])
     with progress_tab:
         render_progress(client.steps(run_id))
+    with queue_tab:
+        render_decisions(selected_run)
     with review_tab:
         render_review(client.review(run_id))
     with fields_tab:

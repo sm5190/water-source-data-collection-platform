@@ -17,6 +17,7 @@ from water_source_research.discovery.service import build_discovery_service
 from water_source_research.llm.extraction import build_extraction_gateway
 from water_source_research.procedures.services import ProcedureServices
 from water_source_research.services.evidence_store import EvidenceRepository
+from water_source_research.services.review import ReviewRepository
 from water_source_research.services.run_recorder import RunRecorder
 from .graph import build_graph
 
@@ -42,4 +43,6 @@ def build_production_graph(
         discovery=build_discovery_service(settings),
         acquisition=build_acquisition_service(settings, artifact_store),
         evidence_store=EvidenceRepository(engine),
+        # Persistent human review (pauses the run) whenever runs are checkpointed.
+        review_store=ReviewRepository(engine) if checkpointer is not None else None,
     )

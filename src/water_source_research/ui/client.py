@@ -46,6 +46,31 @@ class ResearchApiClient:
     def fields(self, run_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/fields")
 
+    # --- human review ---------------------------------------------------------------------
+
+    def review_pending(self, run_id: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/review/pending")
+
+    def review_item(self, run_id: str, item_id: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/review/items/{item_id}")
+
+    def review_history(self, run_id: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/review/history")
+
+    def submit_decisions(self, run_id: str, reviewer: str,
+                         decisions: list[dict[str, Any]]) -> dict[str, Any]:
+        return self._post(f"/research/runs/{run_id}/review/decisions",
+                          {"reviewer": reviewer, "decisions": decisions})
+
+    def resume_review(self, run_id: str, reviewer: str) -> dict[str, Any]:
+        return self._post(f"/research/runs/{run_id}/review/resume", {"reviewer": reviewer})
+
+    def _post(self, path: str, body: dict[str, Any]) -> Any:
+        r = self.http.post(path, json=body)
+        if r.status_code >= 400:
+            raise ApiError(f"POST {path} -> {r.status_code}: {r.text[:500]}")
+        return r.json()
+
     def cancel(self, run_id: str) -> dict[str, Any]:
         r = self.http.post(f"/research/runs/{run_id}/cancel")
         if r.status_code >= 400:

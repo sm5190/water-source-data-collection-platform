@@ -52,6 +52,8 @@ class FieldDefinition(BaseModel):
     descriptive: bool = False
     # Source types authoritative for this field (empty = the resolution policy's default).
     official_sources: list[str] = Field(default_factory=list)
+    # Built at export from the run's citations (References): never extracted or reviewed.
+    generated: bool = False
 
     @model_validator(mode="after")
     def _default_scope(self) -> "FieldDefinition":
@@ -104,6 +106,12 @@ class FieldClaim(BaseModel):
     validation: ClaimValidation | None = None
     # Water source the claim describes (record-scope fields), set by resolution.
     entity_key: str | None = None
+    # Human review: REJECTED claims are kept but never selected; CORRECTED claims were
+    # entered by a reviewer (``corrected_from`` = the claim they replace); a reviewer may pin
+    # a claim to a water source (``assigned_entity_key``) that attribution then respects.
+    review_status: Literal["REJECTED", "CORRECTED"] | None = None
+    corrected_from: str | None = None
+    assigned_entity_key: str | None = None
 
     @property
     def comparable_value(self) -> Any:
@@ -121,6 +129,10 @@ class EntityResolution(BaseModel):
     candidate_claim_uids: list[str] = Field(default_factory=list)
     # Valid claims for earlier reference years (kept, not conflicts).
     historical_claim_uids: list[str] = Field(default_factory=list)
+    # Reviewer decisions are never recomputed by the rules.
+    decided_by: Literal["RULES", "REVIEWER"] = "RULES"
+    review_decision_id: int | None = None
+    note: str | None = None  # reviewer's reason (e.g. why Unknown / N/A)
 
 class FieldResolution(BaseModel):
     scope: str

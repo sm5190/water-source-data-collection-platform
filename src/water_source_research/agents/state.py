@@ -25,7 +25,10 @@ class GraphState(TypedDict, total=False):
     fields_requiring_review: list[str]  # CONFLICT / HITL_REQUIRED after resolution
     needs_human_review: bool
     review_reason: str | None
-    review_decisions: list[dict]  # [{field_key, decision: APPROVED|CORRECTED|REJECTED, ...}]
+    # Inline field-level decisions (no review store): [{field_key, decision:
+    # APPROVED|CORRECTED|REJECTED, value?}]. Production reviews go through the API instead.
+    review_decisions: list[dict]
+    review_round: int  # human review rounds completed (each one an interrupt + resume)
     finalized: bool
     # Trusted workflow events (schemas.events.WorkflowEvent); the only distillation input.
     events: list[dict]

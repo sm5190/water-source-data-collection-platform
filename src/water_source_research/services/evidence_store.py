@@ -158,7 +158,8 @@ class EvidenceRepository:
                 selected_claim_uids=list(e.get("selected_claim_uids") or []),
                 candidate_claim_uids=list(e.get("candidate_claim_uids") or []),
                 decided_by=e.get("decided_by", "RULES"),
-                policy_version=e.get("policy_version", "")))
+                policy_version=e.get("policy_version", ""),
+                review_decision_id=e.get("review_decision_id")))
 
     @staticmethod
     def _chunk_index(session: Session, run_id: str
@@ -191,6 +192,20 @@ class EvidenceRepository:
             return [{"chunk_id": r.chunk_id, "document_id": r.document_id, "url": r.url,
                      "page_number": r.page_number, "ordinal": r.ordinal, "text": r.text}
                     for r in rows]
+
+    def chunk(self, run_id: str, chunk_id: str) -> dict[str, Any] | None:
+        """One evidence chunk with its document's title, source type and date."""
+        with Session(self.engine) as session:
+            row = session.scalar(select(EvidenceChunkRecord).where(
+                EvidenceChunkRecord.run_id == run_id, EvidenceChunkRecord.chunk_id == chunk_id))
+            if row is None:
+                return None
+            doc = session.get(SourceDocumentRecord, row.document_id)
+            return {"chunk_id": row.chunk_id, "document_id": row.document_id, "url": row.url,
+                    "page_number": row.page_number, "text": row.text,
+                    "title": doc.title if doc else None,
+                    "source_type": doc.source_type if doc else None,
+                    "source_date": doc.source_date if doc else None}
 
     def claims(self, run_id: str) -> list[dict[str, Any]]:
         with Session(self.engine) as session:
@@ -237,6 +252,7 @@ class EvidenceRepository:
                      "reason_codes": r.reason_codes, "selected_claim_uids": r.selected_claim_uids,
                      "candidate_claim_uids": r.candidate_claim_uids, "decided_by": r.decided_by,
                      "policy_version": r.policy_version,
+                     "review_decision_id": r.review_decision_id,
                      "created_at": r.created_at.isoformat() if r.created_at else None}
                     for r in rows]
 

@@ -102,35 +102,46 @@ def resolve_research(research: CityResearchState, fields: Mapping[str, FieldDefi
     ws_def = fields.get(ENTITY_FIELD)
     ws = out.fields.get(ENTITY_FIELD)
     if ws_def is not None and ws is not None:
-        if not _preserved(ws) and ws.candidate_claims:
+        if not _preserved(ws) and (ws.candidate_claims or _reviewer_entities(ws)):
             entities = _resolve_entities(ws, ws_def, policy)
             _apply(ws, ws_def, entities, policy, log)
         sources = _accepted_sources(ws)
 
     for key, d in fields.items():
-        if key == ENTITY_FIELD or d.scope == "derived":
+        if key == ENTITY_FIELD or d.scope == "derived" or d.generated:
             continue
         fs = out.fields.get(key)
-        if fs is None or not fs.candidate_claims or _preserved(fs):
+        if fs is None or _preserved(fs) or not (fs.candidate_claims or _reviewer_entities(fs)):
             continue
         if d.scope == "city" or d.scope == "time_series":
-            entities = [_decide(CITY, None, fs.candidate_claims, d, policy)]
+            entities = [e for e in [_decide(CITY, None, fs.candidate_claims, d, policy)] if e]
         else:
             entities = _resolve_record_field(fs, d, sources, index, policy)
         _apply(fs, d, entities, policy, log)
     return out, log
 
+def _reviewer_entities(fs: FieldState) -> dict[str, EntityResolution]:
+    if fs.resolution is None:
+        return {}
+    return {e.entity_key: e for e in fs.resolution.entities if e.decided_by == "REVIEWER"}
+
 def _preserved(fs: FieldState) -> bool:
-    """Final states set by a reviewer (or before rules existed) are never recomputed."""
-    return fs.status in FINAL_STATUSES and (
-        fs.resolution is None or fs.resolution.decided_by == "REVIEWER")
+    """Final states set before rules existed, or by reviewers for every entity, are never
+    recomputed (reviewer-decided entities of a partly reviewed field are kept by _apply)."""
+    if fs.status not in FINAL_STATUSES:
+        return False
+    if fs.resolution is None:
+        return True
+    return bool(fs.resolution.entities) and all(
+        e.decided_by == "REVIEWER" for e in fs.resolution.entities)
 
 def _accepted_sources(ws: FieldState) -> list[Source]:
     """Water sources that SupplyRecords may be built from (accepted or still pending)."""
     if ws.resolution is not None:
         out = []
         for e in ws.resolution.entities:
-            if e.status is S.CONFLICT or e.entity_key == UNATTRIBUTED:
+            if e.status in (S.CONFLICT, S.NOT_APPLICABLE, S.UNRESOLVED) \
+                    or e.entity_key == UNATTRIBUTED:
                 continue
             if not (set(e.selected_claim_uids) | set(e.candidate_claim_uids)):
                 continue
@@ -169,8 +180,9 @@ def _resolve_entities(ws: FieldState, d: FieldDefinition,
         if any(_possibly_same(labels[key], labels[o]) for o in buckets if o != key):
             entity = _to_review(entity, "POSSIBLE_EQUIVALENCE")
         entities.append(entity)
-    if invalid:
-        entities.append(_decide(UNATTRIBUTED, None, invalid, d, policy))
+    unsettled = _decide(UNATTRIBUTED, None, invalid, d, policy) if invalid else None
+    if unsettled is not None:  # None: every invalid claim was rejected by a reviewer
+        entities.append(unsettled)
     for c in ws.candidate_claims:
         c.entity_key = name_key(str(c.comparable_value)) if _is_valid(c) else None
     return entities
@@ -179,12 +191,13 @@ def _resolve_record_field(fs: FieldState, d: FieldDefinition, sources: list[Sour
                           index: EvidenceIndex | None,
                           policy: ResolutionPolicy) -> list[EntityResolution]:
     claims = fs.candidate_claims
-    if d.key in SHARED_RECORD_FIELDS:
+    if d.key in SHARED_RECORD_FIELDS and not any(c.assigned_entity_key for c in claims):
         valid_groups = _group([c for c in claims if _is_valid(c)], d, policy)
         if len(valid_groups) <= 1:  # one utility for every source
             for c in claims:
                 c.entity_key = ALL_RECORDS
-            return [_decide(ALL_RECORDS, None, claims, d, policy)]
+            entity = _decide(ALL_RECORDS, None, claims, d, policy)
+            return [entity] if entity else []
     by_entity: dict[str, list[FieldClaim]] = {}
     reasons: dict[str, set[str]] = {}
     for c in claims:
@@ -197,6 +210,8 @@ def _resolve_record_field(fs: FieldState, d: FieldDefinition, sources: list[Sour
     entities = []
     for key in sorted(by_entity):
         entity = _decide(key, labels.get(key), by_entity[key], d, policy)
+        if entity is None:
+            continue
         for reason in sorted(reasons.get(key, ())):
             entity = _to_review(entity, reason)
         entities.append(entity)
@@ -204,6 +219,8 @@ def _resolve_record_field(fs: FieldState, d: FieldDefinition, sources: list[Sour
 
 def _attribute(claim: FieldClaim, sources: list[Source],
                index: EvidenceIndex | None) -> tuple[str, str | None]:
+    if claim.assigned_entity_key:  # a reviewer pinned it
+        return claim.assigned_entity_key, None
     if not sources:
         return UNATTRIBUTED, "NO_WATER_SOURCE"
     if len(sources) == 1:
@@ -236,7 +253,11 @@ def _sentences(claim: FieldClaim, index: EvidenceIndex) -> list[str]:
 # --- one entity -----------------------------------------------------------------------------
 
 def _decide(entity_key: str, label: str | None, claims: list[FieldClaim], d: FieldDefinition,
-            policy: ResolutionPolicy) -> EntityResolution:
+            policy: ResolutionPolicy) -> EntityResolution | None:
+    """None when a reviewer rejected every claim (the entity has nothing left to resolve)."""
+    claims = [c for c in claims if c.review_status != "REJECTED"]
+    if not claims:
+        return None
     uids = [c.claim_uid or "" for c in claims]
     valid = [c for c in claims if _is_valid(c)]
     ignored = len(claims) - len(valid)
@@ -354,7 +375,8 @@ def _representative(group: Group, d: FieldDefinition, policy: ResolutionPolicy) 
 # --- grouping -------------------------------------------------------------------------------
 
 def _is_valid(c: FieldClaim) -> bool:
-    return c.validation is not None and c.validation.outcome is not ValidationOutcome.INVALID
+    return c.review_status != "REJECTED" and c.validation is not None \
+        and c.validation.outcome is not ValidationOutcome.INVALID
 
 def _fail_codes(c: FieldClaim) -> list[str]:
     return c.validation.codes(CheckResult.FAIL) if c.validation else ["NOT_VALIDATED"]
@@ -400,14 +422,14 @@ def _apply(fs: FieldState, d: FieldDefinition, entities: list[EntityResolution],
     previous = fs.status
     previous_entities = {e.entity_key: e.status for e in fs.resolution.entities} \
         if fs.resolution else {}
-    fs.resolution = FieldResolution(scope=d.scope or "record", decided_by="RULES",
-                                    policy_version=policy.version, entities=entities)
-    fs.status = _aggregate(entities)
-    fs.selected_claim = None
-    if fs.status is S.RESOLVED and len(entities) == 1 \
-            and len(entities[0].selected_claim_uids) == 1:
-        fs.selected_claim = fs.claim(entities[0].selected_claim_uids[0])
-    for e in entities:
+    reviewer = _reviewer_entities(fs)
+    computed = [e for e in entities if e.entity_key not in reviewer]
+    merged = sorted(computed + list(reviewer.values()), key=lambda e: e.entity_key)
+    fs.resolution = FieldResolution(
+        scope=d.scope or "record", policy_version=policy.version, entities=merged,
+        decided_by="REVIEWER" if merged and not computed else "RULES")
+    refresh_field(fs)
+    for e in computed:  # reviewer decisions were logged when they were applied
         before = previous_entities.get(e.entity_key, previous)
         log.append({"field_key": fs.field_key, "entity_key": e.entity_key,
                     "from_status": before.value, "to_status": e.status.value,
@@ -417,6 +439,19 @@ def _apply(fs: FieldState, d: FieldDefinition, entities: list[EntityResolution],
                     "candidate_claim_uids": list(e.candidate_claim_uids),
                     "decided_by": "RULES", "policy_version": policy.version})
 
+def refresh_field(fs: FieldState) -> None:
+    """Field status and selected claim from its entity resolutions."""
+    entities = fs.resolution.entities if fs.resolution else []
+    fs.status = _aggregate(entities)
+    fs.selected_claim = None
+    if fs.status is S.RESOLVED and len(entities) == 1 \
+            and len(entities[0].selected_claim_uids) == 1:
+        fs.selected_claim = fs.claim(entities[0].selected_claim_uids[0])
+
+def default_entity(d: FieldDefinition) -> str:
+    """Entity of a field that has no candidate to attribute (e.g. nothing was found)."""
+    return CITY if d.scope in ("city", "time_series") else ALL_RECORDS
+
 def _aggregate(entities: list[EntityResolution]) -> FieldResolutionStatus:
     statuses = {e.status for e in entities}
     if not statuses:
@@ -424,6 +459,8 @@ def _aggregate(entities: list[EntityResolution]) -> FieldResolutionStatus:
     for status in (S.CONFLICT, S.HITL_REQUIRED, S.UNRESOLVED, S.CANDIDATE):
         if status in statuses:
             return status
+    if S.RESOLVED in statuses:
+        return S.RESOLVED  # at least one value (other entities N/A or Unknown)
     if statuses == {S.NOT_APPLICABLE}:
         return S.NOT_APPLICABLE
-    return S.RESOLVED
+    return S.UNAVAILABLE

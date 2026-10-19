@@ -237,8 +237,10 @@ def claim_uid(claim: FieldClaim) -> str:
     original = claim.original_value if claim.original_value is not None else claim.value
     refs = sorted((e.url, e.page_number or 0, normalize_quote(e.passage))
                   for e in claim.evidence)
-    payload = json.dumps([claim.field_key, original, claim.value_status.value, refs],
-                         sort_keys=True, default=str, ensure_ascii=False)
+    parts: list[Any] = [claim.field_key, original, claim.value_status.value, refs]
+    if claim.review_status == "CORRECTED":  # a reviewer's value is a different claim
+        parts.append(["CORRECTED", claim.corrected_from])
+    payload = json.dumps(parts, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:24]
 
 @dataclass
@@ -314,6 +316,16 @@ def _finish(claim: FieldClaim, uid: str, normalized: Any, qualifiers: ClaimQuali
         "claim_uid": uid, "normalized_value": normalized, "qualifiers": qualifiers,
         "validation": ClaimValidation(outcome=checks.outcome(), checks=checks.items,
                                       version=NORMALIZATION_VERSION)})
+
+def coerce_value(value: Any, d: FieldDefinition, current_year: int | None = None
+                 ) -> tuple[Any, list[str]]:
+    """(typed value, problems) for a value entered by a person (type, enum and range)."""
+    checks = _Checks()
+    typed = _check_type(value, d, checks)
+    if typed is not None:
+        _check_range(typed, d, checks, current_year or datetime.now(UTC).year)
+    problems = [c.detail or c.code for c in checks.items if c.result is CheckResult.FAIL]
+    return typed, problems
 
 def _check_value_status(claim: FieldClaim, checks: _Checks) -> bool:
     if claim.value_status is ValueStatus.KNOWN and claim.value in (None, ""):

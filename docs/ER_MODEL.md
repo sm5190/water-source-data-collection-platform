@@ -21,7 +21,7 @@ Core domain:
 - population / withdrawal / quality observations
 - TreatmentPlant
 
-Evidence and provenance (implemented: SourceDocument = `source_documents`, EvidenceSpan = `evidence_chunks` + `claim_citations`, FieldClaim = `field_claims` keyed by `claim_uid`, FieldResolution = `field_resolutions` (append-only, per field and entity) + `run_field_states.resolution`):
+Evidence and provenance (implemented: SourceDocument = `source_documents`, EvidenceSpan = `evidence_chunks` + `claim_citations`, FieldClaim = `field_claims` keyed by `claim_uid`, FieldResolution = `field_resolutions` (append-only, per field and entity) + `run_field_states.resolution`; HumanReview = `review_items` + append-only `review_decisions`):
 - SourceDocument
 - DocumentArtifact
 - EvidenceSpan

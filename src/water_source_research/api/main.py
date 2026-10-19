@@ -10,6 +10,10 @@ from water_source_research.research_queue.steps import NODE_ORDER
 from water_source_research.services.city_catalog import load_city_catalog
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import load_field_definitions, select_fields
+from water_source_research.schemas.review import ResumeRequest, ReviewSubmission
+from water_source_research.services.review import (
+    DecisionConflict, ReviewRepository, validate_decision,
+)
 
 class RunCityRequest(BaseModel):
     city_name: str
@@ -28,7 +32,8 @@ class ReviewRequest(BaseModel):
 
 def create_app(queue: ResearchQueue | None = None,
                procedures: ProcedureServices | None = None,
-               evidence: EvidenceRepository | None = None) -> FastAPI:
+               evidence: EvidenceRepository | None = None,
+               reviews: ReviewRepository | None = None) -> FastAPI:
     """City runs are asynchronous: the API enqueues, workers execute
     (``scripts/run_research_worker.py``), clients poll ``/research/runs/{run_id}``."""
     settings = get_settings()  # validates all configuration at startup
@@ -40,6 +45,8 @@ def create_app(queue: ResearchQueue | None = None,
             procedures = build_procedure_services(settings, get_engine())
     if evidence is None:
         evidence = EvidenceRepository(queue.engine)
+    if reviews is None:
+        reviews = ReviewRepository(queue.engine)
     app = FastAPI(title="Water Source Research Platform", version="0.1.0")
 
     @app.get("/health")
@@ -78,9 +85,11 @@ def create_app(queue: ResearchQueue | None = None,
         job = queue.get(run_id)
         if job is None:
             raise HTTPException(404, "unknown run")
-        if job.status is not JobStatus.SUCCEEDED:
+        if job.status not in (JobStatus.SUCCEEDED, JobStatus.AWAITING_REVIEW):
             raise HTTPException(409, f"run is {job.status.value}")
-        return {"run_id": run_id, **(queue.result(run_id) or {})}
+        # While awaiting review this is the state the run paused in (partial).
+        return {"run_id": run_id, "partial": job.status is JobStatus.AWAITING_REVIEW,
+                **(queue.result(run_id) or {})}
 
     @app.get("/research/runs/{run_id}/steps")
     async def get_steps(run_id: str):
@@ -141,6 +150,94 @@ def create_app(queue: ResearchQueue | None = None,
             raise HTTPException(404, "unknown run")
         return job
 
+    # --- human review -------------------------------------------------------------------
+
+    def require_waiting(run_id: str):
+        job = require_run(run_id)
+        if job.status is not JobStatus.AWAITING_REVIEW:
+            raise HTTPException(409, f"run is {job.status.value}, not AWAITING_REVIEW")
+        return job
+
+    @app.get("/research/runs/{run_id}/review/pending")
+    async def review_pending(run_id: str):
+        """Open review items of the round the run is waiting on, with candidates and evidence."""
+        job = require_run(run_id)
+        if job.status is not JobStatus.AWAITING_REVIEW:
+            return {"run": job.public(), "round": job.review_round, "items": []}
+        items = reviews.items(run_id, job.review_round, status="OPEN")
+        latest = _latest_by_item(reviews.decisions(run_id, job.review_round))
+        return {"run": job.public(), "round": job.review_round,
+                "items": [{**i, "decision": latest.get(i["id"])} for i in items]}
+
+    @app.get("/research/runs/{run_id}/review/items/{item_id}")
+    async def review_item(run_id: str, item_id: str):
+        """One item with the full text of each cited chunk, for checking quotes in context."""
+        require_run(run_id)
+        item = reviews.item(run_id, item_id)
+        if item is None:
+            raise HTTPException(404, "unknown review item")
+        contexts = {}
+        for c in item["payload"].get("candidates", []):
+            for cite in c.get("citations", []):
+                if cite.get("chunk_id") and cite["chunk_id"] not in contexts:
+                    contexts[cite["chunk_id"]] = evidence.chunk(run_id, cite["chunk_id"])
+        decisions = [d for d in reviews.decisions(run_id) if d["item_id"] == item_id]
+        return {**item, "chunks": contexts, "decisions": decisions}
+
+    @app.post("/research/runs/{run_id}/review/decisions")
+    async def submit_decisions(run_id: str, body: ReviewSubmission):
+        """Record decisions (append-only; idempotent per decision_key). 409 if the run isn't
+        waiting for this round or the item is closed; 422 if a decision is invalid."""
+        job = require_waiting(run_id)
+        fields = load_field_definitions()
+        checked = []
+        problems: dict[str, list[str]] = {}
+        for dec in body.decisions:
+            item = reviews.item(run_id, dec.item_id)
+            if item is None:
+                raise HTTPException(404, f"unknown review item {dec.item_id}")
+            if dec.round != job.review_round or item["round"] != job.review_round \
+                    or item["status"] != "OPEN":
+                raise HTTPException(409, f"item {dec.item_id} is not open in review round "
+                                         f"{job.review_round} (stale decision)")
+            errs = validate_decision(dec, item, fields[item["field_key"]],
+                                     lambda chunk_id: evidence.chunk(run_id, chunk_id))
+            if errs:
+                problems[dec.decision_key] = errs
+            checked.append((dec, item))
+        if problems:
+            raise HTTPException(422, {"invalid_decisions": problems})
+        stored = []
+        for dec, item in checked:
+            try:
+                row, created = reviews.add_decision(run_id, body.reviewer, dec, item)
+            except DecisionConflict as exc:
+                raise HTTPException(409, str(exc)) from exc
+            stored.append({**row, "created": created})
+        return {"round": job.review_round, "decisions": stored}
+
+    @app.post("/research/runs/{run_id}/review/resume", status_code=202)
+    async def resume_review(run_id: str, body: ResumeRequest):
+        """Put the run back in the queue once every open item of the round has a decision."""
+        job = require_waiting(run_id)
+        items = reviews.items(run_id, job.review_round, status="OPEN")
+        decided = _latest_by_item(reviews.decisions(run_id, job.review_round))
+        undecided = [i["id"] for i in items if i["id"] not in decided]
+        if undecided:
+            raise HTTPException(409, {"undecided_items": undecided})
+        if not queue.resume_review(run_id, job.review_round):
+            raise HTTPException(409, "run is no longer waiting on this review round")
+        resumed = queue.get(run_id)
+        return {**resumed.public(), "resumed_by": body.reviewer} if resumed else {}
+
+    @app.get("/research/runs/{run_id}/review/history")
+    async def review_history(run_id: str):
+        """Every review item and decision of the run (append-only), plus applied outcomes."""
+        require_run(run_id)
+        return {"items": reviews.items(run_id), "decisions": reviews.decisions(run_id),
+                "applied": [r for r in evidence.resolutions(run_id)
+                            if r["decided_by"] == "REVIEWER"]}
+
     @app.post("/research/runs/{run_id}/cancel")
     async def cancel_run(run_id: str):
         job = queue.cancel(run_id)
@@ -187,6 +284,12 @@ def create_app(queue: ResearchQueue | None = None,
         return _transition(require().lifecycle.deprecate(version_id))
 
     return app
+
+def _latest_by_item(decisions: list[dict]) -> dict[str, dict]:
+    latest: dict[str, dict] = {}
+    for d in decisions:  # in submission order: the last one per item wins
+        latest[d["item_id"]] = d
+    return latest
 
 def _transition(ok: bool) -> dict:
     if not ok:

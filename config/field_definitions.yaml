@@ -12,6 +12,7 @@ version: 1
 #                note about the raw source water?).
 # official_sources: source types that count as authoritative for this field (default:
 #                   UTILITY, GOVERNMENT, REGULATORY).
+# generated: built at export from the citations (References); never resolved or reviewed.
 # descriptive: differing free-text descriptions go to review, they are not conflicts.
 fields:
   - {key: city_name, field_type: city_identity, subject: city, type: text, keywords: [city, municipality, metropolitan]}
@@ -75,4 +76,4 @@ fields:
     keywords: [percent, share, withdrawal]
   - {key: water_quality_notes, field_type: water_quality, subject: supply_record, type: text, descriptive: true, review_always: true, keywords: [water quality, turbidity, contaminant, nitrate, lead, compliance, treatment]}
   - {key: water_quality_year, field_type: water_quality, subject: supply_record, type: integer, depends_on: [water_quality_notes], keywords: [water quality report, annual report, sampling]}
-  - {key: references, field_type: references, subject: supply_record, type: text, review_always: true, descriptive: true, keywords: [source, reference]}
+  - {key: references, field_type: references, subject: supply_record, type: text, generated: true, review_always: true, descriptive: true, keywords: [source, reference]}
