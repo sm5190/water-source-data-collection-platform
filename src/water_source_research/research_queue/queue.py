@@ -65,6 +65,8 @@ class Job:
     field_keys: list[str] | None = None  # field subset for this run; None = every field
     review_round: int = 0  # human review round awaited (AWAITING_REVIEW) or last resumed
     completion: str | None = None  # SUCCEEDED runs: FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE
+    mode: str = "RESEARCH"  # or REPROCESS (of parent_run_id)
+    parent_run_id: str | None = None
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -73,7 +75,8 @@ class Job:
                 "resumed": self.resumed, "last_error": self.last_error,
                 "created_at": _iso(self.created_at), "started_at": _iso(self.started_at),
                 "finished_at": _iso(self.finished_at), "field_keys": self.field_keys,
-                "review_round": self.review_round, "completion": self.completion}
+                "review_round": self.review_round, "completion": self.completion,
+                "mode": self.mode, "parent_run_id": self.parent_run_id}
 
 @dataclass(frozen=True, slots=True)
 class SubmitResult:
@@ -99,8 +102,21 @@ class ResearchQueue:
 
     # --- producers ----------------------------------------------------------------------
 
+    def submit_reprocess(self, parent_run_id: str, priority: int = 0) -> SubmitResult:
+        """Enqueue a REPROCESS of a finished run (same city and field subset). Returns the
+        city's active run instead if there is one."""
+        parent = self.get(parent_run_id)
+        if parent is None:
+            raise LookupError(f"unknown run {parent_run_id}")
+        if parent.status is not JobStatus.SUCCEEDED:
+            raise ValueError(f"run {parent_run_id} is {parent.status.value}; only SUCCEEDED "
+                             "runs can be reprocessed")
+        return self.submit(parent.city_name, parent.country, priority, parent.field_keys,
+                           mode="REPROCESS", parent_run_id=parent_run_id)
+
     def submit(self, city_name: str, country: str | None = None, priority: int = 0,
-               field_keys: list[str] | None = None) -> SubmitResult:
+               field_keys: list[str] | None = None, mode: str = "RESEARCH",
+               parent_run_id: str | None = None) -> SubmitResult:
         """Enqueue a city run (``field_keys``: optional, already-validated field subset)."""
         key = city_key(city_name, country)
         with get_tracer().start_as_current_span("research_queue.submit") as span:
@@ -114,7 +130,8 @@ class ResearchQueue:
                                       city_key=key, status=JobStatus.QUEUED.value,
                                       priority=priority, max_attempts=self.s.max_attempts,
                                       available_at=now, created_at=now, updated_at=now,
-                                      field_keys=list(field_keys) if field_keys else None))
+                                      field_keys=list(field_keys) if field_keys else None,
+                                      mode=mode, parent_run_id=parent_run_id))
                     job = self.get(run_id)
                     assert job is not None
                     result = SubmitResult(job, True)
@@ -385,7 +402,8 @@ def _job(r: ResearchJobRecord) -> Job:
                resumed=r.resumed, last_error=r.last_error, created_at=r.created_at,
                started_at=r.started_at, finished_at=r.finished_at,
                field_keys=list(r.field_keys) if r.field_keys else None,
-               review_round=r.review_round or 0, completion=r.completion)
+               review_round=r.review_round or 0, completion=r.completion,
+               mode=r.mode or "RESEARCH", parent_run_id=r.parent_run_id)
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

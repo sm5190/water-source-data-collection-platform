@@ -84,6 +84,8 @@ def open_review_items(run_id: str, round_no: int, research: CityResearchState,
         elif not fs.resolution or not fs.resolution.entities:
             reason = "NO_EVIDENCE" if key in missing or not fs.candidate_claims \
                 else "ALL_CLAIMS_REJECTED"
+            if reason == "NO_EVIDENCE" and d.gap_filled_by:
+                continue  # the catalog / derivations fill it at assemble
             specs.append(_spec(run_id, round_no, fs, d, default_entity(d), None, [reason], [],
                                sources, index))
     return specs

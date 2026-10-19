@@ -69,6 +69,15 @@ class Located:
 
 _ELLIPSIS = re.compile(r"\s*(?:…|\.\.\.)\s*")
 
+def quote_segments(quote: str) -> list[str]:
+    """A quote's normalized parts (a quote elided with "…" or "..." has several)."""
+    return [s for s in (normalize_quote(p) for p in _ELLIPSIS.split(quote)) if s]
+
+def quote_in(normalized_text: str, quote: str) -> bool:
+    """Whether ``quote`` occurs in an already-normalized text (elided parts in order)."""
+    segments = quote_segments(quote)
+    return bool(segments) and _contains_in_order(normalized_text, segments)
+
 def _contains_in_order(text: str, segments: list[str]) -> bool:
     pos = 0
     for seg in segments:
@@ -99,8 +108,7 @@ class EvidenceIndex:
     def locate(self, ref: EvidenceRef) -> Located:
         """Find the cited quote in the run's chunks. A quote elided with "…" matches when its
         parts occur in order; a quote across a chunk boundary matches the page's text."""
-        segments = [normalize_quote(s) for s in _ELLIPSIS.split(ref.passage)]
-        segments = [s for s in segments if s]
+        segments = quote_segments(ref.passage)
         candidates = self.by_key.get((ref.url, ref.page_number), [])
         document = self.documents.get(ref.url)
         known = ref.url in self.urls

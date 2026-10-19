@@ -251,3 +251,12 @@ def test_hedged_and_wider_area_figures_are_flagged():
     exact = one(world, "The 2021 census counted 2,794,356 residents in Toronto.",
                 "city_population_millions", 2.794356)
     assert "APPROXIMATE_VALUE" not in checks(exact) and "GEOGRAPHIC_SCOPE" not in checks(exact)
+
+def test_persistence_links_elided_quotes_like_validation():
+    from water_source_research.llm.extraction import normalize_quote
+    from water_source_research.services.evidence_store import _match_chunk
+    text = normalize_quote("Demand declined to an estimated 1420 MLD in 2010, down 24% from "
+                           "the 1850 MLD peak in 2001.")
+    index = {(URL, 9): [(7, "chunk-9", text)]}
+    assert _match_chunk(index, URL, 9, "… 1420 MLD in 2010 … 1850 MLD peak …") == (7, "chunk-9")
+    assert _match_chunk(index, URL, 9, "1850 MLD peak … 1420 MLD") == (7, None)  # wrong order

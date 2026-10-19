@@ -23,6 +23,7 @@ from langgraph.types import Command
 from opentelemetry.trace import Status, StatusCode
 from water_source_research.observability.otel import get_tracer
 from water_source_research.services.field_state import initialize_city_state, unresolved_fields
+from water_source_research.services.reprocess import reprocess_input
 from . import telemetry
 from .config import ResearchQueueSettings
 from .queue import Job, JobStatus, ResearchQueue
@@ -164,7 +165,8 @@ class ResearchWorker:
             return dict(final.values), True, paused_round(final)
         if snapshot.values:  # graph finished but the job was never marked complete
             return dict(snapshot.values), True, None
-        final = await self._stream(job, self._initial_input(job), config, {})
+        graph_input = await asyncio.to_thread(self._input_for, job)
+        final = await self._stream(job, graph_input, config, {})
         return dict(final.values), False, paused_round(final)
 
     async def _stream(self, job: Job, graph_input: Any, config: dict[str, Any],
@@ -254,6 +256,11 @@ class ResearchWorker:
             await saver.adelete_thread(run_id)
         except Exception:  # cleanup only
             log.warning("could not delete checkpoints for %s", run_id, exc_info=True)
+
+    def _input_for(self, job: Job) -> dict[str, Any]:
+        if job.mode == "REPROCESS" and job.parent_run_id:
+            return reprocess_input(self.queue.engine, job, self.queue.result(job.parent_run_id))
+        return self._initial_input(job)
 
     @staticmethod
     def _initial_input(job: Job) -> dict[str, Any]:

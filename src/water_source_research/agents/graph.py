@@ -37,6 +37,10 @@ def make_route_after_resolve(fields: dict[str, FieldDefinition], reviews: bool):
         return "human_review" if open_items else "assemble"
     return route_after_resolve
 
+def route_start(state: GraphState) -> str:
+    """Reprocessing a stored run starts at validate; everything else at plan."""
+    return "validate" if state.get("reprocess_of") else "plan"
+
 def make_route_after_extract(max_discovery_rounds: int):
     def route_after_extract(state: GraphState) -> str:
         # NO_SUFFICIENT_EVIDENCE fields go back to discovery until the round budget is spent;
@@ -98,7 +102,7 @@ def build_graph(
     g.add_node("assemble", make_assemble_node(fields))
     g.add_node("finalize", make_finalize_node(fields, run_recorder, usage_tracker,
                                               evidence_store, record_store))
-    g.add_edge(START, "plan")
+    g.add_conditional_edges(START, route_start, {"plan": "plan", "validate": "validate"})
     g.add_edge("plan", "discover")
     g.add_edge("discover", "acquire")
     g.add_edge("acquire", "extract")

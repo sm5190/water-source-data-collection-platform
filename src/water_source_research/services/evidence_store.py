@@ -21,7 +21,7 @@ from water_source_research.schemas.common import FINAL_STATUSES
 from water_source_research.schemas.research import (
     CityResearchState, EvidenceChunk, FieldClaim, FieldState,
 )
-from water_source_research.services.normalization import claim_uid
+from water_source_research.services.normalization import claim_uid, quote_in
 
 NO_REVIEW_NEEDED = FINAL_STATUSES
 
@@ -175,6 +175,56 @@ class EvidenceRepository:
 
     # --- reads (API / smoke test) ------------------------------------------------------
 
+    def copy_run_evidence(self, from_run: str, to_run: str) -> int:
+        """Copy a run's document and chunk rows to another run (reprocessing reuses stored
+        evidence; raw files are content-addressed and shared). Insert-or-skip; returns the
+        number of chunks copied."""
+        copied = 0
+        with Session(self.engine) as session, session.begin():
+            sources = session.scalars(select(SourceDocumentRecord).where(
+                SourceDocumentRecord.run_id == from_run).order_by(SourceDocumentRecord.id)).all()
+            for src in sources:
+                doc = session.scalar(select(SourceDocumentRecord).where(
+                    SourceDocumentRecord.run_id == to_run,
+                    SourceDocumentRecord.canonical_url == src.canonical_url))
+                if doc is None:
+                    doc = SourceDocumentRecord(run_id=to_run, chunk_count=src.chunk_count,
+                                               **{k: getattr(src, k) for k in _DOC_COLUMNS})
+                    session.add(doc)
+                    session.flush()
+                existing = set(session.scalars(select(EvidenceChunkRecord.chunk_id).where(
+                    EvidenceChunkRecord.run_id == to_run)))
+                for c in session.scalars(select(EvidenceChunkRecord).where(
+                        EvidenceChunkRecord.document_id == src.id)
+                        .order_by(EvidenceChunkRecord.ordinal)):
+                    if c.chunk_id in existing:
+                        continue
+                    session.add(EvidenceChunkRecord(
+                        run_id=to_run, chunk_id=c.chunk_id, document_id=doc.id, url=c.url,
+                        page_number=c.page_number, ordinal=c.ordinal, text=c.text,
+                        char_count=c.char_count))
+                    copied += 1
+        return copied
+
+    def evidence_chunks(self, run_id: str) -> list[dict[str, Any]]:
+        """Every chunk of the run as a serialized EvidenceChunk (graph state shape)."""
+        with Session(self.engine) as session:
+            docs = {d.id: d for d in session.scalars(select(SourceDocumentRecord).where(
+                SourceDocumentRecord.run_id == run_id))}
+            rows = session.scalars(select(EvidenceChunkRecord).where(
+                EvidenceChunkRecord.run_id == run_id).order_by(
+                EvidenceChunkRecord.document_id, EvidenceChunkRecord.ordinal)).all()
+            out = []
+            for r in rows:
+                doc = docs.get(r.document_id)
+                out.append(EvidenceChunk(
+                    chunk_id=r.chunk_id, url=r.url, text=r.text, page_number=r.page_number,
+                    title=doc.title if doc else None,
+                    source_type=doc.source_type if doc else None,
+                    acquisition_method=doc.acquisition_method if doc else None,
+                    retrieved_at=doc.retrieved_at if doc else None).model_dump(mode="json"))
+            return out
+
     def documents(self, run_id: str) -> list[dict[str, Any]]:
         with Session(self.engine) as session:
             rows = session.scalars(select(SourceDocumentRecord).where(
@@ -226,6 +276,7 @@ class EvidenceRepository:
                     "value_status": c.value_status, "value_origin": c.value_origin,
                     "confidence": c.confidence, "is_selected": c.is_selected,
                     "validation_outcome": c.validation_outcome,
+                    "review_status": c.review_status, "original_value": c.original_value,
                     "validation": c.validation, "qualifiers": c.qualifiers,
                     "prompt_version": c.prompt_version,
                     "citations": [_citation_dict(x, docs.get(x.document_id or -1))
@@ -287,12 +338,14 @@ def _set_claim_columns(row: FieldClaimRecord, claim: FieldClaim, selected: bool)
     row.qualifiers = claim.qualifiers.model_dump(mode="json") if claim.qualifiers else None
     row.validation_outcome = claim.validation.outcome.value if claim.validation else None
     row.validation = claim.validation.model_dump(mode="json") if claim.validation else None
+    row.review_status = claim.review_status
 
 def _match_chunk(index, url: str, page: int | None, quote: str) -> tuple[int | None, str | None]:
-    q = normalize_quote(quote)
+    """(document id, chunk id) of the chunk holding ``quote`` — the same matching as
+    validation (normalization.quote_in: elided quotes match their parts in order)."""
     candidates = index.get((url, page), [])
     for doc_id, chunk_id, text in candidates:
-        if q in text:
+        if quote_in(text, quote):
             return doc_id, chunk_id
     if candidates:  # quote spans a chunk boundary: still the right document
         return candidates[0][0], None

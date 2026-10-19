@@ -2,6 +2,9 @@ from typing import TypedDict
 
 class GraphState(TypedDict, total=False):
     run_id: str
+    # REPROCESS runs: the parent run whose stored claims/evidence this run re-validates (the
+    # graph then starts at validate: no discovery, acquisition or model calls).
+    reprocess_of: str
     city_name: str
     country: str | None
     research_state: dict  # serialized CityResearchState; the run's field-level state

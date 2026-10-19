@@ -119,6 +119,10 @@ class ResearchJobRecord(Base):
     review_round: Mapped[int] = mapped_column(Integer, default=0)
     # Scientific state of a SUCCEEDED run: FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE.
     completion: Mapped[str | None] = mapped_column(String(32))
+    # RESEARCH (discover -> ... -> finalize) | REPROCESS (re-validate a parent run's stored
+    # claims and evidence; no new discovery, acquisition or model calls).
+    mode: Mapped[str] = mapped_column(String(16), default="RESEARCH")
+    parent_run_id: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

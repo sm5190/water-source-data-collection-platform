@@ -73,6 +73,21 @@ def create_app(queue: ResearchQueue | None = None,
         # 202 for a new run; 200 when an active run for this city already existed.
         return JSONResponse(body, status_code=202 if submitted.created else 200)
 
+    @app.post("/research/runs/{run_id}/reprocess", status_code=202)
+    async def reprocess_run(run_id: str):
+        """Re-run validation, resolution, review and assembly on a finished run's stored
+        claims and evidence (a new run; no discovery, fetching or model calls). 200 with the
+        city's active run if it already has one."""
+        try:
+            submitted = queue.submit_reprocess(run_id)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        body = {**submitted.job.public(), "created": submitted.created,
+                "status_url": f"/research/runs/{submitted.job.run_id}"}
+        return JSONResponse(body, status_code=202 if submitted.created else 200)
+
     @app.get("/research/cities")
     async def cities():
         return [{"label": c.label, **c.model_dump()} for c in load_city_catalog()]

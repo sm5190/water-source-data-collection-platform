@@ -54,6 +54,9 @@ class FieldDefinition(BaseModel):
     official_sources: list[str] = Field(default_factory=list)
     # Built at export from the run's citations (References): never extracted or reviewed.
     generated: bool = False
+    # When nothing was found, the city catalog or the methodology's derivations fill the gap,
+    # so "nothing found" is not a review item (conflicting/uncertain claims still are).
+    gap_filled_by: Literal["catalog", "rules"] | None = None
 
     @model_validator(mode="after")
     def _default_scope(self) -> "FieldDefinition":

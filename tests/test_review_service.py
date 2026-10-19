@@ -120,3 +120,7 @@ def test_fields_not_researched_or_generated_are_not_review_items():
     everything = open_review_items("run-1", 1, state, FIELDS, None, [], world.index)
     keys = {s.field_key for s in everything}
     assert "references" not in keys and "percentage_total_population" not in keys
+    # Nothing found, but the catalog or the methodology's derivations fill these gaps.
+    assert not keys & {"country", "city_name", "source_withdrawal_contribution_m3_day",
+                       "total_city_water_withdrawals_year", "population_served_millions"}
+    assert {"pod_latitude", "reservoir_names", "water_type"} <= keys
