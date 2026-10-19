@@ -25,6 +25,7 @@ class FakeClient:
         self.cancelled = []
         self.decisions = []
         self.resumed = []
+        self.exports = []
 
     def health(self):
         return self.healthy
@@ -105,6 +106,32 @@ class FakeClient:
         self.resumed.append((run_id, reviewer))
         return {}
 
+    # --- records ---
+
+    def records(self, run_id):
+        row = {"Water Source": "Lake Ontario", "Utility Name": "Toronto Water",
+               "Total City Water Withdrawals (m3/d)": "980000"}
+        return {"completion": "FINALIZED_WITH_GAPS", "quality": [
+                    {"code": "NOT_RESEARCHED", "result": "WARN", "detail": "water_type"}],
+                "records": [{"record_key": "rk1", "water_source": "Lake Ontario",
+                             "utility_name": "Toronto Water", "row": row}],
+                "city_values": {}, "exports": []}
+
+    def trace(self, run_id, record_key, field_key):
+        return {"column": "City Name", "value": {
+                    "value": 980000, "value_status": "KNOWN", "value_origin": "REPORTED",
+                    "resolution_status": "RESOLVED", "calculation": None, "note": None},
+                "review_decisions": [{"reviewer": "analyst", "decision": "CORRECT",
+                                      "reason": "quote says 980,000"}],
+                "claims": [{"claim_uid": "c9", "value": 980000, "citations": [{
+                    "url": "https://toronto.ca/report.pdf", "title": "Annual Report",
+                    "quote": "980,000 cubic metres", "document": {"source_type": "GOVERNMENT"}}]}],
+                "inputs": []}
+
+    def export(self, run_id, fmt, kind="standardized", requested_by=None):
+        self.exports.append((fmt, kind, requested_by))
+        return b"a,b\n", f"toronto.{fmt}", "text/csv"
+
 W = "total_city_water_withdrawals_m3_day"
 REVIEW_ITEM = {
     "id": "item-1", "round": 1, "field_key": W, "entity_key": "city", "label": None,
@@ -171,7 +198,8 @@ def test_dashboard_shows_steps_review_citations_and_provenance():
     assert "**Status:** RESOLVED" in text
     assert [t.label for t in at.tabs] == ["📈 Progress & step outputs", "✍️ Review queue",
                                           "🧑‍⚖️ Human review log",
-                                          "🧬 Field tracking & provenance"]
+                                          "🧬 Field tracking & provenance",
+                                          "📦 Records & export"]
     assert any("Extract claims" in e.label for e in at.expander)
 
 def test_city_without_runs_shows_hint():
@@ -278,3 +306,18 @@ def test_reviewer_corrects_a_value_with_a_chunk_quote_and_resumes():
         assert client.resumed == [("run-1", "analyst@example.org")]
     finally:
         REVIEW_ITEM["decision"] = None
+
+# --- records & export -------------------------------------------------------------------------
+
+def test_records_tab_shows_rows_trace_and_prepares_exports_on_request():
+    client = FakeClient()
+    at = app(client)
+    text = all_text(at)
+    assert "**Completion:** 🟡 FINALIZED_WITH_GAPS · 1 supply record(s)" in text
+    assert "> 980,000 cubic metres" in text  # the trace reaches the quoted source
+    assert "Reviewer analyst: CORRECT — quote says 980,000" in text
+    assert client.exports == []  # nothing generated (or audited) just by viewing
+    next(b for b in at.button if b.label == "Prepare Standardized CSV").click().run()
+    assert not at.exception, at.exception
+    assert client.exports == [("csv", "standardized", None)]
+    assert any(b.label == "⬇️ Standardized CSV" for b in at.get("download_button"))

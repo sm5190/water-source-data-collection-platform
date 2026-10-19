@@ -9,7 +9,7 @@ from typing import Any
 
 # Expected order of a run without discovery loops; used for progress display.
 NODE_ORDER = ("plan", "discover", "acquire", "extract", "validate", "resolve", "human_review",
-              "finalize")
+              "assemble", "finalize")
 MAX_EVENTS_PER_STEP = 100
 MAX_TOP_CANDIDATES = 20
 TOP_CANDIDATE_KEYS = ("title", "url", "providers", "source_type", "doi", "doi_verified",
@@ -83,6 +83,12 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
                        review_reason=state.get("review_reason"),
                        fields_requiring_review=state.get("fields_requiring_review", []),
                        field_statuses=statuses)
+    elif node == "assemble":
+        rs = state.get("record_set") or {}
+        summary.update(completion=state.get("completion"),
+                       records=[r.get("water_source") for r in rs.get("records", [])],
+                       failed_checks=[c for c in rs.get("quality", [])
+                                      if c.get("result") == "FAIL"][:50])
     elif node == "human_review":
         summary.update(decisions=[e for e in new_events if e.get("kind") == "HITL"])
     elif node == "finalize":

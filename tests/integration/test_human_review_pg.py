@@ -10,13 +10,14 @@ from fastapi.testclient import TestClient
 from queue_helpers import make_queue, make_worker
 from slice_helpers import ModelScript, make_discovery, make_gateway, make_site
 from sqlalchemy import text
-from test_human_review import ANSWERS, FIELDS, W
+from review_helpers import ANSWERS, FIELDS, W
 from water_source_research.agents.graph import build_graph
 from water_source_research.api.main import create_app
 from water_source_research.core.config import Settings
 from water_source_research.research_queue.checkpointing import open_checkpointer, run_async
 from water_source_research.research_queue.queue import JobStatus
 from water_source_research.services.evidence_store import EvidenceRepository
+from water_source_research.services.record_store import RecordRepository
 from water_source_research.services.review import ReviewRepository
 
 @pytest.fixture
@@ -30,7 +31,9 @@ def test_review_pause_and_resume_across_processes(pg_engine, drop_checkpoints):
     settings = Settings(database_url=URL)
     queue = make_queue(pg_engine)
     evidence, reviews = EvidenceRepository(pg_engine), ReviewRepository(pg_engine)
-    client = TestClient(create_app(queue=queue, evidence=evidence, reviews=reviews))
+    records = RecordRepository(pg_engine)
+    client = TestClient(create_app(queue=queue, evidence=evidence, reviews=reviews,
+                                   records=records))
     run_id = client.post("/research/city", json={"city_name": "Toronto", "country": "Canada",
                                                  "field_keys": FIELDS}).json()["run_id"]
 
@@ -42,7 +45,8 @@ def test_review_pause_and_resume_across_processes(pg_engine, drop_checkpoints):
                 graph = build_graph(gateway=gateway, discovery=make_discovery(),
                                     acquisition=make_acquisition(make_site()),
                                     max_discovery_rounds=1, evidence_store=evidence,
-                                    review_store=reviews, checkpointer=saver)
+                                    review_store=reviews, record_store=records,
+                                    checkpointer=saver)
                 await make_worker(queue, graph, worker_id).drain()
         run_async(main())
 
@@ -76,3 +80,13 @@ def test_review_pause_and_resume_across_processes(pg_engine, drop_checkpoints):
     reviewer_rows = [x for x in evidence.resolutions(run_id) if x["decided_by"] == "REVIEWER"]
     assert sorted(x["field_key"] for x in reviewer_rows) == [W, "water_type"]
     assert all(x["review_decision_id"] for x in reviewer_rows)
+
+    # Records and export from the Postgres tables (JSONB values round-trip).
+    assert job.completion == "FINALIZED_WITH_GAPS"
+    data = client.get(f"/research/runs/{run_id}/records").json()
+    [rec] = data["records"]
+    assert rec["row"]["Water Source"] == "Lake Ontario"
+    assert rec["row"]["Source Water Withdrawal Percentage"] == "100.000"
+    export = client.get(f"/research/runs/{run_id}/export", params={"format": "xlsx"})
+    assert export.status_code == 200
+    assert [e["sha256"] for e in records.exports(run_id)] == [export.headers["x-export-sha256"]]

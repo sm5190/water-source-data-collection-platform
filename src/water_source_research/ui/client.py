@@ -65,6 +65,28 @@ class ResearchApiClient:
     def resume_review(self, run_id: str, reviewer: str) -> dict[str, Any]:
         return self._post(f"/research/runs/{run_id}/review/resume", {"reviewer": reviewer})
 
+    # --- records and export ---------------------------------------------------------------
+
+    def records(self, run_id: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/records")
+
+    def trace(self, run_id: str, record_key: str, field_key: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/records/{record_key}/trace",
+                         field_key=field_key)
+
+    def export(self, run_id: str, fmt: str, kind: str = "standardized",
+               requested_by: str | None = None) -> tuple[bytes, str, str]:
+        """(content, filename, media type) of an export file."""
+        params = {"format": fmt, "kind": kind}
+        if requested_by:
+            params["requested_by"] = requested_by
+        r = self.http.get(f"/research/runs/{run_id}/export", params=params)
+        if r.status_code >= 400:
+            raise ApiError(f"export -> {r.status_code}: {r.text[:300]}")
+        disposition = r.headers.get("content-disposition", "")
+        filename = disposition.split("filename=")[-1].strip('"') or f"export.{fmt}"
+        return r.content, filename, r.headers.get("content-type", "application/octet-stream")
+
     def _post(self, path: str, body: dict[str, Any]) -> Any:
         r = self.http.post(path, json=body)
         if r.status_code >= 400:

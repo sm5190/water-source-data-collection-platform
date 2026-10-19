@@ -11,6 +11,7 @@ import os
 from typing import Any
 import pandas as pd
 import streamlit as st
+from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.ui.client import ApiError, ResearchApiClient
 
 ACTIVE = {"QUEUED", "RUNNING"}
@@ -19,7 +20,7 @@ STATUS_ICON = {"QUEUED": "⏳", "RUNNING": "🔄", "AWAITING_REVIEW": "🧑‍�
 NODE_LABEL = {"plan": "Plan", "discover": "Discover sources", "acquire": "Acquire documents",
               "extract": "Extract claims", "validate": "Validate claims",
               "resolve": "Resolve fields", "human_review": "Human review",
-              "finalize": "Finalize"}
+              "assemble": "Assemble records", "finalize": "Finalize"}
 
 st.set_page_config(page_title="Water Source Research", page_icon="💧", layout="wide")
 
@@ -404,10 +405,77 @@ def render_history() -> None:
         "supersedes": d["supersedes_id"] or "",
     } for d in history["decisions"]]), hide_index=True, width="stretch")
 
+COMPLETION_ICON = {"FINALIZED": "✅", "FINALIZED_WITH_GAPS": "🟡", "INCOMPLETE": "❌"}
+
+def render_records(run: dict[str, Any]) -> None:
+    """SupplyRecords as exported, quality checks, downloads, and a per-cell provenance trace."""
+    if run["status"] != "SUCCEEDED":
+        st.info(f"Records are assembled when the run finishes (it is {run['status']}).")
+        return
+    data = client.records(run_id)
+    completion = data.get("completion")
+    if not data["records"]:
+        st.info("This run finished before records were assembled.")
+        return
+    st.markdown(f"**Completion:** {COMPLETION_ICON.get(completion, '')} {completion} · "
+                f"{len(data['records'])} supply record(s)")
+    failed = [c for c in data["quality"] if c["result"] != "PASS"]
+    if failed:
+        st.dataframe(pd.DataFrame(failed), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame([r["row"] for r in data["records"]]), hide_index=True,
+                 width="stretch")
+
+    if completion == "INCOMPLETE":
+        st.error("Export is blocked until the open fields / failed checks are resolved.")
+    else:
+        # Each generated file is recorded in the export audit trail, so files are generated
+        # on request (Prepare), not on every page render.
+        cols = st.columns(3)
+        for col, (label, fmt, kind) in zip(cols, [
+                ("Standardized CSV", "csv", "standardized"),
+                ("Workbook (XLSX)", "xlsx", "standardized"),
+                ("Provenance CSV", "csv", "provenance")], strict=True):
+            slot = f"export:{fmt}:{kind}:{run_id}"
+            if col.button(f"Prepare {label}", key=f"prepare:{slot}"):
+                try:
+                    st.session_state[slot] = client.export(run_id, fmt, kind, reviewer or None)
+                except ApiError as exc:
+                    col.error(str(exc))
+            if slot in st.session_state:
+                content, filename, media = st.session_state[slot]
+                col.download_button(f"⬇️ {label}", content, file_name=filename, mime=media,
+                                    key=f"download:{slot}")
+
+    st.markdown("**Trace a value to its evidence**")
+    labels = {r["record_key"]: r["water_source"] or "Unknown source" for r in data["records"]}
+    a, b = st.columns(2)
+    record = a.selectbox("Record", list(labels), format_func=labels.get,
+                         key=f"trace_record:{run_id}")
+    field = b.selectbox("Column", [k for k, _ in COLUMNS], format_func=HEADERS.get,
+                        key=f"trace_field:{run_id}")
+    trace = client.trace(run_id, record, field)
+    value = trace["value"]
+    st.markdown(f"**{trace['column']}:** {value.get('value')} · {value['value_status']} · "
+                f"origin {value.get('value_origin') or '—'} · {value['resolution_status']}")
+    if value.get("calculation"):
+        calc = value["calculation"]
+        st.caption(f"Calculated ({calc['rule']}): {calc['formula']}")
+    if value.get("note"):
+        st.caption(value["note"])
+    for d in trace["review_decisions"]:
+        st.caption(f"Reviewer {d['reviewer']}: {d['decision']} — {d.get('reason') or ''}")
+    for claim in trace["claims"] + [c for i in trace["inputs"] for c in i["claims"]]:
+        for cite in claim["citations"]:
+            doc = cite.get("document") or {}
+            st.markdown(f"Claim `{claim['claim_uid']}` = **{claim['value']}** → "
+                        f"[{cite.get('title') or cite['url']}]({cite['url']}) · "
+                        f"{doc.get('source_type') or '—'} · {doc.get('acquisition_method') or ''}")
+            st.markdown("> " + (cite.get("quote") or "").replace("\n", " ")[:600])
+
 def dashboard() -> None:
-    progress_tab, queue_tab, review_tab, fields_tab = st.tabs(
+    progress_tab, queue_tab, review_tab, fields_tab, records_tab = st.tabs(
         ["📈 Progress & step outputs", "✍️ Review queue", "🧑‍⚖️ Human review log",
-         "🧬 Field tracking & provenance"])
+         "🧬 Field tracking & provenance", "📦 Records & export"])
     with progress_tab:
         render_progress(client.steps(run_id))
     with queue_tab:
@@ -416,6 +484,8 @@ def dashboard() -> None:
         render_review(client.review(run_id))
     with fields_tab:
         render_fields(client.fields(run_id))
+    with records_tab:
+        render_records(selected_run)
 
 # Poll only while the run is queued/running; finished runs render once.
 st.fragment(run_every=refresh_seconds if is_active else None)(dashboard)()

@@ -1,6 +1,6 @@
 # ER Model
 
-The central entity is `SupplyRecord`.
+The central entity is `SupplyRecord` (implemented: `supply_records`, with observations in `record_values` — city-level values stored once with scope CITY; see `services/supply_records.py`).
 
 A SupplyRecord means:
 

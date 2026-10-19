@@ -52,5 +52,6 @@ def clean(request):
                           "procedures, distillation_jobs, trajectories, run_events, "
                           "research_runs, context_bundles, research_jobs, claim_citations, "
                           "field_claims, run_field_states, evidence_chunks, source_documents, "
-                          "field_resolutions, review_decisions, review_items CASCADE"))
+                          "field_resolutions, review_decisions, review_items, supply_records, "
+                          "record_values, research_exports CASCADE"))
     yield

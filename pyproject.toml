@@ -25,6 +25,7 @@ dependencies = [
   "langgraph-checkpoint-postgres>=3.1.2",
   "minio>=7.2",
   "pypdfium2>=4.30",
+  "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]

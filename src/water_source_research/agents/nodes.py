@@ -20,6 +20,7 @@ from water_source_research.schemas.common import (
 from water_source_research.schemas.events import (
     ANCHOR_FIELDS, EventKind, EventResult, append_event, strip_url,
 )
+from water_source_research.schemas.records import RecordSet
 from water_source_research.schemas.research import (
     CityResearchState, FieldClaim, FieldDefinition,
 )
@@ -29,7 +30,9 @@ from water_source_research.context_manager import (
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import initialize_city_state
 from water_source_research.services.normalization import EvidenceIndex, normalize_research
+from water_source_research.services.record_store import RecordRepository
 from water_source_research.services.resolution import ResolutionPolicy, resolve_research
+from water_source_research.services.supply_records import build_record_set
 from water_source_research.services.review import (
     ReviewRepository, apply_decisions, legacy_decisions, open_review_items,
 )
@@ -516,11 +519,34 @@ def _review_events(state: GraphState, before: CityResearchState, applied) -> lis
                               field_key=key, attrs=attrs)
     return events
 
+def make_assemble_node(fields: Mapping[str, FieldDefinition]):
+    """SupplyRecords, derived fields and the final quality checks (services/supply_records.py).
+
+    Deterministic. ``completion`` says what the run is scientifically: FINALIZED,
+    FINALIZED_WITH_GAPS (explicit Unknowns) or INCOMPLETE (open fields or failed checks)."""
+    async def assemble_node(state: GraphState) -> GraphState:
+        research = CityResearchState.model_validate(state["research_state"])
+        with get_tracer().start_as_current_span("graph.assemble") as span:
+            span.set_attribute("graph.run_id", state.get("run_id", ""))
+            rs = build_record_set(research, fields, state.get("unresolved_fields"))
+            span.set_attribute("records.count", len(rs.records))
+            span.set_attribute("records.completion", rs.completion)
+        events = list(state.get("events", []))
+        events = append_event(events, kind=EventKind.NODE, node="assemble",
+                              strategy=rs.completion,
+                              result=EventResult.FAILURE if rs.completion == "INCOMPLETE"
+                              else EventResult.SUCCESS,
+                              attrs={"records": len(rs.records)})
+        return {**state, "record_set": rs.model_dump(mode="json"),
+                "completion": rs.completion, "events": events}
+    return assemble_node
+
 def make_finalize_node(
     fields: Mapping[str, FieldDefinition],
     run_recorder: RunRecorder | None = None,
     usage_tracker: UsageTracker | None = None,
     evidence_store: EvidenceRepository | None = None,
+    record_store: RecordRepository | None = None,
 ):
     async def finalize_node(state: GraphState) -> GraphState:
         state = {**state, "finalized": True}
@@ -531,6 +557,9 @@ def make_finalize_node(
                     evidence_store.save_results, state["run_id"], state["research_state"],
                     state.get("fields_needing_evidence"), state.get("unresolved_fields"),
                     state.get("resolution_log"))
+            if record_store is not None and state.get("record_set"):
+                await asyncio.to_thread(record_store.save, state["run_id"],
+                                        RecordSet.model_validate(state["record_set"]))
             # The scientific result is complete here; everything below is soft post-processing.
             post = await asyncio.to_thread(finalize_post_processing, state, run_recorder,
                                            usage_tracker, fields)

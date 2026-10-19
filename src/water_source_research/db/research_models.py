@@ -117,6 +117,8 @@ class ResearchJobRecord(Base):
     field_keys: Mapped[list[str] | None] = mapped_column(JSONType)
     # Human review round the run is waiting on (AWAITING_REVIEW) or last resumed from.
     review_round: Mapped[int] = mapped_column(Integer, default=0)
+    # Scientific state of a SUCCEEDED run: FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE.
+    completion: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

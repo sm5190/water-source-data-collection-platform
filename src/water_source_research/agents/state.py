@@ -29,6 +29,9 @@ class GraphState(TypedDict, total=False):
     # APPROVED|CORRECTED|REJECTED, value?}]. Production reviews go through the API instead.
     review_decisions: list[dict]
     review_round: int  # human review rounds completed (each one an interrupt + resume)
+    # SupplyRecords, derived values and quality checks (schemas/records.py RecordSet).
+    record_set: dict
+    completion: str  # FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE
     finalized: bool
     # Trusted workflow events (schemas.events.WorkflowEvent); the only distillation input.
     events: list[dict]

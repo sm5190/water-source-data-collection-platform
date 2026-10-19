@@ -64,6 +64,7 @@ class Job:
     finished_at: datetime | None
     field_keys: list[str] | None = None  # field subset for this run; None = every field
     review_round: int = 0  # human review round awaited (AWAITING_REVIEW) or last resumed
+    completion: str | None = None  # SUCCEEDED runs: FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -72,7 +73,7 @@ class Job:
                 "resumed": self.resumed, "last_error": self.last_error,
                 "created_at": _iso(self.created_at), "started_at": _iso(self.started_at),
                 "finished_at": _iso(self.finished_at), "field_keys": self.field_keys,
-                "review_round": self.review_round}
+                "review_round": self.review_round, "completion": self.completion}
 
 @dataclass(frozen=True, slots=True)
 class SubmitResult:
@@ -211,6 +212,7 @@ class ResearchQueue:
         with Session(self.engine) as session, session.begin():
             n = session.execute(update(J).where(*self._owned(run_id, worker_id)).values(
                 status=JobStatus.SUCCEEDED.value, result=result, resumed=resumed,
+                completion=result.get("completion"),
                 lease_owner=None, lease_until=None, finished_at=now, updated_at=now,
                 last_error=None)).rowcount
         if n:
@@ -383,7 +385,7 @@ def _job(r: ResearchJobRecord) -> Job:
                resumed=r.resumed, last_error=r.last_error, created_at=r.created_at,
                started_at=r.started_at, finished_at=r.finished_at,
                field_keys=list(r.field_keys) if r.field_keys else None,
-               review_round=r.review_round or 0)
+               review_round=r.review_round or 0, completion=r.completion)
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

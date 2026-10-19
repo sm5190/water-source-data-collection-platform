@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
 from water_source_research.core.config import get_settings
 from water_source_research.procedures.services import ProcedureServices, build_procedure_services
@@ -10,7 +10,13 @@ from water_source_research.research_queue.steps import NODE_ORDER
 from water_source_research.services.city_catalog import load_city_catalog
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import load_field_definitions, select_fields
+from water_source_research.schemas.records import QualityCheck, RecordSet
 from water_source_research.schemas.review import ResumeRequest, ReviewSubmission
+from water_source_research.schemas.standardized import HEADERS
+from water_source_research.services.export import (
+    ExportBlocked, build_export, check_exportable, standardized_rows,
+)
+from water_source_research.services.record_store import RecordRepository
 from water_source_research.services.review import (
     DecisionConflict, ReviewRepository, validate_decision,
 )
@@ -33,7 +39,8 @@ class ReviewRequest(BaseModel):
 def create_app(queue: ResearchQueue | None = None,
                procedures: ProcedureServices | None = None,
                evidence: EvidenceRepository | None = None,
-               reviews: ReviewRepository | None = None) -> FastAPI:
+               reviews: ReviewRepository | None = None,
+               records: RecordRepository | None = None) -> FastAPI:
     """City runs are asynchronous: the API enqueues, workers execute
     (``scripts/run_research_worker.py``), clients poll ``/research/runs/{run_id}``."""
     settings = get_settings()  # validates all configuration at startup
@@ -47,6 +54,8 @@ def create_app(queue: ResearchQueue | None = None,
         evidence = EvidenceRepository(queue.engine)
     if reviews is None:
         reviews = ReviewRepository(queue.engine)
+    if records is None:
+        records = RecordRepository(queue.engine)
     app = FastAPI(title="Water Source Research Platform", version="0.1.0")
 
     @app.get("/health")
@@ -149,6 +158,93 @@ def create_app(queue: ResearchQueue | None = None,
         if job is None:
             raise HTTPException(404, "unknown run")
         return job
+
+    # --- SupplyRecords, provenance trace and export -------------------------------------
+
+    def record_set(run_id: str) -> tuple[RecordSet, list[QualityCheck]]:
+        stored = (queue.result(run_id) or {}).get("record_set") or {}
+        quality = [QualityCheck.model_validate(c) for c in stored.get("quality", [])]
+        return records.load(run_id), quality
+
+    @app.get("/research/runs/{run_id}/records")
+    async def get_records(run_id: str):
+        """SupplyRecords with their export rows, city values (once), quality and completion."""
+        job = require_run(run_id)
+        rs, quality = record_set(run_id)
+        rows = standardized_rows(rs)
+        return {"run": job.public(), "completion": job.completion,
+                "quality": [c.model_dump(mode="json") for c in quality],
+                "records": [{**r.model_dump(mode="json"), "row": row}
+                            for r, row in zip(sorted(rs.records, key=lambda r: r.position), rows,
+                                              strict=True)],
+                "city_values": {k: v.model_dump(mode="json")
+                                for k, v in rs.city_values.items()},
+                "exports": records.exports(run_id)}
+
+    @app.get("/research/runs/{run_id}/records/{record_key}/trace")
+    async def trace_value(run_id: str, record_key: str, field_key: str):
+        """One exported value back to its evidence: value -> resolution (and reviewer
+        decisions) -> claims -> citations -> chunk text -> source document -> URL. Calculated
+        values list their formula and the same chain for each input."""
+        require_run(run_id)
+        rs, _ = record_set(run_id)
+        if record_key not in rs.record_values:
+            raise HTTPException(404, "unknown record")
+        rv = rs.value(field_key, record_key)
+        if rv is None:
+            raise HTTPException(404, f"no value for {field_key}")
+        claims = {c["claim_uid"]: c for c in evidence.claims(run_id) if c["claim_uid"]}
+        docs = {d["document_id"]: d for d in evidence.documents(run_id)}
+        decisions = {d["id"]: d for d in reviews.decisions(run_id)}
+        resolutions = [r for r in evidence.resolutions(run_id) if r["field_key"] == field_key]
+
+        def chain(uids: list[str]) -> list[dict]:
+            out = []
+            for uid in uids:
+                claim = claims.get(uid)
+                if claim is None:
+                    continue
+                cites = []
+                for c in claim["citations"]:
+                    chunk = evidence.chunk(run_id, c["chunk_id"]) if c.get("chunk_id") else None
+                    cites.append({**c, "chunk_text": chunk["text"] if chunk else None,
+                                  "document": docs.get(c.get("document_id"))})
+                out.append({**claim, "citations": cites})
+            return out
+
+        calc = rv.calculation
+        return {
+            "record_key": record_key, "field_key": field_key, "column": HEADERS[field_key],
+            "value": rv.model_dump(mode="json"),
+            "claims": chain(rv.claim_uids),
+            "inputs": [{**i.model_dump(mode="json"), "claims": chain(i.claim_uids)}
+                       for i in (calc.inputs if calc else [])],
+            "resolution_history": resolutions,
+            "review_decisions": [decisions[i] for i in rv.review_decision_ids if i in decisions],
+        }
+
+    @app.get("/research/runs/{run_id}/export")
+    async def export_run(run_id: str, format: str = "csv", kind: str = "standardized",
+                         requested_by: str | None = None):
+        """Standardized CSV/XLSX (one row per SupplyRecord; XLSX adds provenance, quality and
+        review-log sheets) or, with kind=provenance, the audit export. 409 unless the run
+        SUCCEEDED and isn't INCOMPLETE."""
+        job = require_run(run_id)
+        if kind not in ("standardized", "provenance") or format not in ("csv", "xlsx"):
+            raise HTTPException(422, "format is csv|xlsx and kind is standardized|provenance")
+        try:
+            check_exportable(job.status.value, job.completion)
+        except ExportBlocked as exc:
+            raise HTTPException(409, str(exc)) from exc
+        rs, quality = record_set(run_id)
+        claims = {c["claim_uid"]: c for c in evidence.claims(run_id) if c["claim_uid"]}
+        file = build_export(rs, quality, claims, reviews.decisions(run_id), job.city_name,
+                            run_id, format, kind)
+        audit = records.record_export(run_id, kind, format, file.sha256, file.rows,
+                                      len(file.content), job.completion, requested_by)
+        return Response(file.content, media_type=file.media_type, headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+            "X-Export-Id": str(audit["id"]), "X-Export-Sha256": file.sha256})
 
     # --- human review -------------------------------------------------------------------
 
