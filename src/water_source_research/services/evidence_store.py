@@ -1,8 +1,9 @@
 """Persist a run's evidence and claims (``db/evidence_models.py``).
 
 Writes are idempotent so a retried or checkpoint-resumed run never duplicates rows:
-documents/chunks are insert-or-skip on their (run, url) / (run, chunk) keys; field states,
-claims and citations are replaced wholesale for the run at finalize. Failures propagate: a run
+documents/chunks are insert-or-skip on their (run, url) / (run, chunk) keys; claims are
+upserted by their stable claim_uid (citations written once), resolution decisions are
+insert-or-skip by seq, and only the field-state snapshot is replaced at finalize. Failures propagate: a run
 is not recorded as succeeded without its evidence (the research queue retries it).
 """
 
@@ -12,14 +13,17 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.db.evidence_models import (
-    ClaimCitationRecord, EvidenceChunkRecord, FieldClaimRecord, RunFieldStateRecord,
-    SourceDocumentRecord,
+    ClaimCitationRecord, EvidenceChunkRecord, FieldClaimRecord, FieldResolutionRecord,
+    RunFieldStateRecord, SourceDocumentRecord,
 )
 from water_source_research.llm.extraction import normalize_quote
-from water_source_research.schemas.common import FieldResolutionStatus
-from water_source_research.schemas.research import CityResearchState, EvidenceChunk
+from water_source_research.schemas.common import FINAL_STATUSES
+from water_source_research.schemas.research import (
+    CityResearchState, EvidenceChunk, FieldClaim, FieldState,
+)
+from water_source_research.services.normalization import claim_uid
 
-NO_REVIEW_NEEDED = {FieldResolutionStatus.RESOLVED, FieldResolutionStatus.NOT_APPLICABLE}
+NO_REVIEW_NEEDED = FINAL_STATUSES
 
 _DOC_COLUMNS = ("round", "requested_url", "canonical_url", "final_url", "title", "source_type",
                 "acquisition_method", "media_type", "retrieved_at", "source_date",
@@ -77,56 +81,84 @@ class EvidenceRepository:
 
     def save_results(self, run_id: str, research_state: Mapping[str, Any],
                      needs_evidence: list[str] | None = None,
-                     field_keys: list[str] | None = None) -> int:
-        """Replace the run's field states, claims and citations. Returns claims stored.
+                     field_keys: list[str] | None = None,
+                     resolution_log: list[Mapping[str, Any]] | None = None) -> int:
+        """Store the run's claims, citations, resolution decisions and field-state snapshot.
+        Returns the number of claims written or updated.
 
-        ``field_keys`` limits rows to the fields researched in this run (None = all)."""
+        Claims are upserted by their stable ``claim_uid`` (never deleted, so ids referenced by
+        reviews and exports stay valid); citations are written once per claim. Resolution log
+        entries are append-only (insert-or-skip by seq). The field-state rows are a current
+        snapshot and are replaced. ``field_keys`` limits rows to the fields researched in this
+        run (None = all)."""
         research = CityResearchState.model_validate(research_state)
         missing = set(needs_evidence or [])
         keys = list(field_keys) if field_keys is not None else list(research.fields)
         with Session(self.engine) as session, session.begin():
-            claim_ids = select(FieldClaimRecord.id).where(FieldClaimRecord.run_id == run_id)
-            session.execute(delete(ClaimCitationRecord).where(
-                ClaimCitationRecord.claim_id.in_(claim_ids)))
-            session.execute(delete(FieldClaimRecord).where(FieldClaimRecord.run_id == run_id))
             session.execute(delete(RunFieldStateRecord).where(
                 RunFieldStateRecord.run_id == run_id))
             chunks = self._chunk_index(session, run_id)
+            existing = {r.claim_uid: r for r in session.scalars(select(FieldClaimRecord).where(
+                FieldClaimRecord.run_id == run_id, FieldClaimRecord.claim_uid.is_not(None)))}
             stored = 0
             for key in keys:
                 fs = research.fields.get(key)
                 if fs is None:
                     continue
-                selected_id = None
+                selected = _selected_uids(fs)
                 claims = list(fs.candidate_claims)
                 if fs.selected_claim is not None and fs.selected_claim not in claims:
                     claims.append(fs.selected_claim)
+                selected_id = None
                 for claim in claims:
-                    row = FieldClaimRecord(
-                        run_id=run_id, field_key=key, value=claim.value,
-                        value_status=claim.value_status.value,
-                        value_origin=claim.value_origin.value, confidence=claim.confidence,
-                        is_selected=claim == fs.selected_claim,
-                        prompt_version=EXTRACTION_PROMPT_VERSION)
-                    session.add(row)
-                    session.flush()
+                    uid = claim.claim_uid or claim_uid(claim)
+                    row = existing.get(uid)
+                    if row is None:
+                        row = FieldClaimRecord(run_id=run_id, field_key=key, claim_uid=uid,
+                                               prompt_version=EXTRACTION_PROMPT_VERSION)
+                        session.add(row)
+                        _set_claim_columns(row, claim, uid in selected)
+                        session.flush()
+                        existing[uid] = row
+                        for ref in claim.evidence:
+                            doc_id, chunk_id = _match_chunk(chunks, ref.url, ref.page_number,
+                                                            ref.passage)
+                            session.add(ClaimCitationRecord(
+                                claim_id=row.id, run_id=run_id, document_id=doc_id,
+                                chunk_id=chunk_id, url=ref.url[:2048],
+                                title=(ref.title or None) and ref.title[:1000],
+                                page_number=ref.page_number, quote=ref.passage,
+                                retrieved_at=ref.retrieved_at))
+                    else:
+                        _set_claim_columns(row, claim, uid in selected)
                     stored += 1
-                    if row.is_selected:
+                    if uid in selected and selected_id is None:
                         selected_id = row.id
-                    for ref in claim.evidence:
-                        doc_id, chunk_id = _match_chunk(chunks, ref.url, ref.page_number,
-                                                        ref.passage)
-                        session.add(ClaimCitationRecord(
-                            claim_id=row.id, run_id=run_id, document_id=doc_id,
-                            chunk_id=chunk_id, url=ref.url[:2048],
-                            title=(ref.title or None) and ref.title[:1000],
-                            page_number=ref.page_number, quote=ref.passage,
-                            retrieved_at=ref.retrieved_at))
                 session.add(RunFieldStateRecord(
                     run_id=run_id, field_key=key, status=fs.status.value,
                     review_required=fs.status not in NO_REVIEW_NEEDED,
-                    needs_evidence=key in missing, selected_claim_id=selected_id))
+                    needs_evidence=key in missing, selected_claim_id=selected_id,
+                    resolution=fs.resolution.model_dump(mode="json") if fs.resolution else None))
+            self._append_resolutions(session, run_id, resolution_log or [])
         return stored
+
+    @staticmethod
+    def _append_resolutions(session: Session, run_id: str,
+                            entries: list[Mapping[str, Any]]) -> None:
+        stored = set(session.scalars(select(FieldResolutionRecord.seq).where(
+            FieldResolutionRecord.run_id == run_id)))
+        for e in entries:
+            if e["seq"] in stored:
+                continue
+            session.add(FieldResolutionRecord(
+                run_id=run_id, seq=e["seq"], field_key=e["field_key"],
+                entity_key=str(e["entity_key"])[:255], from_status=e["from_status"],
+                to_status=e["to_status"], rule=e["rule"][:64],
+                reason_codes=list(e.get("reason_codes") or []),
+                selected_claim_uids=list(e.get("selected_claim_uids") or []),
+                candidate_claim_uids=list(e.get("candidate_claim_uids") or []),
+                decided_by=e.get("decided_by", "RULES"),
+                policy_version=e.get("policy_version", "")))
 
     @staticmethod
     def _chunk_index(session: Session, run_id: str
@@ -173,9 +205,13 @@ class EvidenceRepository:
             out = []
             for c in claims:
                 out.append({
-                    "claim_id": c.id, "field_key": c.field_key, "value": c.value,
+                    "claim_id": c.id, "claim_uid": c.claim_uid, "field_key": c.field_key,
+                    "entity_key": c.entity_key, "value": c.value,
+                    "normalized_value": c.normalized_value,
                     "value_status": c.value_status, "value_origin": c.value_origin,
                     "confidence": c.confidence, "is_selected": c.is_selected,
+                    "validation_outcome": c.validation_outcome,
+                    "validation": c.validation, "qualifiers": c.qualifiers,
                     "prompt_version": c.prompt_version,
                     "citations": [_citation_dict(x, docs.get(x.document_id or -1))
                                   for x in cites.get(c.id, [])],
@@ -188,7 +224,21 @@ class EvidenceRepository:
                 RunFieldStateRecord.run_id == run_id).order_by(RunFieldStateRecord.id)).all()
             return [{"field_key": r.field_key, "status": r.status,
                      "review_required": r.review_required, "needs_evidence": r.needs_evidence,
-                     "selected_claim_id": r.selected_claim_id} for r in rows]
+                     "selected_claim_id": r.selected_claim_id, "resolution": r.resolution}
+                    for r in rows]
+
+    def resolutions(self, run_id: str) -> list[dict[str, Any]]:
+        """The run's append-only resolution log, in order."""
+        with Session(self.engine) as session:
+            rows = session.scalars(select(FieldResolutionRecord).where(
+                FieldResolutionRecord.run_id == run_id).order_by(FieldResolutionRecord.seq)).all()
+            return [{"seq": r.seq, "field_key": r.field_key, "entity_key": r.entity_key,
+                     "from_status": r.from_status, "to_status": r.to_status, "rule": r.rule,
+                     "reason_codes": r.reason_codes, "selected_claim_uids": r.selected_claim_uids,
+                     "candidate_claim_uids": r.candidate_claim_uids, "decided_by": r.decided_by,
+                     "policy_version": r.policy_version,
+                     "created_at": r.created_at.isoformat() if r.created_at else None}
+                    for r in rows]
 
     def counts(self, run_id: str) -> dict[str, int]:
         with Session(self.engine) as session:
@@ -197,7 +247,30 @@ class EvidenceRepository:
                                       .where(model.run_id == run_id)) or 0
             return {"documents": n(SourceDocumentRecord), "chunks": n(EvidenceChunkRecord),
                     "claims": n(FieldClaimRecord), "citations": n(ClaimCitationRecord),
-                    "field_states": n(RunFieldStateRecord)}
+                    "field_states": n(RunFieldStateRecord),
+                    "resolutions": n(FieldResolutionRecord)}
+
+def _selected_uids(fs: FieldState) -> set[str]:
+    uids = {u for e in (fs.resolution.entities if fs.resolution else [])
+            for u in e.selected_claim_uids}
+    if fs.selected_claim is not None:
+        uids.add(fs.selected_claim.claim_uid or claim_uid(fs.selected_claim))
+    return uids
+
+def _set_claim_columns(row: FieldClaimRecord, claim: FieldClaim, selected: bool) -> None:
+    """Fields that normalization/resolution may refine on a later pass (the extracted
+    value, status, origin and citations of a claim_uid never change)."""
+    row.value = claim.value
+    row.value_status = claim.value_status.value
+    row.value_origin = claim.value_origin.value
+    row.confidence = claim.confidence
+    row.is_selected = selected
+    row.entity_key = claim.entity_key and claim.entity_key[:255]
+    row.original_value = claim.original_value
+    row.normalized_value = claim.normalized_value
+    row.qualifiers = claim.qualifiers.model_dump(mode="json") if claim.qualifiers else None
+    row.validation_outcome = claim.validation.outcome.value if claim.validation else None
+    row.validation = claim.validation.model_dump(mode="json") if claim.validation else None
 
 def _match_chunk(index, url: str, page: int | None, quote: str) -> tuple[int | None, str | None]:
     q = normalize_quote(quote)

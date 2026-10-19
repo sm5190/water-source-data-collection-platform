@@ -75,7 +75,8 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
     fields = {f["field_key"]: f for f in client.get(f"/research/runs/{run_id}/fields")
               .json()["fields"]}
     ws = fields["water_source"]
-    assert ws["status"] == "CANDIDATE" and ws["review_required"]
+    # Both sources are quoted from the city's own page: accepted by the rules, not the LLM.
+    assert ws["status"] == "RESOLVED" and not ws["review_required"]
     assert {c["value"] for c in ws["candidates"]} == {"Lake Ontario",
                                                       "Groundwater wells (Toronto Island)"}
     assert ws["candidates"][0]["citations"][0]["acquisition_method"] == "DIRECT_HTTP"
@@ -97,13 +98,22 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
     withdrawal = next(c for c in stored["claims"]
                       if c["field_key"] == "total_city_water_withdrawals_m3_day")
     cite = withdrawal["citations"][0]
-    assert withdrawal["value"] == 980000 and not withdrawal["is_selected"]
+    assert withdrawal["value"] == 980000 and withdrawal["is_selected"]
+    assert withdrawal["claim_uid"] and withdrawal["validation_outcome"] == "VALID"
+    assert withdrawal["qualifiers"]["reference_year"] == 2023
+    assert withdrawal["validation"]["version"]
     assert cite["url"] == PDF_URL and cite["page_number"] == 2
     assert cite["chunk_id"] in {c["chunk_id"] for c in chunks}  # linked to the exact chunk
     assert cite["source_date"] == "2024-03-15"
     assert cite["raw_object_key"] == docs[PDF_URL]["raw_object_key"]
     assert {s["field_key"]: s["review_required"] for s in stored["field_states"]} == {
-        k: True for k in TARGETS}
+        k: False for k in TARGETS}
+    assert all(s["resolution"]["decided_by"] == "RULES" for s in stored["field_states"])
+    log = EvidenceRepository(engine).resolutions(run_id)
+    assert {(e["field_key"], e["rule"]) for e in log} == {
+        ("utility_name", "AUTO_STRICT"), ("water_source", "AUTO_STRICT"),
+        ("total_city_water_withdrawals_m3_day", "AUTO_STRICT")}
+    assert [e["seq"] for e in log] == list(range(1, len(log) + 1))
 
     # run/events always recorded; no distillation jobs with procedure memory off
     assert count(engine, ResearchRunRecord, run_id=run_id) == 1
@@ -151,8 +161,10 @@ def test_review_approval_persists_selected_claim(engine):
     states = {s["field_key"]: s for s in repo.field_states("run-toronto")}
     assert states["utility_name"]["status"] == "RESOLVED"
     assert not states["utility_name"]["review_required"]
-    selected = [c for c in repo.claims("run-toronto") if c["is_selected"]]
-    assert [c["field_key"] for c in selected] == ["utility_name"]
+    assert states["utility_name"]["resolution"]["decided_by"] == "REVIEWER"
+    selected = [c for c in repo.claims("run-toronto")
+                if c["is_selected"] and c["field_key"] == "utility_name"]
+    assert len(selected) == 1
     assert states["utility_name"]["selected_claim_id"] == selected[0]["claim_id"]
 
 def test_minio_failure_keeps_evidence(engine):
@@ -161,7 +173,8 @@ def test_minio_failure_keeps_evidence(engine):
     docs = {d["requested_url"]: d for d in EvidenceRepository(engine).documents("run-toronto")}
     assert docs[UTIL_URL]["status"] == "OK" and docs[UTIL_URL]["raw_object_key"] is None
     assert "minio down" in docs[UTIL_URL]["artifact_error"]
-    assert result["research_state"]["fields"]["utility_name"]["status"] == "CANDIDATE"
+    # The evidence (and so the rules' acceptance) doesn't depend on the raw-file copy.
+    assert result["research_state"]["fields"]["utility_name"]["status"] == "RESOLVED"
 
 def test_database_failure_fails_the_run(engine):
     class BrokenStore(EvidenceRepository):

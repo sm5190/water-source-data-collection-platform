@@ -42,6 +42,7 @@ PROVIDER_CAPABILITIES: dict[str, Capability] = {
 # workflow doesn't know is incompatible.
 WORKFLOW_CAPABILITIES: dict[int, frozenset[Capability]] = {
     2: frozenset(Capability),
+    3: frozenset(Capability),  # adds deterministic validation/resolution nodes
 }
 
 def capabilities_for_workflow(workflow_version: int) -> frozenset[Capability]:

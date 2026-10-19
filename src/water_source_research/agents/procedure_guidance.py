@@ -18,7 +18,7 @@ from water_source_research.observability.otel import get_tracer
 from water_source_research.procedures import telemetry
 from water_source_research.procedures.retrieval import ProcedureMemory, choose_strategy
 from water_source_research.procedures.usage import UsageTracker, record_field_metrics
-from water_source_research.schemas.common import FieldResolutionStatus
+from water_source_research.schemas.common import FINAL_STATUSES, FieldResolutionStatus
 from water_source_research.schemas.events import EventKind, append_event
 from water_source_research.schemas.procedures import (
     RetrievalRequest, RetrievalResult, task_type_for,
@@ -28,7 +28,7 @@ from water_source_research.context_manager import ProcedureHint
 from water_source_research.services.run_recorder import RunRecorder
 
 log = logging.getLogger(__name__)
-_DONE = {FieldResolutionStatus.RESOLVED, FieldResolutionStatus.NOT_APPLICABLE}
+_DONE = FINAL_STATUSES
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 async def plan_with_procedures(

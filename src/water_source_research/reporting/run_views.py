@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 from water_source_research.schemas.research import FieldDefinition
 
-NO_REVIEW_STATUSES = ("RESOLVED", "NOT_APPLICABLE")
+NO_REVIEW_STATUSES = ("RESOLVED", "NOT_APPLICABLE", "UNAVAILABLE")
 
 def human_review_log(result: Mapping[str, Any],
                      fields: Mapping[str, FieldDefinition]) -> list[dict[str, Any]]:
@@ -30,7 +30,11 @@ def human_review_log(result: Mapping[str, Any],
         state = research.get(key) or {}
         status = state.get("status", "UNRESOLVED")
         candidates = state.get("candidate_claims") or []
-        base = {"field_key": key, "field_type": d.field_type, "field_status": status}
+        resolution = state.get("resolution") or {}
+        base = {"field_key": key, "field_type": d.field_type, "field_status": status,
+                # Why the rules didn't accept it (services/resolution.py reason codes).
+                "resolution_reasons": sorted({r for e in resolution.get("entities") or []
+                                              for r in e.get("reason_codes") or []})}
         if key in missing:
             items.append({**base, "reason_code": "NO_SUFFICIENT_EVIDENCE",
                           "reason": f"No sufficient evidence after {rounds} discovery round(s)",

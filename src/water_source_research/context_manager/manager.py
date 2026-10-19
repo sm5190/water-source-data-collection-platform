@@ -18,7 +18,7 @@ from enum import StrEnum
 from typing import Any
 
 from water_source_research.observability.otel import get_tracer
-from water_source_research.schemas.common import FieldResolutionStatus
+from water_source_research.schemas.common import FINAL_STATUSES, FieldResolutionStatus
 from water_source_research.schemas.research import (
     CityResearchState,
     EvidenceChunk,
@@ -31,7 +31,7 @@ from water_source_research.services.field_state import load_field_definitions
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "2"
+RETRIEVAL_POLICY_VERSION = "3"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -68,7 +68,7 @@ EXCERPT_THRESHOLD_TOKENS = 250
 MAX_CLAIM_PASSAGE_TOKENS = 150
 MIN_CLAIM_PASSAGE_TOKENS = 20
 
-_DONE = {FieldResolutionStatus.RESOLVED, FieldResolutionStatus.NOT_APPLICABLE}
+_DONE = FINAL_STATUSES
 _SKIP_DONE_PURPOSES = {
     ContextPurpose.PLAN, ContextPurpose.QUERY_GENERATION, ContextPurpose.EXTRACT,
 }
@@ -471,6 +471,8 @@ class ContextManager:
                     sid = sources.add_ref(fs.selected_claim.evidence[0])
             elif fs and fs.status is FieldResolutionStatus.NOT_APPLICABLE:
                 value = "N/A"
+            elif fs and fs.status is FieldResolutionStatus.UNAVAILABLE:
+                value = "Unknown"
             elif key == "city_name":
                 value = state.city_name
             elif key == "country":

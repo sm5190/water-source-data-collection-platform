@@ -161,7 +161,9 @@ def test_graph_runs_extraction_through_the_gateway():
         "evidence_chunks": [UTILITY.model_dump(mode="json"), NEWS.model_dump(mode="json")],
     }))
     fs = result["research_state"]["fields"]["water_type"]
-    assert fs["status"] == FieldResolutionStatus.CANDIDATE
+    # Source-level field with no water source to attribute it to: a reviewer decides.
+    assert fs["status"] == FieldResolutionStatus.HITL_REQUIRED
+    assert fs["resolution"]["entities"][0]["reason_codes"][0] == "NO_WATER_SOURCE"
     assert fs["candidate_claims"][0]["value"] == "Surface"
     assert fs["candidate_claims"][0]["evidence"][0]["url"] == "https://toronto.ca/water"
     assert result["fields_needing_evidence"] == []

@@ -13,18 +13,25 @@ from water_source_research.llm.router import llm_call_log
 from water_source_research.observability.otel import get_tracer
 from water_source_research.procedures.retrieval import ProcedureMemory
 from water_source_research.procedures.usage import UsageTracker
-from water_source_research.schemas.common import FieldResolutionStatus
+from water_source_research.schemas.common import (
+    CheckResult, FieldResolutionStatus, ValidationOutcome,
+)
 from water_source_research.schemas.events import (
     ANCHOR_FIELDS, EventKind, EventResult, append_event, strip_url,
 )
+from water_source_research.core.versions import RESOLUTION_POLICY_VERSION
 from water_source_research.schemas.research import (
-    CityResearchState, FieldClaim, FieldDefinition,
+    CityResearchState, EntityResolution, FieldClaim, FieldDefinition, FieldResolution,
 )
 from water_source_research.context_manager import (
     ContextBundle, ContextPurpose, ContextService, ContextStatus,
 )
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import initialize_city_state
+from water_source_research.services.normalization import (
+    EvidenceIndex, claim_uid, normalize_research,
+)
+from water_source_research.services.resolution import ResolutionPolicy, resolve_research
 from water_source_research.services.run_recorder import RunRecorder
 from .procedure_guidance import (
     apply_selected_procedures, finalize_post_processing, plan_with_procedures,
@@ -290,21 +297,136 @@ def llm_usage(calls: list[dict]) -> dict[str, object]:
             "duration_ms": sum(c["latency_ms"] for c in calls),
             "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
 
-async def validate_node(state: GraphState) -> GraphState:
-    missing = state.get("fields_needing_evidence") or []
+def make_validate_node(fields: Mapping[str, FieldDefinition]):
+    """Normalize and validate every candidate claim (deterministic; no model calls).
+
+    Claims are never dropped: each gets a stable claim_uid and a ClaimValidation, and INVALID
+    claims stay visible candidates that resolution never selects."""
+    async def validate_node(state: GraphState) -> GraphState:
+        research = CityResearchState.model_validate(state["research_state"])
+        with get_tracer().start_as_current_span("graph.validate") as span:
+            span.set_attribute("graph.run_id", state.get("run_id", ""))
+            normalized = normalize_research(research, fields, evidence_index(state))
+            seen = set(state.get("validated_claim_uids", []))
+            events = list(state.get("events", []))
+            counts: dict[str, int] = {}
+            for key, fs in normalized.fields.items():
+                for claim in fs.candidate_claims:
+                    if claim.claim_uid in seen or claim.validation is None:
+                        continue
+                    seen.add(claim.claim_uid or "")
+                    outcome = claim.validation.outcome
+                    counts[outcome.value] = counts.get(outcome.value, 0) + 1
+                    problems = claim.validation.codes(CheckResult.FAIL, CheckResult.WARN)
+                    events = append_event(
+                        events, kind=EventKind.VALIDATION, node="validate", field_key=key,
+                        strategy=outcome.value,
+                        result=EventResult.REJECTED if outcome is ValidationOutcome.INVALID
+                        else EventResult.ACCEPTED,
+                        attrs={"claim_uid": claim.claim_uid, "outcome": outcome.value,
+                               **({"reason_code": ",".join(problems)} if problems else {})})
+            for outcome_name, n in counts.items():
+                span.set_attribute(f"graph.claims_{outcome_name.lower()}", n)
+        return {**state, "research_state": normalized.model_dump(mode="json"),
+                "events": events, "validated_claim_uids": sorted(seen)}
+    return validate_node
+
+def make_resolve_node(fields: Mapping[str, FieldDefinition],
+                      policy: ResolutionPolicy | None = None):
+    """Deterministic candidate resolution: accept only under explicit, conservative rules;
+    flag conflicts and anything uncertain for human review."""
+    policy = policy or ResolutionPolicy()
+
+    async def resolve_node(state: GraphState) -> GraphState:
+        research = CityResearchState.model_validate(state["research_state"])
+        with get_tracer().start_as_current_span("graph.resolve") as span:
+            span.set_attribute("graph.run_id", state.get("run_id", ""))
+            resolved, entries = resolve_research(research, fields, evidence_index(state), policy)
+            log, events = _record_resolution(state, resolved, entries)
+            for key, fs in resolved.fields.items():
+                before = research.fields[key].status if key in research.fields else None
+                if before is None or before is fs.status:
+                    continue
+                attrs: dict[str, object] = {"from_status": before.value,
+                                            "to_status": fs.status.value}
+                if fs.status is FieldResolutionStatus.RESOLVED and key in ANCHOR_FIELDS \
+                        and fs.selected_claim and isinstance(fs.selected_claim.value, str):
+                    attrs["anchor_value"] = fs.selected_claim.value
+                events = append_event(events, kind=EventKind.FIELD_TRANSITION, node="resolve",
+                                      field_key=key, attrs=attrs)
+            review = review_summary(resolved, state)
+            span.set_attribute("graph.fields_requiring_review", review["fields_requiring_review"])
+        return {**state, "research_state": resolved.model_dump(mode="json"), "events": events,
+                "resolution_log": log, **review}
+    return resolve_node
+
+def _record_resolution(state: GraphState, resolved: CityResearchState,
+                       entries: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Append changed (field, entity) decisions to the resolution log, with trusted events.
+    Unchanged decisions from an earlier pass (e.g. after a review round) are not repeated."""
+    log = list(state.get("resolution_log", []))
+    events = list(state.get("events", []))
+    latest = {(e["field_key"], e["entity_key"]): e for e in log}
+    source_types = {c["url"]: c.get("source_type") for c in state.get("evidence_chunks", [])}
+    for entry in entries:
+        key = (entry["field_key"], entry["entity_key"])
+        prior = latest.get(key)
+        if prior and all(prior[k] == entry[k] for k in
+                         ("to_status", "rule", "selected_claim_uids", "reason_codes")):
+            continue
+        entry = {**entry, "seq": len(log) + 1}
+        log.append(entry)
+        latest[key] = entry
+        accepted = entry["to_status"] == FieldResolutionStatus.RESOLVED.value
+        events = append_event(
+            events, kind=EventKind.RESOLUTION, node="resolve", field_key=entry["field_key"],
+            strategy=entry["rule"],
+            result=EventResult.ACCEPTED if accepted else EventResult.NO_RESULT,
+            attrs={"entity_key": entry["entity_key"], "rule": entry["rule"],
+                   "from_status": entry["from_status"], "to_status": entry["to_status"],
+                   **({"reason_code": ",".join(entry["reason_codes"])}
+                      if entry["reason_codes"] else {})})
+        if not accepted:
+            continue
+        fs = resolved.fields[entry["field_key"]]
+        for uid in entry["selected_claim_uids"]:
+            claim = fs.claim(uid)
+            for ref in claim.evidence if claim else []:
+                events = append_event(
+                    events, kind=EventKind.EVIDENCE_ACCEPTED, node="resolve",
+                    field_key=entry["field_key"],
+                    attrs={"url": ref.url, "source_type": source_types.get(ref.url),
+                           "claim_uid": uid})
+    return log, events
+
+def evidence_index(state: GraphState) -> EvidenceIndex:
+    return EvidenceIndex(state.get("evidence_chunks", []), state.get("acquired_documents", []))
+
+def review_summary(research: CityResearchState, state: GraphState) -> GraphState:
+    """Which fields need a person, and why. A run never counts as complete just because
+    extraction finished."""
+    missing = list(state.get("fields_needing_evidence") or [])
+    conflicts = [k for k, fs in research.fields.items()
+                 if fs.status is FieldResolutionStatus.CONFLICT]
+    hitl = [k for k, fs in research.fields.items()
+            if fs.status is FieldResolutionStatus.HITL_REQUIRED]
+    reasons = []
     if missing:
-        return {
-            **state,
-            "needs_human_review": True,
-            "review_reason": "No sufficient evidence after discovery for: " + ", ".join(missing),
-        }
-    return {**state, "needs_human_review": state.get("needs_human_review", False)}
+        reasons.append("No sufficient evidence after discovery for: " + ", ".join(missing))
+    if conflicts:
+        reasons.append("Conflicting values for: " + ", ".join(conflicts))
+    if hitl:
+        reasons.append("Not accepted automatically: " + ", ".join(hitl))
+    return {"needs_human_review": bool(missing or conflicts or hitl),
+            "review_reason": "; ".join(reasons) or None,
+            "fields_requiring_review": conflicts + hitl}
 
 async def human_review_node(state: GraphState) -> GraphState:
     """Apply reviewer decisions and record them as trusted HITL events.
 
-    APPROVED/CORRECTED accepts the top candidate claim (a correction replaces only its
-    value; the evidence must still exist). REJECTED discards the candidates.
+    APPROVED/CORRECTED accepts the rules' selected claim, else the best non-INVALID candidate
+    (a correction becomes a new claim citing the same evidence; the extracted claim is kept).
+    REJECTED discards the candidates. Interim: explicit claim-level decisions replace this.
     """
     decisions = state.get("review_decisions") or []
     if not decisions:
@@ -324,14 +446,30 @@ async def human_review_node(state: GraphState) -> GraphState:
                               result=decision, attrs=hitl_attrs)
         previous = fs.status.value
         if decision in (EventResult.APPROVED, EventResult.CORRECTED):
-            ranked = sorted(fs.candidate_claims, key=lambda c: -c.confidence)
+            # The rules' selection if there is one, else the best non-INVALID candidate.
+            ranked = [fs.selected_claim] if fs.selected_claim else sorted(
+                fs.candidate_claims, key=lambda c: (
+                    c.validation is not None
+                    and c.validation.outcome is ValidationOutcome.INVALID, -c.confidence))
             if not ranked or not ranked[0].evidence:
                 continue  # nothing evidence-backed to accept
             claim = ranked[0]
             if decision is EventResult.CORRECTED and "value" in d:
-                claim = claim.model_copy(update={"value": d["value"]})
+                # A new claim (new claim_uid); the extracted one stays as history.
+                claim = claim.model_copy(update={
+                    "value": d["value"], "original_value": d["value"], "normalized_value": None,
+                    "claim_uid": None, "validation": None})
+                claim = claim.model_copy(update={"claim_uid": claim_uid(claim)})
+                fs.candidate_claims.append(claim)
             fs.selected_claim = claim
             fs.status = FieldResolutionStatus.RESOLVED
+            fs.resolution = FieldResolution(
+                scope=fs.resolution.scope if fs.resolution else "city", decided_by="REVIEWER",
+                policy_version=RESOLUTION_POLICY_VERSION,
+                entities=[EntityResolution(
+                    entity_key=claim.entity_key or "city", status=FieldResolutionStatus.RESOLVED,
+                    rule=decision.value, selected_claim_uids=[claim.claim_uid or ""],
+                    candidate_claim_uids=[c.claim_uid or "" for c in fs.candidate_claims])])
             for ref in claim.evidence:
                 events = append_event(events, kind=EventKind.EVIDENCE_ACCEPTED,
                                       node="human_review", field_key=key,
@@ -345,6 +483,7 @@ async def human_review_node(state: GraphState) -> GraphState:
         elif decision is EventResult.REJECTED:
             fs.candidate_claims = []
             fs.selected_claim = None
+            fs.resolution = None
             fs.status = FieldResolutionStatus.UNRESOLVED
             events = append_event(events, kind=EventKind.FIELD_TRANSITION, node="human_review",
                                   field_key=key,
@@ -365,7 +504,8 @@ def make_finalize_node(
             if evidence_store is not None:  # part of the result: a failure fails the run
                 await asyncio.to_thread(
                     evidence_store.save_results, state["run_id"], state["research_state"],
-                    state.get("fields_needing_evidence"), state.get("unresolved_fields"))
+                    state.get("fields_needing_evidence"), state.get("unresolved_fields"),
+                    state.get("resolution_log"))
             # The scientific result is complete here; everything below is soft post-processing.
             post = await asyncio.to_thread(finalize_post_processing, state, run_recorder,
                                            usage_tracker, fields)

@@ -20,6 +20,10 @@ class EventKind(StrEnum):
     VALIDATION = "VALIDATION"
     HITL = "HITL"
     EVIDENCE_ACCEPTED = "EVIDENCE_ACCEPTED"
+    RESOLUTION = "RESOLUTION"  # one field/entity resolution decision (services/resolution.py)
+
+# Outcome bookkeeping, not research strategy: not part of distillation trajectories' steps.
+NON_PLANNING_KINDS = frozenset({EventKind.VALIDATION, EventKind.RESOLUTION})
 
 class EventResult(StrEnum):
     SUCCESS = "SUCCESS"
@@ -40,6 +44,7 @@ ALLOWED_ATTRS = frozenset({
     "from_status", "to_status", "bundle_status", "claims", "chunks", "anchor_value",
     "correction_category", "procedure_id", "procedure_version", "planned_queries",
     "llm_requests", "cache_hits", "prompt_tokens", "completion_tokens", "model",
+    "claim_uid", "entity_key", "rule", "reason_code", "outcome",
 })
 MAX_ATTR_CHARS = 300
 

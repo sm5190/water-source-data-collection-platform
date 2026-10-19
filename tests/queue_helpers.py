@@ -45,7 +45,7 @@ class Probe:
 
     def install(self, monkeypatch) -> None:
         original_acquire = graph_module.acquire_node
-        original_validate = graph_module.validate_node
+        original_make_validate = graph_module.make_validate_node
         probe = self
 
         async def acquire(state):
@@ -64,16 +64,20 @@ class Probe:
                 probe.in_flight -= 1
             return await original_acquire(state)
 
-        async def validate(state):
-            run_id = state["run_id"]
-            probe.validate_calls[run_id] += 1
-            if probe.fail_validate_once and run_id not in probe._failed:
-                probe._failed.add(run_id)
-                raise probe.fail_validate_once("injected failure in validate")
-            return await original_validate(state)
+        def make_validate(fields):
+            original_validate = original_make_validate(fields)
+
+            async def validate(state):
+                run_id = state["run_id"]
+                probe.validate_calls[run_id] += 1
+                if probe.fail_validate_once and run_id not in probe._failed:
+                    probe._failed.add(run_id)
+                    raise probe.fail_validate_once("injected failure in validate")
+                return await original_validate(state)
+            return validate
 
         monkeypatch.setattr(graph_module, "acquire_node", acquire)
-        monkeypatch.setattr(graph_module, "validate_node", validate)
+        monkeypatch.setattr(graph_module, "make_validate_node", make_validate)
 
 def make_graph(checkpointer=None):
     return build_graph(max_discovery_rounds=1, checkpointer=checkpointer or InMemorySaver())

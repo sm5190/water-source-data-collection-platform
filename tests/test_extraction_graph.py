@@ -59,7 +59,9 @@ def test_ready_bundle_is_passed_to_gateway_and_claim_recorded():
     assert bundle.target_fields == ["utility_name"]
 
     fs = result["research_state"]["fields"]["utility_name"]
-    assert fs["status"] == FieldResolutionStatus.CANDIDATE
+    # Quoted verbatim from a utility page: accepted by the deterministic rules.
+    assert fs["status"] == FieldResolutionStatus.RESOLVED
+    assert fs["resolution"]["entities"][0]["rule"] == "AUTO_STRICT"
     assert fs["candidate_claims"][0]["evidence"][0]["url"] == "https://toronto.ca/water"
     assert result["claims"][0]["value"] == "Toronto Water"
     assert result["seen_evidence"] == [["util", "utility_name"]]
@@ -117,7 +119,7 @@ def test_evidence_found_on_rediscovery_is_extracted(monkeypatch):
                  initial_state(["utility_name"]))
     assert result["discovery_rounds"] == 2
     assert len(gateway.calls) == 1
-    assert result["research_state"]["fields"]["utility_name"]["status"] == "CANDIDATE"
+    assert result["research_state"]["fields"]["utility_name"]["status"] == "RESOLVED"
     assert not result["needs_human_review"]
 
 def test_only_insufficient_fields_are_retried(monkeypatch):

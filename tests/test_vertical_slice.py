@@ -55,8 +55,15 @@ def test_full_slice_three_fields_with_provenance():
     assert {c["page_number"] for c in chunks if c["url"] == PDF_URL} == {1, 2}
 
     f = fields_of(result)
-    assert all(f[k]["status"] == "CANDIDATE" for k in TARGETS)  # never RESOLVED by the LLM
-    assert all(f[k]["selected_claim"] is None for k in TARGETS)
+    # Accepted by the deterministic rules (verbatim quotes from official pages), never by
+    # the LLM's confidence.
+    assert all(f[k]["status"] == "RESOLVED" for k in TARGETS)
+    assert all(e["rule"] == "AUTO_STRICT" for k in TARGETS
+               for e in f[k]["resolution"]["entities"])
+    assert f["utility_name"]["selected_claim"]["value"] == "Toronto Water"
+    assert f["water_source"]["selected_claim"] is None  # two sources, both accepted
+    assert {e["label"] for e in f["water_source"]["resolution"]["entities"]} == {
+        "Lake Ontario", "Groundwater wells (Toronto Island)"}
     [utility] = f["utility_name"]["candidate_claims"]
     assert utility["value"] == "Toronto Water"
     assert utility["evidence"][0]["url"] == UTIL_URL
@@ -79,7 +86,7 @@ def test_full_slice_three_fields_with_provenance():
 
     rows = {r["field_key"]: r for r in field_provenance(result, load_field_definitions())}
     w = rows["total_city_water_withdrawals_m3_day"]
-    assert w["review_required"] and w["researched"] and w["status"] == "CANDIDATE"
+    assert not w["review_required"] and w["researched"] and w["status"] == "RESOLVED"
     cite = w["candidates"][0]["citations"][0]
     assert cite["source_type"] and cite["acquisition_method"] == "DIRECT_HTTP_PDF"
     assert cite["source_date"] == "2024-03-15" and cite["page_number"] == 2
@@ -115,7 +122,7 @@ def test_malformed_model_output_yields_no_claims_and_review():
     assert result["discovery_rounds"] == 2  # sent back to discovery once
     assert result["needs_human_review"]
     assert "utility_name" in result["review_reason"]
-    assert f["water_source"]["status"] == "CANDIDATE"  # other fields unaffected
+    assert f["water_source"]["status"] == "RESOLVED"  # other fields unaffected
 
 def test_hallucinated_quote_and_unknown_source_rejected():
     def invented_quote(prompt):
@@ -172,7 +179,7 @@ def test_vt_mode_never_invokes_openai(monkeypatch):
         "vt.test"}
     assert {r.url.path for r in server.requests} == {"/api/v1/chat/completions"}
     assert all(r.headers["authorization"] == "Bearer sk-vt-test" for r in server.requests)
-    assert fields_of(result)["utility_name"]["status"] == "CANDIDATE"
+    assert fields_of(result)["utility_name"]["status"] == "RESOLVED"
 
 # --- 10: rediscovery ---------------------------------------------------------------------------
 
@@ -190,7 +197,7 @@ def test_rediscovery_acquires_only_new_documents():
     assert site.fetched().count(BLOG_URL) == 1  # not re-fetched in round 2
     rounds = {d["requested_url"]: d["round"] for d in result["acquired_documents"]}
     assert rounds == {BLOG_URL: 1, UTIL_URL: 2}
-    assert fields_of(result)["utility_name"]["status"] == "CANDIDATE"
+    assert fields_of(result)["utility_name"]["status"] == "RESOLVED"
     assert not result["needs_human_review"]
 
 def test_nothing_acquirable_ends_in_review_not_failure():
@@ -214,7 +221,7 @@ def test_empty_documents_produce_no_evidence():
 
 # --- 11: review semantics -------------------------------------------------------------------
 
-def test_only_reviewer_approval_resolves_a_field():
+def test_reviewer_decisions_apply_after_rule_resolution():
     graph, _, _ = slice_graph()
     state = initial_state(review_decisions=[
         {"field_key": "utility_name", "decision": "APPROVED"},
@@ -223,12 +230,13 @@ def test_only_reviewer_approval_resolves_a_field():
     f = fields_of(result)
     assert f["utility_name"]["status"] == "RESOLVED"
     assert f["utility_name"]["selected_claim"]["value"] == "Toronto Water"
-    assert f["water_source"]["status"] == "UNRESOLVED"
-    assert f["total_city_water_withdrawals_m3_day"]["status"] == "CANDIDATE"
+    assert f["utility_name"]["resolution"]["decided_by"] == "REVIEWER"
+    assert f["water_source"]["status"] == "UNRESOLVED"  # a rejection overrides the rules
+    assert f["total_city_water_withdrawals_m3_day"]["resolution"]["decided_by"] == "RULES"
     rows = {r["field_key"]: r for r in field_provenance(result, load_field_definitions())}
     assert not rows["utility_name"]["review_required"]
     assert rows["utility_name"]["citations"][0]["url"] == UTIL_URL
-    assert rows["total_city_water_withdrawals_m3_day"]["review_required"]
+    assert rows["water_source"]["review_required"]
 
 # --- field subset ---------------------------------------------------------------------------
 
@@ -260,7 +268,7 @@ def test_html_only_site_still_works_without_pdf():
     graph, _, _ = slice_graph(site=site, rounds=1)
     result = run(graph, initial_state())
     f = fields_of(result)
-    assert f["utility_name"]["status"] == "CANDIDATE"
+    assert f["utility_name"]["status"] == "RESOLVED"
     assert f["total_city_water_withdrawals_m3_day"]["status"] == "UNRESOLVED"
     assert "total_city_water_withdrawals_m3_day" in result["fields_needing_evidence"]
 

@@ -31,7 +31,7 @@ RESULT_KEYS = ("finalized", "events", "context_bundle_ids", "procedure_selection
                "research_state", "claims", "discovery_rounds", "procedure_memory_degraded",
                "post_processing_errors", "distillation_jobs", "acquired_documents",
                "unresolved_fields", "discovery_provider_status", "discovery_candidates",
-               "candidate_urls")
+               "candidate_urls", "resolution_log", "fields_requiring_review")
 
 class _Stop(Exception):
     def __init__(self, reason: str) -> None:

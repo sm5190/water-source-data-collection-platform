@@ -14,7 +14,7 @@ from water_source_research.services.run_recorder import RunRecorder
 from .state import GraphState
 from .nodes import (
     acquire_node, human_review_node, make_acquire_node, make_discover_node, make_extract_node,
-    make_finalize_node, make_plan_node, validate_node,
+    make_finalize_node, make_plan_node, make_resolve_node, make_validate_node,
 )
 
 def route_after_validation(state: GraphState) -> str:
@@ -71,7 +71,8 @@ def build_graph(
     g.add_node("extract", make_extract_node(
         context_service or ContextService(), gateway or UnconfiguredGateway(),
     ))
-    g.add_node("validate", validate_node)
+    g.add_node("validate", make_validate_node(fields))
+    g.add_node("resolve", make_resolve_node(fields))
     g.add_node("human_review", human_review_node)
     g.add_node("finalize", make_finalize_node(fields, run_recorder, usage_tracker,
                                               evidence_store))
@@ -83,7 +84,8 @@ def build_graph(
         "discover": "discover",
         "validate": "validate",
     })
-    g.add_conditional_edges("validate", route_after_validation, {
+    g.add_edge("validate", "resolve")
+    g.add_conditional_edges("resolve", route_after_validation, {
         "human_review": "human_review",
         "finalize": "finalize",
     })

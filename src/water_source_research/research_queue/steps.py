@@ -8,7 +8,8 @@ bounded in size; full detail lives in the run result and the trusted event log.
 from typing import Any
 
 # Expected order of a run without discovery loops; used for progress display.
-NODE_ORDER = ("plan", "discover", "acquire", "extract", "validate", "human_review", "finalize")
+NODE_ORDER = ("plan", "discover", "acquire", "extract", "validate", "resolve", "human_review",
+              "finalize")
 MAX_EVENTS_PER_STEP = 100
 MAX_TOP_CANDIDATES = 20
 TOP_CANDIDATE_KEYS = ("title", "url", "providers", "source_type", "doi", "doi_verified",
@@ -67,8 +68,21 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
             context_bundles=len(state.get("context_bundle_ids", {})),
         )
     elif node == "validate":
+        outcomes: dict[str, int] = {}
+        for e in new_events:
+            if e.get("kind") == "VALIDATION":
+                outcome = str((e.get("attrs") or {}).get("outcome"))
+                outcomes[outcome] = outcomes.get(outcome, 0) + 1
+        summary.update(claims_validated=outcomes)
+    elif node == "resolve":
+        statuses: dict[str, int] = {}
+        for f in (state.get("research_state") or {}).get("fields", {}).values():
+            if f.get("candidate_claims"):
+                statuses[str(f.get("status"))] = statuses.get(str(f.get("status")), 0) + 1
         summary.update(needs_human_review=state.get("needs_human_review", False),
-                       review_reason=state.get("review_reason"))
+                       review_reason=state.get("review_reason"),
+                       fields_requiring_review=state.get("fields_requiring_review", []),
+                       field_statuses=statuses)
     elif node == "human_review":
         summary.update(decisions=[e for e in new_events if e.get("kind") == "HITL"])
     elif node == "finalize":

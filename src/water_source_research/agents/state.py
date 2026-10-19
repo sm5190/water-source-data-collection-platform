@@ -19,6 +19,10 @@ class GraphState(TypedDict, total=False):
     discovery_rounds: int
     context_bundle_ids: dict[str, str]  # field_key -> persisted ContextBundle id
     claims: list[dict]
+    # Normalization/resolution (services/normalization.py, services/resolution.py).
+    validated_claim_uids: list[str]  # claims a VALIDATION event was emitted for
+    resolution_log: list[dict]  # append-only (field, entity) decisions, with seq
+    fields_requiring_review: list[str]  # CONFLICT / HITL_REQUIRED after resolution
     needs_human_review: bool
     review_reason: str | None
     review_decisions: list[dict]  # [{field_key, decision: APPROVED|CORRECTED|REJECTED, ...}]

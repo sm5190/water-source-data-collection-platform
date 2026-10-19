@@ -1,8 +1,10 @@
 """Per-run evidence and claims: the provenance chain of a city run in queryable form.
 
 SourceDocument (one attempted URL, raw bytes in the artifact store) -> EvidenceChunk (text
-the context manager selects from) -> ClaimCitation (exact quote) -> FieldClaim -> RunFieldState.
-Written by the graph (acquire: documents/chunks; finalize: field states/claims/citations).
+the context manager selects from) -> ClaimCitation (exact quote) -> FieldClaim ->
+FieldResolution (append-only decisions) -> RunFieldState (current snapshot).
+Written by the graph (acquire: documents/chunks; finalize: field states, claims, citations and
+resolution decisions). Claims are keyed by their stable claim_uid and never deleted.
 """
 
 from datetime import datetime
@@ -71,10 +73,14 @@ class RunFieldStateRecord(Base):
     review_required: Mapped[bool] = mapped_column(Boolean)
     needs_evidence: Mapped[bool] = mapped_column(Boolean, default=False)
     selected_claim_id: Mapped[int | None] = mapped_column(Integer)
+    # Serialized FieldResolution: per-entity status, rule, reasons and selected claim uids.
+    resolution: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 class FieldClaimRecord(Base):
     __tablename__ = "field_claims"
+    # Rows written before claim_uid existed keep NULL (unconstrained).
+    __table_args__ = (UniqueConstraint("run_id", "claim_uid", name="uq_field_claims_run_uid"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(64), index=True)
@@ -85,6 +91,13 @@ class FieldClaimRecord(Base):
     confidence: Mapped[float] = mapped_column(Float)
     is_selected: Mapped[bool] = mapped_column(Boolean, default=False)
     prompt_version: Mapped[str | None] = mapped_column(String(64))
+    claim_uid: Mapped[str | None] = mapped_column(String(32))
+    entity_key: Mapped[str | None] = mapped_column(String(255))
+    original_value: Mapped[Any] = mapped_column(JSONType, nullable=True)
+    normalized_value: Mapped[Any] = mapped_column(JSONType, nullable=True)
+    qualifiers: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
+    validation_outcome: Mapped[str | None] = mapped_column(String(24))
+    validation: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 class ClaimCitationRecord(Base):
@@ -101,3 +114,25 @@ class ClaimCitationRecord(Base):
     page_number: Mapped[int | None] = mapped_column(Integer)
     quote: Mapped[str] = mapped_column(Text)
     retrieved_at: Mapped[str | None] = mapped_column(String(40))
+
+class FieldResolutionRecord(Base):
+    """Append-only log of resolution decisions per (run, field, entity); the latest row per
+    (run, field, entity) is current. Rules write them now; reviewer decisions will too."""
+
+    __tablename__ = "field_resolutions"
+    __table_args__ = (UniqueConstraint("run_id", "seq", name="uq_field_resolutions_run_seq"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # order within the run
+    field_key: Mapped[str] = mapped_column(String(128))
+    entity_key: Mapped[str] = mapped_column(String(255))  # city | * | <source key> | unattributed
+    from_status: Mapped[str] = mapped_column(String(32))
+    to_status: Mapped[str] = mapped_column(String(32))
+    rule: Mapped[str] = mapped_column(String(64))
+    reason_codes: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    selected_claim_uids: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    candidate_claim_uids: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    decided_by: Mapped[str] = mapped_column(String(16))  # RULES | REVIEWER
+    policy_version: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

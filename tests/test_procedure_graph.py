@@ -133,7 +133,7 @@ def test_procedure_memory_outage_uses_default_strategy(repo):
     assert result["procedure_selections"] == []
     plan_events = [e for e in result["events"] if e["node"] == "plan"]
     assert plan_events[0]["strategy"] == "default:degraded"
-    assert result["research_state"]["fields"][PRIMARY]["status"] == "CANDIDATE"
+    assert result["research_state"]["fields"][PRIMARY]["candidate_claims"]
 
 def test_total_procedure_memory_failure_does_not_break_run(repo):
     class Broken(ProcedureMemory):

@@ -4,7 +4,7 @@ Bump the relevant constant when behaviour changes in a way stored data doesn't c
 """
 
 # Graph/workflow shape. Integer so procedures can declare a minimum supported version.
-WORKFLOW_VERSION = 2
+WORKFLOW_VERSION = 3
 
 # Procedural memory.
 DISTILLER_VERSION = "deterministic-1"
@@ -18,3 +18,7 @@ PROCEDURE_RETRIEVAL_POLICY_VERSION = "1"
 EMBEDDING_VERSION = "1"
 # Fixed by the pgvector column type; changing it requires a migration and re-embedding.
 EMBEDDING_DIMENSIONS = 1536
+# Deterministic claim normalization/validation (services/normalization.py) and resolution
+# rules (services/resolution.py). Stored with each claim's validation / field resolution.
+NORMALIZATION_VERSION = "normalize-1"
+RESOLUTION_POLICY_VERSION = "resolve-1"

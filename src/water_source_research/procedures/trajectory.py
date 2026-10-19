@@ -7,7 +7,9 @@ import hashlib
 import re
 from collections.abc import Mapping
 from typing import Any
-from water_source_research.schemas.events import EventKind, EventResult, WorkflowEvent
+from water_source_research.schemas.events import (
+    NON_PLANNING_KINDS, EventKind, EventResult, WorkflowEvent,
+)
 from water_source_research.schemas.procedures import (
     QualitySignals, Trajectory, TrajectoryStep, task_type_for,
 )
@@ -83,6 +85,8 @@ def build_trajectory(
                 corrected_fields.add(e.field_key)
         if e.kind is EventKind.VALIDATION and e.result is EventResult.REJECTED:
             rejected += 1
+        if e.kind in NON_PLANNING_KINDS:
+            continue
         steps.append(TrajectoryStep(
             seq=e.seq, kind=e.kind.value, node=e.node, field_key=e.field_key,
             capability=e.capability.value if e.capability else None, provider=e.provider,
