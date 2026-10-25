@@ -120,6 +120,15 @@ class ResearchApiClient:
     def adjudicate(self, eval_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return self._post(f"/evaluation/runs/{eval_id}/adjudications", body)
 
+    def eval_cities(self) -> list[dict[str, Any]]:
+        return self._get("/evaluation/cities")
+
+    def eval_comparison(self, eval_id: str, stage: str) -> dict[str, Any]:
+        return self._get(f"/evaluation/runs/{eval_id}/comparison", stage=stage)
+
+    def eval_performance(self) -> dict[str, Any]:
+        return self._get("/evaluation/performance")
+
     def eval_report(self, eval_id: str, kind: str, fmt: str) -> tuple[bytes, str, str]:
         r = self.http.get(f"/evaluation/runs/{eval_id}/report",
                           params={"kind": kind, "format": fmt})

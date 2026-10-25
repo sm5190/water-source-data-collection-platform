@@ -15,7 +15,7 @@ from water_source_research.core.paths import CONFIG_DIR
 # Bump when reference import/normalization behaviour changes (part of the dataset version).
 REFERENCE_POLICY_VERSION = "reference-1"
 # Bump when comparison, evidence, diagnosis or metric rules change.
-COMPARE_POLICY_VERSION = "compare-2"
+COMPARE_POLICY_VERSION = "compare-3"
 
 EVALUATION_CONFIG = CONFIG_DIR / "evaluation.yaml"
 ALIASES_CONFIG = CONFIG_DIR / "evaluation_aliases.yaml"

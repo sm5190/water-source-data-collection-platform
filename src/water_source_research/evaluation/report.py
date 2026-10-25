@@ -22,7 +22,7 @@ from .store import EvaluationStore
 ADJUDICATED_STATUS = {"CONFIRM_MATCH": "MATCH", "CONFIRM_MISMATCH": "MISMATCH",
                       "AMBIGUOUS": "NEEDS_REVIEW", "REFERENCE_ERROR": "NOT_COMPARABLE"}
 REPORT_KINDS = ("summary", "fields", "city", "evidence", "failures", "metrics")
-STAGE_ORDER = ("RAW", "AUTO", "FINAL")
+STAGE_ORDER = ("RAW", "PROPOSED", "AUTO", "FINAL")
 
 def effective(store: EvaluationStore, eval_id: str,
               fields: Mapping[str, FieldDefinition] | None = None) -> dict[str, Any] | None:
@@ -88,6 +88,11 @@ def predicted_text(r: dict[str, Any]) -> str:
     if r["stage"] == "AUTO":
         return _show(p.get("value")) if p.get("outcome") == "RESOLVED" \
             else (p.get("outcome") or "").lower().replace("_", " ")
+    if r["stage"] == "PROPOSED":
+        if p.get("source") is None:
+            return ""
+        many = f" (1 of {p['candidate_count']})" if p.get("candidate_count", 0) > 1 else ""
+        return _show(p.get("value")) + many
     value = _show(p.get("value"))
     status = p.get("value_status")
     shown = value if status == "KNOWN" else (status or "")

@@ -58,6 +58,17 @@ class ReviewItemSpec:
     candidate_claim_uids: list[str]
     payload: dict[str, Any] = field(default_factory=dict)
 
+OFFICIAL_DEFAULT = frozenset({"UTILITY", "GOVERNMENT", "REGULATORY"})
+
+def proposal_key(outcome: str | None, source_types: set[str], value_in_quote: str | None,
+                 official: set[str] | frozenset[str], order: int) -> tuple[int, int, int, int]:
+    """Sort key for the value the system proposes among a field's candidates: passes
+    validation, then an official source type, then the value re-found in its quote, then the
+    order the claims were found. Confidence is never used."""
+    return ({"VALID": 0, "VALID_WITH_WARNINGS": 1}.get(outcome or "", 2),
+            0 if source_types & set(official or OFFICIAL_DEFAULT) else 1,
+            0 if value_in_quote == "PASS" else 1, order)
+
 def item_id(run_id: str, round_no: int, field_key: str, entity_key: str) -> str:
     raw = "\x1f".join([run_id, str(round_no), field_key, entity_key])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:24]

@@ -9,6 +9,19 @@ adjudicates them; their number is reported next to each rate.
 
 Value accuracy, coverage and evidence validity are separate numbers. Automatic-resolution
 precision is always reported with its coverage (4/4 correct at 4/27 coverage is not "100%").
+
+Researcher-facing scores (``simple_scores``; stages PROPOSED, AUTO, FINAL), per cell:
+  comparable C   the reference has a value, N/A or "None reported" (not Unknown/blank, not a
+                 placeholder) and the field was researched
+  answered A     comparable cells where the stage gave a value or an explicit N/A
+  coverage       A / C
+  accuracy       strict  = MATCH / A
+                 lenient = (MATCH + 0.5 x PARTIAL_MATCH) / A
+  Wrong year / area / measure count as mismatches. "Needs verification" cells stay in A and
+  are not correct until a person verifies them. ``provisional`` counts cells whose status
+  rests on an unverified semantic (LLM) judgment.
+RAW's "any_candidate_recall" (a cell where at least one extracted candidate matches / C) is a
+different question (did extraction find the value at all?) and is never the proposed accuracy.
 """
 
 from collections import Counter
@@ -18,6 +31,39 @@ from typing import Any
 from water_source_research.schemas.research import FieldDefinition
 from .compare import NOT_SCORED
 WRONG = {"MISMATCH", "SCOPE_MISMATCH", "TEMPORAL_MISMATCH"}
+# Plain groups for the dashboard.
+GROUP = {"MATCH": "MATCH", "PARTIAL_MATCH": "PARTIAL", "MISMATCH": "MISMATCH",
+         "TEMPORAL_MISMATCH": "MISMATCH", "SCOPE_MISMATCH": "MISMATCH",
+         "NEEDS_REVIEW": "NEEDS_VERIFICATION", "MISSING_PREDICTION": "MISSING_AUTOMATED",
+         "MISSING_REFERENCE": "MISSING_MANUAL", "NOT_COMPARABLE": "NOT_COMPARABLE",
+         "NOT_RESEARCHED": "NOT_RESEARCHED"}
+SIMPLE_STAGES = ("PROPOSED", "AUTO", "FINAL")
+
+def is_provisional(r: dict[str, Any]) -> bool:
+    """The status rests on a semantic (LLM) judgment nobody has verified yet."""
+    return bool((r.get("comparison") or {}).get("judgment_id")) and not r.get("adjudication")
+
+def simple_scores(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Counts and rates for one stage's cells (see the module docstring)."""
+    groups = Counter(GROUP.get(r["status"], "MISMATCH") for r in rows)
+    comparable = [r for r in rows if r["status"] not in NOT_SCORED]
+    answered = [r for r in comparable if r["status"] != "MISSING_PREDICTION"]
+    match = sum(r["status"] == "MATCH" for r in answered)
+    partial = sum(r["status"] == "PARTIAL_MATCH" for r in answered)
+    a, c = len(answered), len(comparable)
+    return {"cells": len(rows), "comparable": c, "answered": a, "match": match,
+            "partial": partial, "mismatch": groups["MISMATCH"],
+            "needs_verification": groups["NEEDS_VERIFICATION"],
+            "missing_automated": groups["MISSING_AUTOMATED"],
+            "missing_manual": groups["MISSING_MANUAL"],
+            "not_comparable": groups["NOT_COMPARABLE"],
+            "not_researched": groups["NOT_RESEARCHED"],
+            "provisional": sum(is_provisional(r) for r in answered),
+            "coverage": _rate(a, c), "accuracy_strict": _rate(match, a),
+            "accuracy_lenient": _rate(match + 0.5 * partial, a)}
+
+def _rate(num: float, den: int) -> float | None:
+    return round(num / den, 4) if den else None
 
 def metric(scope: str, key: str, name: str, num: float | None, den: float | None,
            **detail: Any) -> dict[str, Any]:
@@ -36,6 +82,14 @@ def compute_metrics(results: list[dict[str, Any]], diagnoses: list[dict[str, Any
     for stage, rows in by_stage.items():
         out += _stage(stage, rows, diagnoses)
         out += _by_field_type(stage, rows, fields)
+        if stage in SIMPLE_STAGES:
+            out += _simple(stage, rows)
+        if stage == "RAW":
+            scored = [r for r in rows if r["status"] not in NOT_SCORED]
+            out.append(metric("stage", stage, "any_candidate_recall",
+                              sum(r["status"] == "MATCH" for r in scored), len(scored),
+                              note="cells where at least one extracted candidate matches; "
+                                   "not the accuracy of the proposed value"))
     out += _evidence(evidence)
     out += _diagnoses(diagnoses)
     out += _reliability(snap)
@@ -106,6 +160,18 @@ def _stage(stage: str, rows: list[dict[str, Any]], diagnoses: list[dict[str, Any
                    sum(r["status"] == "MATCH" for r in na), len(na)),
         ]
     return out
+
+def _simple(stage: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    s = simple_scores(rows)
+    counts = {k: s[k] for k in ("match", "partial", "mismatch", "needs_verification",
+                                "missing_automated", "missing_manual", "not_comparable",
+                                "not_researched", "provisional")}
+    return [
+        metric("stage", stage, "answer_coverage", s["answered"], s["comparable"], **counts),
+        metric("stage", stage, "accuracy_strict", s["match"], s["answered"], **counts),
+        metric("stage", stage, "accuracy_lenient", s["match"] + 0.5 * s["partial"],
+               s["answered"], partial_credit=0.5, **counts),
+    ]
 
 def _by_field_type(stage: str, rows: list[dict[str, Any]],
                    fields: Mapping[str, FieldDefinition]) -> list[dict[str, Any]]:

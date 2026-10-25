@@ -14,6 +14,7 @@ from water_source_research.db.models import Base
 from water_source_research.evaluation.diagnosis import volume_rates
 from water_source_research.evaluation.evaluate import run_evaluation
 from water_source_research.evaluation.store import EvaluationStore
+from water_source_research.schemas.standardized import COLUMNS
 
 @pytest.fixture
 def engine(tmp_path):
@@ -45,7 +46,7 @@ def test_pre_review_run_is_evaluated_at_raw_and_auto(engine, tmp_path):
     assert research_counts(engine) == before  # nothing written to research tables
     store = EvaluationStore(engine)
     run = store.run(eval_id)
-    assert run["stages"] == ["RAW", "AUTO"] and run["status"] == "COMPLETED"
+    assert run["stages"] == ["RAW", "PROPOSED", "AUTO"] and run["status"] == "COMPLETED"
     results = store.field_results(eval_id)
     # Rules accepted the utility and source; both match the reference.
     for field in ("utility_name", "water_source"):
@@ -64,6 +65,39 @@ def test_pre_review_run_is_evaluated_at_raw_and_auto(engine, tmp_path):
     assert coverage["denominator"] > coverage["numerator"]  # ...at partial coverage
     assert precision["detail"]["coverage"] == f"{coverage['numerator']:g}/" \
                                               f"{coverage['denominator']:g}".replace(".0", "")
+
+def test_proposed_stage_scores_the_value_put_forward_before_review(engine, tmp_path):
+    w, dataset = paused_run(engine, tmp_path)
+    store = EvaluationStore(engine)
+    eval_id = run_evaluation(engine, w.run_id, dataset)
+    results = store.field_results(eval_id)
+    # Accepted by the rules: the proposed value is the accepted one.
+    utility = by(results, "PROPOSED", "utility_name")
+    assert utility["status"] == "MATCH" and utility["predicted"]["source"] == "AUTO_ACCEPTED"
+    # Escalated: AUTO has no answer, but the system still proposed (and got wrong) 450,000.
+    proposed = by(results, "PROPOSED", W)
+    p = proposed["predicted"]
+    assert (proposed["status"], p["source"], p["value"]) == ("MISMATCH", "PROPOSED", 450000)
+    assert p["candidate_count"] == 1 and p["selection_reason"] == "the only candidate"
+    assert p["selected_claim_uids"] == [p["candidates"][0]["claim_uid"]]
+    assert p["citations"][0]["quote"]  # the quote is kept for the comparison view
+    # Nothing extracted for water_type: missing, not "N/A".
+    assert by(results, "PROPOSED", "water_type")["status"] in ("MISSING_PREDICTION",
+                                                               "MISSING_REFERENCE")
+
+    metrics = {(m["scope_key"], m["metric"]): m for m in store.metrics(eval_id)}
+    cov, strict = metrics[("PROPOSED", "answer_coverage")], metrics[("PROPOSED", "accuracy_strict")]
+    auto_cov = metrics[("AUTO", "answer_coverage")]
+    # Proposed answers more cells than the rules accepted, and is scored on all of them.
+    assert cov["numerator"] > auto_cov["numerator"]
+    assert strict["denominator"] == cov["numerator"]
+    assert strict["numerator"] < strict["denominator"]  # the 450,000 is wrong
+    lenient = metrics[("PROPOSED", "accuracy_lenient")]
+    assert lenient["detail"]["partial_credit"] == 0.5
+    assert lenient["numerator"] >= strict["numerator"]
+    assert strict["detail"]["provisional"] == 0  # no semantic judgment involved
+    recall = metrics[("RAW", "any_candidate_recall")]
+    assert "not the accuracy of the proposed value" in recall["detail"]["note"]
 
 def test_extraction_failure_is_diagnosed_from_the_bundle(engine, tmp_path):
     w, dataset = paused_run(engine, tmp_path)
@@ -122,12 +156,18 @@ def test_reviewed_run_keeps_raw_predictions_and_scores_final_output(engine, tmp_
     store = EvaluationStore(engine)
     eval_id = run_evaluation(engine, w.run_id, dataset)
     results = store.field_results(eval_id)
-    assert store.run(eval_id)["stages"] == ["RAW", "AUTO", "FINAL"]
+    assert store.run(eval_id)["stages"] == ["RAW", "PROPOSED", "AUTO", "FINAL"]
     # The reviewer's 980,000 is not an extraction: RAW still shows the model's 450,000.
     raw = by(results, "RAW", W)
     assert [c["value"] for c in raw["predicted"]["candidates"]] == [450000]
     final = by(results, "FINAL", W)
     assert final["status"] == "MATCH" and final["predicted"]["origin"] == "REVIEWER"
+    # ...and so does PROPOSED: the reviewer's correction never counts as automated output.
+    proposed = by(results, "PROPOSED", W)
+    assert proposed["predicted"]["value"] == 450000 and proposed["status"] == "MISMATCH"
+    metrics = {(m["scope_key"], m["metric"]): m for m in store.metrics(eval_id)}
+    assert metrics[("FINAL", "accuracy_strict")]["value"] != \
+        metrics[("PROPOSED", "accuracy_strict")]["value"]
     contribution = by(results, "FINAL", "source_withdrawal_contribution_m3_day")
     assert contribution["predicted"]["origin"] == "DERIVED" and contribution["status"] == "MATCH"
     metrics = {(m["scope_key"], m["metric"]): m for m in store.metrics(eval_id)}
@@ -167,7 +207,7 @@ def test_api_evaluates_investigates_and_adjudicates(engine, tmp_path):
     eval_id = r.json()["id"]
     assert client.get(f"/evaluation/runs?research_run_id={w.run_id}").json()[0]["id"] == eval_id
     field = client.get(f"/evaluation/runs/{eval_id}/fields/{W}").json()
-    assert {x["stage"] for x in field["results"]} == {"RAW", "AUTO"}
+    assert {x["stage"] for x in field["results"]} == {"RAW", "PROPOSED", "AUTO"}
     assert field["diagnoses"] and field["evidence"]
     raw_id = next(x["id"] for x in field["results"] if x["stage"] == "RAW")
     bad = client.post(f"/evaluation/runs/{eval_id}/adjudications", json={
@@ -186,6 +226,52 @@ def test_api_evaluates_investigates_and_adjudicates(engine, tmp_path):
         "research_run_id": "nope"}).status_code == 404
     assert client.post("/evaluation/references", json={
         "path": "../outside.xlsx"}).status_code == 422
+
+def test_comparison_view_lists_every_field_side_by_side(engine, tmp_path):
+    w, dataset = paused_run(engine, tmp_path)
+    client = TestClient(create_app(queue=w.queue, evidence=w.evidence, reviews=w.reviews,
+                                   records=w.records))
+    eval_id = client.post("/evaluation/runs", json={"research_run_id": w.run_id,
+                                                    "dataset_id": dataset}).json()["id"]
+    cities = client.get("/evaluation/cities").json()
+    assert cities[0]["latest_eval_run_id"] == eval_id
+    view = client.get(f"/evaluation/runs/{eval_id}/comparison", params={"stage": "PROPOSED"})
+    assert view.status_code == 200, view.text
+    body = view.json()
+    assert body["stages"] == ["PROPOSED", "AUTO"] and body["stage_label"] == "Proposed"
+    assert not body["judge_validated"]
+    # all 32 standardized fields are listed, even those this stage doesn't produce
+    assert {r["field_key"] for r in body["rows"]} == {k for k, _ in COLUMNS}
+    rows = {r["field_key"]: r for r in body["rows"]}
+    withdrawal = rows[W]
+    assert withdrawal["automated"] == "450000" and withdrawal["group"] == "MISMATCH"
+    assert withdrawal["proposed_not_accepted"]
+    assert withdrawal["details"]["candidate_count"] == 1
+    assert withdrawal["details"]["candidates"][0]["selected"]
+    assert withdrawal["details"]["citations"][0]["quote"]
+    assert rows["references"]["status"] == "NOT_EVALUATED"
+    assert rows["percentage_total_population"]["status"] == "NOT_EVALUATED"
+    assert rows["city_population_millions"]["status"] == "NOT_RESEARCHED"
+    proposed, auto = body["summaries"]["PROPOSED"], body["summaries"]["AUTO"]
+    assert proposed["answered"] > auto["answered"]  # both stages' scores are always served
+    auto_view = client.get(f"/evaluation/runs/{eval_id}/comparison",
+                           params={"stage": "AUTO"}).json()
+    auto_rows = {r["field_key"]: r for r in auto_view["rows"]}
+    assert auto_rows[W]["automated"] == "— (sent to review)"
+    assert auto_rows[W]["group"] == "MISSING_AUTOMATED"
+    assert client.get(f"/evaluation/runs/{eval_id}/comparison",
+                      params={"stage": "FINAL"}).status_code == 409
+
+    perf = client.get("/evaluation/performance").json()
+    assert perf["stages"] == ["PROPOSED", "AUTO"]
+    [city] = perf["cities"]
+    assert city["scores"]["PROPOSED"]["comparable"] == proposed["comparable"]
+    # one city: no cross-city average is claimed
+    assert perf["dataset"]["PROPOSED"]["mean_city_accuracy_strict"] is None
+    by_field = {f["field_key"]: f for f in perf["fields"]}
+    assert by_field[W]["PROPOSED"]["n_cities"] == 1
+    assert perf["judge"]["validated"] is False
+    assert [h["eval_run_id"] for h in perf["history"]] == [eval_id]
 
 @pytest.mark.parametrize("text, value", [
     (("In 2023 the plants produced an average of 980,000 cubic metres of drinking water "

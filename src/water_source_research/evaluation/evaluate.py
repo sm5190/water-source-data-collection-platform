@@ -15,6 +15,7 @@ from water_source_research.schemas.research import FieldDefinition
 from water_source_research.services.field_state import load_field_definitions
 from water_source_research.services.normalization import years_in
 from water_source_research.services.resolution import ALL_RECORDS, CITY, name_key
+from water_source_research.services.review import OFFICIAL_DEFAULT, proposal_key
 from .compare import Comparison, Prediction, compare, entity_keys
 from .diagnosis import Diagnoser
 from .evidence import check_evidence
@@ -25,7 +26,10 @@ from .snapshot import (
     auto_decisions, build_snapshot, has_final, raw_claims, snapshot_sha256, value_origin,
 )
 
-STAGES = ("RAW", "AUTO", "FINAL")
+# RAW: every candidate (a cell scores its best one: "any-candidate recall", Advanced only).
+# PROPOSED: the one value the system puts forward per cell (auto-accepted, else the proposed
+# candidate). AUTO: only what the rules accepted. FINAL: after human review.
+STAGES = ("RAW", "PROPOSED", "AUTO", "FINAL")
 RANK = {"MATCH": 0, "PARTIAL_MATCH": 1, "SCOPE_MISMATCH": 2, "TEMPORAL_MISMATCH": 2,
         "NEEDS_REVIEW": 3, "MISMATCH": 4, "MISSING_PREDICTION": 5}
 ENTITY = "water_source"
@@ -50,7 +54,7 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
                       policy: ComparePolicy | None = None) -> dict[str, Any]:
     fields = fields or load_field_definitions()
     policy = policy or load_policy()
-    stages = ["RAW", "AUTO"] + (["FINAL"] if has_final(snap) else [])
+    stages = ["RAW", "PROPOSED", "AUTO"] + (["FINAL"] if has_final(snap) else [])
     claims = raw_claims(snap)
     auto = auto_decisions(snap)
     records = snap["records"]
@@ -58,6 +62,7 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
         "RAW": _pair(ref_city.records, _raw_sources(claims), policy),
         "AUTO": _pair(ref_city.records, _auto_sources(auto, snap), policy),
     }
+    pairing["PROPOSED"] = pairing["RAW"]
     if "FINAL" in stages:
         pairing["FINAL"] = _pair(ref_city.records, [
             (r["record_key"], r.get("water_source") or "") for r in records["records"]], policy)
@@ -73,6 +78,9 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
             pred_key = pairing[stage]["pairs"].get(rkey) if record else None
             if stage == "RAW":
                 r = _raw_cell(d, ref, claims, pred_key, scope, ref_city, policy)
+            elif stage == "PROPOSED":
+                r = _proposed_cell(d, ref, auto, claims, pred_key, scope, ref_city, policy,
+                                   pairing["AUTO"]["pairs"].get(rkey) if record else None)
             elif stage == "AUTO":
                 r = _auto_cell(d, ref, auto, claims, pred_key, scope, ref_city, policy)
             else:
@@ -252,6 +260,81 @@ def _auto_cell(d: FieldDefinition, ref: ReferenceValue | None,
                           "entity_key": decision["entity_key"] if decision else None},
             "links": {"resolution_seq": decision["seq"] if decision else None}}
 
+def _proposed_cell(d: FieldDefinition, ref: ReferenceValue | None,
+                   auto: dict[tuple[str, str], dict[str, Any]], claims: list[dict[str, Any]],
+                   pred_key: str | None, scope: str, city: ReferenceCity, policy: ComparePolicy,
+                   auto_key: str | None) -> dict[str, Any]:
+    """The one value the system puts forward for a cell, before any person: the value the
+    rules accepted, else the proposed candidate (``proposal_order``; confidence never used).
+    Every candidate stays listed with its own comparison; only the selected one is scored."""
+    raw = _raw_cell(d, ref, claims, pred_key, scope, city, policy)
+    candidates = raw["predicted"]["candidates"]
+    accepted = _auto_cell(d, ref, auto, claims, auto_key or pred_key, scope, city, policy)
+    by_uid = {c["claim_uid"]: c for c in claims}
+    if accepted["predicted"]["outcome"] == "RESOLVED":
+        uids = accepted["predicted"]["claim_uids"]
+        cmp = accepted["comparison"]
+        source, reason = "AUTO_ACCEPTED", f"accepted by the rules ({accepted['predicted']['rule']})"
+        value = accepted["predicted"]["value"]
+    else:
+        mine = proposal_order(d, _claims_for(d.key, claims, pred_key, scope, city))
+        if not mine:
+            uids, value, source, reason = [], None, None, "no candidate was extracted"
+            cmp = compare(d, ref, None, policy, _other_lat(d, ref, city)).model_dump(mode="json")
+            if cmp["status"] not in ("MISSING_REFERENCE", "NOT_COMPARABLE"):
+                # Nothing extracted is not an answer of N/A (the methodology has no blanks).
+                cmp = Comparison(status="MISSING_PREDICTION",
+                                 detail="no candidate was extracted").model_dump(mode="json")
+        else:
+            usable = [c for c in mine if c.get("validation_outcome") != "INVALID"]
+            chosen = (usable if d.multi_valued and usable else mine)[: None if d.multi_valued
+                                                                     else 1]
+            uids = [c["claim_uid"] for c in chosen]
+            pred = claim_prediction(chosen[0])
+            if d.multi_valued and len(chosen) > 1:
+                pred = pred.model_copy(update={"value": list(dict.fromkeys(
+                    claim_prediction(c).value for c in chosen))})
+            value = pred.value
+            cmp = compare(d, ref, pred, policy, _other_lat(d, ref, city)).model_dump(mode="json")
+            source = "PROPOSED"
+            reason = _selection_reason(chosen[0], len(mine), d)
+    selected = [by_uid[u] for u in uids if u in by_uid]
+    return {"status": cmp["status"], "comparison": cmp,
+            "predicted": {"source": source, "value": value, "selected_claim_uids": uids,
+                          "selection_reason": reason, "candidate_count": len(candidates),
+                          "reference_year": next((claim_prediction(c).reference_year
+                                                  for c in selected), None),
+                          "citations": [{"url": x["url"], "title": x.get("title"),
+                                         "quote": x.get("quote"),
+                                         "page_number": x.get("page_number"),
+                                         "source_type": x.get("source_type")}
+                                        for c in selected for x in c.get("citations") or []],
+                          "candidates": candidates},
+            "links": {"claim_uids": uids, "candidate_claim_uids": raw["links"]["claim_uids"]}}
+
+def proposal_order(d: FieldDefinition, claims: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Candidates in the order the review screen proposes them (services/review.py)."""
+    official = set(d.official_sources) if d.official_sources else set(OFFICIAL_DEFAULT)
+
+    def key(pair: tuple[int, dict[str, Any]]) -> tuple[int, int, int, int]:
+        n, c = pair
+        checks = {k["code"]: k["result"] for k in (c.get("validation") or {}).get("checks", [])}
+        types = {x.get("source_type") for x in c.get("citations") or []} | set(
+            (c.get("qualifiers") or {}).get("source_types") or [])
+        return proposal_key(c.get("validation_outcome"), types, checks.get("VALUE_IN_QUOTE"),
+                            official, n)
+    return [c for _, c in sorted(enumerate(claims), key=key)]
+
+def _selection_reason(c: dict[str, Any], n: int, d: FieldDefinition) -> str:
+    if n == 1:
+        return "the only candidate"
+    official = set(d.official_sources) if d.official_sources else set(OFFICIAL_DEFAULT)
+    parts = ["passed validation" if c.get("validation_outcome") != "INVALID"
+             else "no candidate passed validation"]
+    if {x.get("source_type") for x in c.get("citations") or []} & official:
+        parts.append("official source")
+    return f"first of {n} candidates: " + ", ".join(parts)
+
 def _final_cell(d: FieldDefinition, ref: ReferenceValue | None, records: dict[str, Any],
                 pred_key: str | None, scope: str, city: ReferenceCity,
                 policy: ComparePolicy) -> dict[str, Any]:
@@ -262,8 +345,8 @@ def _final_cell(d: FieldDefinition, ref: ReferenceValue | None, records: dict[st
     elif pred_key is not None:
         rk = by_source.get(pred_key, pred_key)
         rv = (records["record_values"].get(rk) or {}).get(d.key)
-    if rv is None:
-        pred = None
+    if rv is None or rv.get("resolution_status") == "NEEDS_RESEARCH":
+        pred = None  # rejected by the reviewer, nothing chosen: no answer (not an Unknown)
     else:
         status = {"KNOWN": "KNOWN", "NOT_APPLICABLE": "NOT_APPLICABLE"}.get(
             rv["value_status"], "UNKNOWN")
@@ -273,6 +356,8 @@ def _final_cell(d: FieldDefinition, ref: ReferenceValue | None, records: dict[st
     return {"status": cmp.status, "comparison": cmp.model_dump(mode="json"),
             "predicted": {"value": rv.get("value") if rv else None,
                           "value_status": rv.get("value_status") if rv else None,
+                          "resolution_status": rv.get("resolution_status") if rv else None,
+                          "reference_year": rv.get("reference_year") if rv else None,
                           "origin": value_origin(rv) if rv else None,
                           "review_decision_ids": rv.get("review_decision_ids") if rv else [],
                           "calculation": rv.get("calculation") if rv else None,

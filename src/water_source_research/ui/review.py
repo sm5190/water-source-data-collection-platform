@@ -19,6 +19,7 @@ from typing import Any
 import streamlit as st
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.services.field_state import load_field_definitions
+from water_source_research.services.review import proposal_key
 from water_source_research.ui.client import ApiError
 
 ORDER = {key: n for n, (key, _) in enumerate(COLUMNS)}
@@ -58,18 +59,16 @@ def ordered_candidates(item: dict[str, Any]) -> list[dict[str, Any]]:
     """Proposed value first: passes validation, then an official source type, then the value
     re-found in its quote, then the order the claims were found. Confidence is never used."""
     d = load_field_definitions().get(item["field_key"])
-    official = set(d.official_sources if d and d.official_sources else OFFICIAL_DEFAULT)
+    official = set(d.official_sources) if d and d.official_sources else set(OFFICIAL_DEFAULT)
     cands = list(item["payload"].get("candidates") or [])
 
     def rank(pair: tuple[int, dict[str, Any]]) -> tuple[int, int, int, int]:
         n, c = pair
-        outcome = (c.get("validation") or {}).get("outcome")
+        v = c.get("validation") or {}
         types = {x.get("source_type") for x in c.get("citations") or []} | set(
             (c.get("qualifiers") or {}).get("source_types") or [])
-        checks = {k["code"]: k["result"] for k in (c.get("validation") or {}).get("checks", [])}
-        return ({"VALID": 0, "VALID_WITH_WARNINGS": 1}.get(outcome or "", 2),
-                0 if types & official else 1,
-                0 if checks.get("VALUE_IN_QUOTE") == "PASS" else 1, n)
+        checks = {k["code"]: k["result"] for k in v.get("checks", [])}
+        return proposal_key(v.get("outcome"), types, checks.get("VALUE_IN_QUOTE"), official, n)
     return [c for _, c in sorted(enumerate(cands), key=rank)]
 
 def show_value(value: Any, unit: str | None = None) -> str:

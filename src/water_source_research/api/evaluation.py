@@ -15,6 +15,7 @@ from water_source_research.evaluation.evaluate import run_evaluation
 from water_source_research.evaluation.reference import import_reference
 from water_source_research.evaluation.report import REPORT_KINDS, effective, overview, render
 from water_source_research.evaluation.store import EvaluationStore
+from water_source_research.evaluation.views import city_comparison, performance
 
 class ImportRequest(BaseModel):
     path: str  # file under the repository (e.g. resources/<workbook>.xlsx)
@@ -139,6 +140,35 @@ def evaluation_router(engine: Engine, store: EvaluationStore | None = None) -> A
             raise HTTPException(422, f"CORRECT_DIAGNOSIS needs a root_cause: {ROOT_CAUSES}")
         return store.add_adjudication(eval_id, body.target, body.target_id, body.decision,
                                       body.reviewer, body.status, body.root_cause, body.note)
+
+    @router.get("/cities")
+    async def evaluated_cities():
+        """Cities with a completed evaluation: the latest one per city, and all of them."""
+        out: dict[str, dict] = {}
+        for r in store.runs():  # newest first
+            if r["status"] != "COMPLETED":
+                continue
+            entry = out.setdefault(r["city_key"], {"city_key": r["city_key"],
+                                                   "latest_eval_run_id": r["id"],
+                                                   "evaluations": []})
+            entry["evaluations"].append({"id": r["id"], "stages": r["stages"],
+                                         "created_at": r["created_at"],
+                                         "research_run_id": r["research_run_id"]})
+        return list(out.values())
+
+    @router.get("/runs/{eval_id}/comparison")
+    async def comparison(eval_id: str, stage: Literal["PROPOSED", "AUTO", "FINAL"] = "PROPOSED"):
+        """Field | Manual | Automated | Status for one stage, with every stage's summary."""
+        v = view(eval_id)
+        if stage not in v["run"]["stages"]:
+            raise HTTPException(409, f"this evaluation has no {stage} stage "
+                                     f"(stages: {', '.join(v['run']['stages'])})")
+        return city_comparison(v, stage)
+
+    @router.get("/performance")
+    async def research_performance():
+        """Accuracy and coverage by city, by field and overall (latest evaluation per city)."""
+        return performance(store)
 
     @router.get("/runs/{eval_id}/report")
     async def report(eval_id: str, kind: str = "summary", format: str = "md"):
