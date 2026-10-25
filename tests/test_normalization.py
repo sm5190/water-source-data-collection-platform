@@ -219,6 +219,32 @@ def test_quantities_parser_ignores_years_as_units():
     assert [(q.number, q.canonical) for q in found if q.canonical] == [
         (1159.0, 1159000.0), (3200000.0, 3200000.0)]
 
+@pytest.mark.parametrize("text, canonical, period", [
+    ("980,000 cubic metres of drinking water per day", 980000.0, "day"),
+    ("980,000 cubic metres of treated drinking water each day", 980000.0, "day"),
+    ("1,159 megalitres of water a day", 1159000.0, "day"),
+    ("357.7 million cubic metres of raw lake water per year", 357700000.0, "year"),
+    ("980,000 cubic metres per day", 980000.0, "day"),
+])
+def test_unit_survives_a_filler_phrase_before_the_period(text, canonical, period):
+    # Regression: the filler after "of" was lazy and anchored, so it stopped after "of" and
+    # the period ("per day") was never reached, leaving the number without a unit.
+    q = next(q for q in quantities(text, "m3/day") if q.canonical is not None)
+    assert q.canonical == pytest.approx(canonical) and q.period == period
+
+def test_filler_is_bounded_and_needs_a_period():
+    # More than four filler words, or no period at all: no rate is read.
+    assert all(q.canonical is None for q in quantities(
+        "980,000 cubic metres of very old and rather murky lake water per day", "m3/day"))
+    assert all(q.canonical is None for q in quantities(
+        "a reservoir of 980,000 cubic metres of storage", "m3/day"))
+
+def test_annual_volume_with_filler_converts_to_daily():
+    text = "In 2023 the plants treated 357.7 million cubic metres of drinking water a year."
+    c = one(World(), text, W, 980000)  # 357.7e6 / 365 = 980,000
+    assert checks(c)["VALUE_IN_QUOTE"] == "PASS"
+    assert c.qualifiers.measurement_basis == "annual"
+
 # --- findings from the real Toronto run -----------------------------------------------------
 
 def test_elided_quote_links_when_its_parts_occur_in_order():

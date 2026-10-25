@@ -20,5 +20,5 @@ EMBEDDING_VERSION = "1"
 EMBEDDING_DIMENSIONS = 1536
 # Deterministic claim normalization/validation (services/normalization.py) and resolution
 # rules (services/resolution.py). Stored with each claim's validation / field resolution.
-NORMALIZATION_VERSION = "normalize-1"
+NORMALIZATION_VERSION = "normalize-2"
 RESOLUTION_POLICY_VERSION = "resolve-1"

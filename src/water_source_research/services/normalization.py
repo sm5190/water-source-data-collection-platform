@@ -167,9 +167,13 @@ _VOLUME_WORDS = [
     (re.compile(r"^\s*(?:US\s+)?gallons?\b", re.IGNORECASE), 0.003785411784, "gal"),
     (re.compile(r"^\s*acre[-\s]?f(?:ee|oo)t\b", re.IGNORECASE), 1233.48183754752, "acre-ft"),
 ]
-_FILLER = re.compile(r"^\s*(?:of\s+(?:[A-Za-z-]+\s+){0,4}?)?", re.IGNORECASE)
-_PERIOD = re.compile(r"^\s*(?:(?:per|/|a|an|each|every)\s*(day|d|year|yr|annum)\b"
+# A word prefix needs a space ("and" is not "an d"); "/" doesn't ("m3/d").
+_PERIOD = re.compile(r"^\s*(?:(?:(?:per|a|an|each|every)\s+|/\s*)(day|d|year|yr|annum)\b"
                      r"|(daily|a\s+day|annually|yearly|a\s+year|per\s+annum))", re.IGNORECASE)
+# "of drinking water" between a volume and its period: up to four words, matched together with
+# the period so the filler can backtrack to wherever the period starts.
+_FILLER_PERIOD = re.compile(r"^\s*(?:of\s+(?:[A-Za-z-]+\s+){0,4}?)?"
+                            + _PERIOD.pattern.removeprefix("^"), re.IGNORECASE)
 _PERCENT = re.compile(r"^\s*(?:%|per\s?cent\b)", re.IGNORECASE)
 _YEAR = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
 _DMS = re.compile(r"(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(?:(\d{1,2}(?:\.\d+)?)\s*[\"″])?\s*"
@@ -205,9 +209,7 @@ def quantities(text: str, unit: str | None = None) -> list[Quantity]:
                     hit = pattern.match(tail)
                     if not hit:
                         continue
-                    rest = tail[hit.end():]
-                    rest = rest[_FILLER.match(rest).end():]  # "of drinking water"
-                    per = _PERIOD.match(rest)
+                    per = _FILLER_PERIOD.match(tail[hit.end():])  # "of drinking water per day"
                     if per:
                         word = (per.group(1) or per.group(2) or "").lower()
                         period = "day" if word.startswith(("d", "a d")) else "year"

@@ -25,7 +25,7 @@ from typing import Any
 from urllib.parse import urlsplit
 from water_source_research.schemas.research import FieldDefinition
 from water_source_research.services.normalization import (
-    _MULTIPLIER, _NUMBER, _PERIOD, _VOLUME_WORDS, close, coordinates_in, quantities, years_in,
+    close, coordinates_in, quantities, years_in,
 )
 from water_source_research.services.resolution import name_key
 from water_source_research.services.rules_engine import days_in_year
@@ -48,35 +48,10 @@ STAGE_OF = {"DISCOVERY_FAILURE": "discovery", "ACQUISITION_FAILURE": "acquisitio
 
 AVAILABILITY_TOLERANCE = 0.01  # relative: "the acquired text states the reference value"
 
-# normalization.quantities stops at "of " before the period in "980,000 cubic metres of
-# drinking water per day" (its filler is lazy and anchored), leaving the number unitless. The
-# evaluator re-reads such numbers with a filler that can backtrack; the research parser is not
-# changed here.
-_RATE_TAILS = [(re.compile(p.pattern + r"\s*(?:of\s+(?:[A-Za-z-]+\s+){0,4})?"
-                           + _PERIOD.pattern.removeprefix("^"), p.flags), factor)
-               for p, factor, _ in _VOLUME_WORDS]
-
 def volume_rates(text: str) -> list[tuple[float, str, int]]:
     """(m3 per period, period, offset) for every volume rate stated in ``text``."""
-    out = []
-    for q in quantities(text, "m3/day"):
-        if q.canonical is not None and q.period:
-            out.append((q.canonical, q.period, q.start))
-            continue
-        m = _NUMBER.match(text, q.start)
-        tail = text[m.end():m.end() + 120] if m else ""
-        mult = _MULTIPLIER.match(tail)
-        value = q.number
-        if mult:  # quantities already applied it to q.number
-            tail = tail[mult.end():]
-        for pattern, factor in _RATE_TAILS:
-            hit = pattern.match(tail)
-            if hit:
-                word = next(g for g in hit.groups() if g).lower()
-                period = "day" if word.startswith(("d", "a d")) else "year"
-                out.append((value * factor, period, q.start))
-                break
-    return out
+    return [(q.canonical, q.period, q.start) for q in quantities(text, "m3/day")
+            if q.canonical is not None and q.period]
 
 def _contains_phrase(words: list[str], phrase: list[str]) -> bool:
     """Whether ``phrase`` (stemmed words) occurs contiguously in ``words``."""
