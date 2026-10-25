@@ -1,0 +1,58 @@
+# Manual comparison of Toronto run 8ad1fa90 (pre-review: RAW and AUTO) with the workbook's
+# Toronto row, written on 2026-10-19 BEFORE the evaluator existed. Used only to check the
+# evaluator (`scripts/evaluate_run.py --compare-manual`); the evaluator never reads it.
+#
+# status: acceptable comparison statuses for that stage (any of).
+# root_cause / symptoms: what the manual analysis concluded (symptoms: all must be present).
+# Only judgments the manual comparison actually made are recorded.
+research_run_id: 8ad1fa90-cff6-4572-864d-a9997abea332
+city: Toronto
+country: Canada
+findings:
+  # Accepted automatically, all match the workbook.
+  - {field: city_name, stage: AUTO, status: [MATCH]}
+  - {field: utility_name, stage: AUTO, status: [MATCH]}
+  - {field: water_source, stage: AUTO, status: [MATCH]}
+  - {field: water_type, stage: AUTO, status: [MATCH]}
+  # Correct candidates the rules sent to review.
+  - {field: jurisdiction, stage: RAW, status: [MATCH],
+     note: "Ontario is right; blocked because only a technical source cites it"}
+  - {field: jurisdiction, stage: AUTO, status: [MISSING_PREDICTION]}
+  - {field: source_withdrawal_contribution_method, stage: RAW, status: [MATCH],
+     note: "Reported Daily, matches; not stated in the quote"}
+  # Wrong candidates, correctly blocked.
+  - {field: city_population_millions, stage: RAW, status: [SCOPE_MISMATCH, MISMATCH],
+     symptoms: [GEOGRAPHIC_SCOPE_MISMATCH],
+     note: "3.6M is 'Toronto and portions of York and Peel' (wider area), hedged"}
+  - {field: city_population_millions, stage: AUTO, status: [MISSING_PREDICTION]}
+  - {field: utility_reported_city_population_millions, stage: RAW,
+     status: [SCOPE_MISMATCH, MISMATCH], symptoms: [GEOGRAPHIC_SCOPE_MISMATCH]}
+  - {field: total_city_water_withdrawals_m3_day, stage: RAW,
+     status: [TEMPORAL_MISMATCH, SCOPE_MISMATCH, MISMATCH], symptoms: [TEMPORAL_MISMATCH],
+     root_cause: [DISCOVERY_FAILURE],
+     note: "1.42M is an estimated 2010 academic figure; the workbook's 2024 Summary Report
+       was never acquired (and the acquired daily-consumption page lacked the 2024 figure)"}
+  - {field: total_city_water_withdrawals_m3_day, stage: AUTO, status: [MISSING_PREDICTION]}
+  - {field: water_system, stage: RAW, status: [NOT_COMPARABLE],
+     note: "the workbook holds the placeholder 'HYBAS ID'"}
+  - {field: water_transfer_system, stage: RAW, status: [MISMATCH],
+     symptoms: [FIELD_SEMANTICS_MISMATCH],
+     note: "Coxwell Bypass Tunnel is a sewer tunnel; the workbook says N/A"}
+  - {field: seasonal_uses, stage: RAW, status: [MISMATCH, NEEDS_REVIEW],
+     symptoms: [FIELD_SEMANTICS_MISMATCH], note: "a taste/odour sentence, not a seasonal use"}
+  - {field: infrastructure_notes, stage: RAW, status: [PARTIAL_MATCH, NEEDS_REVIEW],
+     note: "a long paragraph covering similar items to the workbook's list"}
+  - {field: water_quality_notes, stage: RAW, status: [MISMATCH, NEEDS_REVIEW],
+     symptoms: [FIELD_SEMANTICS_MISMATCH],
+     note: "treated-water testing text; the rules want raw-water quality"}
+  - {field: water_quality_year, stage: RAW, status: [MISMATCH], note: "2025 vs 2024"}
+  # Nothing found.
+  - {field: city_latitude, stage: RAW, status: [MISSING_PREDICTION]}
+  - {field: city_longitude, stage: RAW, status: [MISSING_PREDICTION]}
+  - {field: pod_latitude, stage: RAW, status: [MISSING_PREDICTION]}
+  - {field: pod_longitude, stage: RAW, status: [MISSING_PREDICTION]}
+  - {field: pod_coordinate_method, stage: RAW, status: [MISSING_PREDICTION]}
+  - {field: city_population_reference_year, stage: RAW, status: [MISSING_PREDICTION]}
+run_findings:
+  - {symptom: SOURCE_CLASSIFICATION_ERROR, mentions: toronto.name,
+     note: "a third-party history site labelled GOVERNMENT"}

@@ -5,6 +5,12 @@ research data is only read). Each invocation stores a new evaluation run.
 
 Prints per-field results (RAW / AUTO / FINAL), diagnoses and the main metrics with their
 numerators and denominators. --out writes the full evaluation as JSON.
+
+    uv run python scripts/evaluate_run.py --compare-manual tests/evaluation/toronto_manual_findings.yaml
+        [--eval-run <id>] [--out dir]
+
+checks the latest evaluation of the findings' research run (or --eval-run; one is created if
+none exists) against independently written manual findings and lists every disagreement.
 """
 
 import argparse
@@ -13,16 +19,26 @@ import sys
 from pathlib import Path
 from water_source_research.db.session import get_engine
 from water_source_research.evaluation.evaluate import run_evaluation
+from water_source_research.evaluation.manual import compare_manual, load_findings, manual_markdown
+from water_source_research.evaluation.report import effective
 from water_source_research.evaluation.store import EvaluationStore
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("run_id")
+    parser.add_argument("run_id", nargs="?")
     parser.add_argument("--dataset", default=None,
                         help="reference dataset version (default: latest with this city)")
     parser.add_argument("--out", type=Path, default=None, help="directory for the JSON result")
+    parser.add_argument("--compare-manual", type=Path, default=None,
+                        help="YAML manual findings to check the evaluation against")
+    parser.add_argument("--eval-run", default=None,
+                        help="with --compare-manual: the evaluation to check")
     args = parser.parse_args()
     engine = get_engine()
+    if args.compare_manual:
+        return compare(engine, args)
+    if not args.run_id:
+        parser.error("run_id is required (unless --compare-manual)")
     try:
         eval_id = run_evaluation(engine, args.run_id, args.dataset)
     except LookupError as exc:
@@ -63,6 +79,33 @@ def main() -> int:
             "run": run, "results": results, "diagnoses": diagnoses, "metrics": metrics,
             "evidence": store.evidence_checks(eval_id)}, indent=1, default=str,
             ensure_ascii=False), encoding="utf-8")
+        print(f"wrote {path}")
+    return 0
+
+def compare(engine, args) -> int:
+    manual = load_findings(args.compare_manual)
+    store = EvaluationStore(engine)
+    run_id = args.run_id or manual["research_run_id"]
+    eval_id = args.eval_run or next(
+        (r["id"] for r in store.runs(run_id) if r["status"] == "COMPLETED"), None)
+    if eval_id is None:
+        try:
+            eval_id = run_evaluation(engine, run_id, args.dataset)
+        except LookupError as exc:
+            print(f"cannot evaluate: {exc}")
+            return 2
+    view = effective(store, eval_id)
+    if view is None:
+        print(f"unknown evaluation {eval_id}")
+        return 2
+    rows = compare_manual(view, manual)
+    text = manual_markdown(rows, f"Evaluator vs manual findings: evaluation {eval_id} "
+                                 f"({view['metrics_basis']}) of research run {run_id}")
+    print(text)
+    if args.out:
+        args.out.mkdir(parents=True, exist_ok=True)
+        path = args.out / f"manual_comparison_{eval_id[:8]}.md"
+        path.write_text(text, encoding="utf-8")
         print(f"wrote {path}")
     return 0
 

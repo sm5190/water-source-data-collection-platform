@@ -138,3 +138,13 @@ def test_coordinates_by_distance():
                   Prediction(value=79.274), POLICY, other_lat=43.67)
     assert lon.status == "MISMATCH" and lon.tags == ["SIGN"]
     assert haversine_km(43.6532, -79.3832, 43.6678, -79.274) == pytest.approx(8.9, 0.05)
+
+def test_a_listed_description_is_compared_by_concepts_not_as_a_set():
+    f = "infrastructure_notes"
+    reference = ref(f, ["lake intake", "intake pipe", "treatment plant", "pumping station"])
+    c = cmp(f, reference, "Intake pipes 1-5 km offshore feed a multi-barrier treatment system "
+                          "and pumping stations.")
+    assert c.status == "PARTIAL_MATCH"  # a paragraph is never a set MISMATCH
+    assert "intake pipe" in c.matched and "pumping station" in c.matched
+    assert "lake intake" in c.missing
+    assert cmp(f, reference, "Chlorine residual is tested daily.").status == "NEEDS_REVIEW"

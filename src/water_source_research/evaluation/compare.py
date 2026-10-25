@@ -95,6 +95,12 @@ def compare(d: FieldDefinition, ref: ReferenceValue | None, pred: Prediction | N
         return Comparison(status="MISSING_PREDICTION")
     assert pred is not None
     expected = ref.normalized
+    if d.key in DESCRIPTIVE_FIELDS or d.descriptive:
+        # Before list handling: a comma-separated description is a list of concepts, and free
+        # text is never an automatic MATCH or MISMATCH.
+        concepts = ", ".join(_as_list(expected)) if isinstance(expected, list) else str(expected)
+        return _description(d, concepts, " ".join(_as_list(pred.value))
+                            if isinstance(pred.value, list) else str(pred.value))
     if d.key in LIST_FIELDS or d.multi_valued:
         return compare_sets(_as_list(expected), _as_list(pred.value), policy)
     if d.type == "coordinate":
@@ -105,8 +111,6 @@ def compare(d: FieldDefinition, ref: ReferenceValue | None, pred: Prediction | N
         return _number(d, float(expected), pred, ref, policy)
     if d.allowed:
         return _category(d, expected, pred)
-    if d.key in DESCRIPTIVE_FIELDS or d.descriptive:
-        return _description(d, str(expected), str(pred.value))
     return _entity(str(expected), str(pred.value), policy)
 
 # --- numbers ----------------------------------------------------------------------------------
@@ -189,12 +193,28 @@ def _entity(expected: str, got: str, policy: ComparePolicy) -> Comparison:
                           detail=f"{got!r} vs {expected!r}: one name contains the other")
     return Comparison(status="MISMATCH", detail=f"{got!r} vs {expected!r}")
 
-_STEM = re.compile(r"(ing|ed|es|s)$")
+def _stem(w: str) -> str:
+    """A light, consistent stem: pipe/pipes/piped, intake/intakes, line/lines agree."""
+    if len(w) <= 3 or w.isdigit():
+        return w
+    for suffix in ("ing", "ed"):
+        if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+            w = w[:-len(suffix)]
+            break
+    else:
+        if w.endswith("ies") and len(w) > 4:
+            w = w[:-3] + "y"
+        elif w.endswith(("sses", "shes", "ches", "xes", "zes")):
+            w = w[:-2]
+        elif w.endswith("s") and not w.endswith(("ss", "us", "is")):
+            w = w[:-1]
+    return w[:-1] if len(w) > 3 and w.endswith("e") else w
+
 _STOP = frozenset({"the", "and", "of", "for", "to", "in", "a", "an", "with", "on", "at", "by"})
 
 def _concept_words(text: str) -> list[str]:
     words = [w for w in re.findall(r"[a-z0-9]+", text.casefold()) if w not in _STOP]
-    return [_STEM.sub("", w) if len(w) > 4 else w for w in words]
+    return [_stem(w) for w in words]
 
 def _description(d: FieldDefinition, expected: str, got: str) -> Comparison:
     """Concept coverage only; free-text agreement is a person's call (never an automatic
