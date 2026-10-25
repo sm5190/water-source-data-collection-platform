@@ -231,12 +231,13 @@ def test_reviewer_decisions_apply_after_rule_resolution():
     assert f["utility_name"]["status"] == "RESOLVED"
     assert f["utility_name"]["selected_claim"]["value"] == "Toronto Water"
     assert f["utility_name"]["resolution"]["decided_by"] == "REVIEWER"
-    assert f["water_source"]["status"] == "UNRESOLVED"  # a rejection overrides the rules
+    # Rejecting the only candidate: needs further research (not an Unknown, not reopened).
+    assert f["water_source"]["status"] == "NEEDS_RESEARCH"
     assert f["total_city_water_withdrawals_m3_day"]["resolution"]["decided_by"] == "RULES"
     rows = {r["field_key"]: r for r in field_provenance(result, load_field_definitions())}
     assert not rows["utility_name"]["review_required"]
     assert rows["utility_name"]["citations"][0]["url"] == UTIL_URL
-    assert rows["water_source"]["review_required"]
+    assert not rows["water_source"]["review_required"]  # settled for this run
 
 # --- field subset ---------------------------------------------------------------------------
 

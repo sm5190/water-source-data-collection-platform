@@ -45,6 +45,7 @@ ALLOWED_ATTRS = frozenset({
     "correction_category", "procedure_id", "procedure_version", "planned_queries",
     "llm_requests", "cache_hits", "prompt_tokens", "completion_tokens", "model",
     "claim_uid", "entity_key", "rule", "reason_code", "outcome", "decision_id", "records",
+    "validation_override",
 })
 MAX_ATTR_CHARS = 300
 

@@ -9,9 +9,13 @@ sent back (rejections, source assignments). Reviewer decisions are never recompu
 Rules enforced here:
   - nothing is accepted that wasn't shown: APPROVE/REJECT/ASSIGN_SOURCE name candidate claims
     of the item; claims that failed validation can't be approved (CORRECT them instead);
-  - a corrected value needs a reason and evidence: a verbatim quote from one of the run's
-    evidence chunks, or a reviewer-supplied source (kept as REVIEWER_SUPPLIED, unverified);
-  - Unknown / N/A / deferral need a reason; the highest-confidence claim is never picked.
+  - approving a claim that failed validation needs a deliberate override
+    (``override_validation``), recorded in the audit trail;
+  - a corrected value needs evidence: a verbatim quote from one of the run's evidence chunks,
+    or a reviewer-supplied source (kept as REVIEWER_SUPPLIED, unverified);
+  - reasons are optional (the stored ``decision_basis`` describes every decision);
+  - rejecting the candidates leaves no value: with no usable candidate left the field is
+    NEEDS_RESEARCH (never an implicit Unknown); the highest-confidence claim is never picked.
 """
 
 import hashlib
@@ -32,7 +36,7 @@ from water_source_research.schemas.research import (
     CityResearchState, EntityResolution, EvidenceRef, FieldClaim, FieldDefinition,
     FieldResolution, FieldState,
 )
-from water_source_research.schemas.review import DecisionType, ReviewDecisionIn
+from water_source_research.schemas.review import DecisionType, ReviewDecisionIn, reviewer_key
 from .normalization import EvidenceIndex, claim_uid, coerce_value, normalize_claim
 from .resolution import (
     ALL_RECORDS, ENTITY_FIELD, UNATTRIBUTED, default_entity, refresh_field,
@@ -158,24 +162,31 @@ def validate_decision(dec: ReviewDecisionIn, item: Mapping[str, Any], d: FieldDe
     if dec.decision.value not in payload.get("allowed_decisions", []):
         return [f"{dec.decision.value} is not allowed for this item"]
     candidates = {c["claim_uid"]: c for c in payload.get("candidates", [])}
-    unknown = [u for u in dec.claim_uids if u not in candidates]
+    unknown = [u for u in [*dec.claim_uids, *dec.rejected_claim_uids] if u not in candidates]
     if unknown:
         problems.append(f"claims not shown in this item: {', '.join(unknown)}")
-    needs_reason = dec.decision in (D.CORRECT, D.MARK_UNKNOWN, D.MARK_NA, D.DEFER)
-    if needs_reason and not (dec.reason and dec.reason.strip()):
-        problems.append(f"{dec.decision.value} needs a reason")
+    if dec.rejected_claim_uids and dec.decision is not D.APPROVE:
+        problems.append("rejected_claim_uids go with APPROVE of another claim (use REJECT)")
+    if set(dec.rejected_claim_uids) & set(dec.claim_uids):
+        problems.append("a claim can't be both approved and rejected")
+    if dec.override_validation and dec.decision is not D.APPROVE:
+        problems.append("override_validation only applies to APPROVE")
 
     if dec.decision is D.APPROVE:
         if not dec.claim_uids:
             problems.append("APPROVE names the claim(s) to accept")
         elif len(dec.claim_uids) > 1 and not d.multi_valued:
             problems.append(f"{d.key} takes one value: approve exactly one claim")
-        for uid in dec.claim_uids:
-            v = (candidates.get(uid) or {}).get("validation") or {}
-            if v.get("outcome") == ValidationOutcome.INVALID.value:
+        invalid = [uid for uid in dec.claim_uids if _invalid(candidates.get(uid))]
+        for uid in invalid:
+            if not dec.override_validation:
+                v = candidates[uid]["validation"]
                 failed = [k["code"] for k in v.get("checks", []) if k["result"] == "FAIL"]
                 problems.append(f"claim {uid} failed validation ({', '.join(failed)}); "
-                                "use CORRECT with supporting evidence instead")
+                                "confirm it deliberately (override_validation) or use CORRECT "
+                                "with supporting evidence")
+        if dec.override_validation and not invalid:
+            problems.append("override_validation is only for claims that failed validation")
         sources = payload.get("sources") or []
         if item["entity_key"] == UNATTRIBUTED and len(sources) > 1:
             problems.append("attribute the claim to a water source (ASSIGN_SOURCE) first")
@@ -202,6 +213,31 @@ def validate_decision(dec: ReviewDecisionIn, item: Mapping[str, Any], d: FieldDe
             elif normalize_quote(dec.evidence.quote or "") not in normalize_quote(row["text"]):
                 problems.append("the quote does not occur in the cited chunk")
     return problems
+
+def _invalid(candidate: Mapping[str, Any] | None) -> bool:
+    v = (candidate or {}).get("validation") or {}
+    return v.get("outcome") == ValidationOutcome.INVALID.value
+
+def decision_basis(dec: ReviewDecisionIn) -> str:
+    """A plain description of what the reviewer decided (stored with every decision, so a
+    reviewer never has to type an explanation)."""
+    kind = dec.decision
+    if kind is D.APPROVE:
+        text = "Accepted another value found (rejected the proposed value)" \
+            if dec.rejected_claim_uids else "Accepted the proposed value"
+        if dec.override_validation:
+            text += "; reviewer confirmed it despite a failed validation check"
+        return text
+    if kind is D.CORRECT:
+        evidence = dec.evidence
+        source = "a quote from the run's evidence" if evidence and evidence.chunk_id \
+            else "a reviewer-supplied source (not machine-verified)"
+        return f"Corrected the value, supported by {source}"
+    return {D.REJECT: "Rejected the proposed value",
+            D.ASSIGN_SOURCE: "Assigned the value to a water source",
+            D.MARK_UNKNOWN: "Marked Unknown (applies, no reliable value)",
+            D.MARK_NA: "Marked Not applicable",
+            D.DEFER: "Deferred (finalized as Unknown for now)"}[kind]
 
 # --- applying decisions -----------------------------------------------------------------------
 
@@ -247,13 +283,15 @@ def _apply_one(research: CityResearchState, d: FieldDefinition, item: Mapping[st
               "candidate_claim_uids": list(item.get("candidate_claim_uids") or [])}
 
     if kind is D.APPROVE:
+        _reject(fs, dec.get("rejected_claim_uids") or [])
         for uid in uids:
             c = fs.claim(uid)
             if c is not None and d.scope == "record":
                 c.entity_key = entity
             if c is not None:
                 applied.accepted.append((d.key, c))
-        resolution = EntityResolution(**common, status=S.RESOLVED, rule="REVIEW_APPROVE",
+        rule = "REVIEW_APPROVE_OVERRIDE" if dec.get("validation_override") else "REVIEW_APPROVE"
+        resolution = EntityResolution(**common, status=S.RESOLVED, rule=rule,
                                       selected_claim_uids=uids)
     elif kind is D.CORRECT:
         corrected = _corrected_claim(d, dec, uids, entity, index, chunk)
@@ -263,10 +301,18 @@ def _apply_one(research: CityResearchState, d: FieldDefinition, item: Mapping[st
         resolution = EntityResolution(**common, status=S.RESOLVED, rule="REVIEW_CORRECT",
                                       selected_claim_uids=[corrected.claim_uid or ""])
     elif kind is D.REJECT:
-        for uid in uids:
-            c = fs.claim(uid)
-            if c is not None:
-                c.review_status = "REJECTED"
+        _reject(fs, uids)
+        usable = [c for c in (fs.claim(u) for u in item.get("candidate_claim_uids") or [])
+                  if c is not None and c.review_status != "REJECTED"
+                  and not (c.validation and c.validation.outcome is ValidationOutcome.INVALID)]
+        if not usable:
+            # Nothing left the rules could accept: the field needs further research. Not an
+            # Unknown (no one decided that), and no new review or research round.
+            if entity == UNATTRIBUTED:
+                entity = ALL_RECORDS
+                common["entity_key"] = entity
+            resolution = EntityResolution(**common, status=S.NEEDS_RESEARCH,
+                                          rule="REVIEW_REJECT")
     elif kind is D.ASSIGN_SOURCE:
         c = fs.claim(uids[0]) if uids else None
         if c is not None:
@@ -296,15 +342,24 @@ def _apply_one(research: CityResearchState, d: FieldDefinition, item: Mapping[st
     applied.log.append({
         "field_key": d.key, "entity_key": entity, "from_status": before,
         "to_status": after, "field_from_status": before, "field_to_status": fs.status.value,
-        "rule": f"REVIEW_{kind.value}", "reason_codes": [], "selected_claim_uids":
+        "rule": resolution.rule if resolution else f"REVIEW_{kind.value}",
+        "reason_codes": [], "selected_claim_uids":
         list(resolution.selected_claim_uids) if resolution else [],
         "candidate_claim_uids": list(item.get("candidate_claim_uids") or []),
         "decided_by": "REVIEWER", "policy_version": RESOLUTION_POLICY_VERSION,
         "review_decision_id": dec.get("id")})
     applied.hitl.append({"field_key": d.key, "decision": kind.value,
                          "result": HITL_RESULT.get(kind, "SKIPPED"), "entity_key": entity,
-                         "decision_id": dec.get("id"),
+                         "decision_id": dec.get("id"), "to_status": after,
+                         "field_to_status": fs.status.value,
+                         "validation_override": bool(dec.get("validation_override")),
                          "correction_category": dec.get("correction_category")})
+
+def _reject(fs: FieldState, uids: list[str]) -> None:
+    for uid in uids:
+        c = fs.claim(uid)
+        if c is not None:
+            c.review_status = "REJECTED"
 
 def _entity_status(fs: FieldState, entity_key: str) -> str:
     for e in fs.resolution.entities if fs.resolution else []:
@@ -446,7 +501,11 @@ class ReviewRepository:
             row = ReviewDecisionRecord(
                 decision_key=dec.decision_key, run_id=run_id, item_id=dec.item_id,
                 round=dec.round, field_key=item["field_key"], entity_key=item["entity_key"],
-                reviewer=reviewer, decision=dec.decision.value, claim_uids=list(dec.claim_uids),
+                reviewer=reviewer, reviewer_key=reviewer_key(reviewer),
+                decision=dec.decision.value, claim_uids=list(dec.claim_uids),
+                rejected_claim_uids=list(dec.rejected_claim_uids) or None,
+                validation_override=dec.override_validation,
+                decision_basis=decision_basis(dec),
                 original_value=original[0] if len(original) == 1 else (original or None),
                 reviewed_value=dec.value,
                 value_origin=dec.value_origin.value if dec.decision is D.CORRECT else None,
@@ -465,6 +524,17 @@ class ReviewRepository:
             if round_no is not None:
                 q = q.where(ReviewDecisionRecord.round == round_no)
             return [_decision_dict(r) for r in session.scalars(q.order_by(ReviewDecisionRecord.id))]
+
+    def record_outcomes(self, outcomes: Mapping[int, str]) -> None:
+        """The field status each applied decision led to (written once; decisions are
+        otherwise never changed)."""
+        if not outcomes:
+            return
+        with Session(self.engine) as session, session.begin():
+            for decision_id, status in outcomes.items():
+                session.execute(update(ReviewDecisionRecord).where(
+                    ReviewDecisionRecord.id == decision_id,
+                    ReviewDecisionRecord.status_after.is_(None)).values(status_after=status))
 
     def mark_applied(self, run_id: str, round_no: int) -> None:
         with Session(self.engine) as session, session.begin():
@@ -486,6 +556,10 @@ def _decision_dict(r: ReviewDecisionRecord) -> dict[str, Any]:
             "entity_key": r.entity_key, "reviewer": r.reviewer, "decision": r.decision,
             "claim_uids": r.claim_uids, "original_value": r.original_value,
             "reviewed_value": r.reviewed_value, "value_origin": r.value_origin,
+            "reviewer_key": r.reviewer_key, "decision_basis": r.decision_basis,
+            "rejected_claim_uids": r.rejected_claim_uids or [],
+            "validation_override": bool(r.validation_override),
+            "status_after": r.status_after,
             "reason": r.reason, "correction_category": r.correction_category,
             "evidence": r.evidence, "target_entity_key": r.target_entity_key,
             "status_before": r.status_before, "supersedes_id": r.supersedes_id,

@@ -471,7 +471,8 @@ class ContextManager:
                     sid = sources.add_ref(fs.selected_claim.evidence[0])
             elif fs and fs.status is FieldResolutionStatus.NOT_APPLICABLE:
                 value = "N/A"
-            elif fs and fs.status is FieldResolutionStatus.UNAVAILABLE:
+            elif fs and fs.status in (FieldResolutionStatus.UNAVAILABLE,
+                                      FieldResolutionStatus.NEEDS_RESEARCH):
                 value = "Unknown"
             elif key == "city_name":
                 value = state.city_name

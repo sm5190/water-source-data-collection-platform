@@ -477,6 +477,9 @@ def make_human_review_node(fields: Mapping[str, FieldDefinition],
             applied = apply_decisions(research, fields, items, decisions, index, chunks.get)
             span.set_attribute("review.decisions_applied", len(applied.hitl))
             if review_store is not None:
+                outcomes = {h["decision_id"]: h["field_to_status"] for h in applied.hitl
+                            if h["decision_id"] is not None}
+                await asyncio.to_thread(review_store.record_outcomes, outcomes)
                 await asyncio.to_thread(review_store.mark_applied, state["run_id"], round_no)
         events = _review_events(state, research, applied)
         log = list(state.get("resolution_log", []))
@@ -498,6 +501,9 @@ def _review_events(state: GraphState, before: CityResearchState, applied) -> lis
             attrs["correction_category"] = h["correction_category"]
         if h["decision_id"] is not None:
             attrs["decision_id"] = h["decision_id"]
+        if h.get("validation_override"):
+            attrs["validation_override"] = True
+        attrs["to_status"] = h.get("to_status")
         events = append_event(events, kind=EventKind.HITL, node="human_review",
                               field_key=h["field_key"], strategy=h["decision"],
                               result=EventResult(h["result"]), attrs=attrs)

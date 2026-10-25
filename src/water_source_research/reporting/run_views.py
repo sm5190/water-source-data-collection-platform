@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 from water_source_research.schemas.research import FieldDefinition
 
-NO_REVIEW_STATUSES = ("RESOLVED", "NOT_APPLICABLE", "UNAVAILABLE")
+NO_REVIEW_STATUSES = ("RESOLVED", "NOT_APPLICABLE", "UNAVAILABLE", "NEEDS_RESEARCH")
 
 def human_review_log(result: Mapping[str, Any],
                      fields: Mapping[str, FieldDefinition]) -> list[dict[str, Any]]:

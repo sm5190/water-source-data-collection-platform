@@ -140,7 +140,7 @@ def _accepted_sources(ws: FieldState) -> list[Source]:
     if ws.resolution is not None:
         out = []
         for e in ws.resolution.entities:
-            if e.status in (S.CONFLICT, S.NOT_APPLICABLE, S.UNRESOLVED) \
+            if e.status in (S.CONFLICT, S.NOT_APPLICABLE, S.UNRESOLVED, S.NEEDS_RESEARCH) \
                     or e.entity_key == UNATTRIBUTED:
                 continue
             if not (set(e.selected_claim_uids) | set(e.candidate_claim_uids)):
@@ -463,4 +463,6 @@ def _aggregate(entities: list[EntityResolution]) -> FieldResolutionStatus:
         return S.RESOLVED  # at least one value (other entities N/A or Unknown)
     if statuses == {S.NOT_APPLICABLE}:
         return S.NOT_APPLICABLE
+    if S.NEEDS_RESEARCH in statuses:
+        return S.NEEDS_RESEARCH
     return S.UNAVAILABLE

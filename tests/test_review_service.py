@@ -6,7 +6,7 @@ from water_source_research.schemas.common import FieldResolutionStatus as S
 from water_source_research.schemas.review import ReviewDecisionIn
 from water_source_research.services.resolution import UNATTRIBUTED, resolve_research
 from water_source_research.services.review import (
-    apply_decisions, known_sources, open_review_items, validate_decision,
+    apply_decisions, decision_basis, known_sources, open_review_items, validate_decision,
 )
 
 C = "source_withdrawal_contribution_m3_day"
@@ -43,7 +43,8 @@ def stored(d: ReviewDecisionIn, n: int) -> dict:
             "value_origin": d.value_origin.value, "reason": d.reason,
             "correction_category": d.correction_category,
             "evidence": d.evidence.model_dump() if d.evidence else None,
-            "target_entity_key": d.entity_key}
+            "target_entity_key": d.entity_key, "rejected_claim_uids": d.rejected_claim_uids,
+            "validation_override": d.override_validation}
 
 def test_ambiguous_volume_is_assigned_to_a_source_then_resolved_by_the_rules():
     world, state = two_sources_and_an_ambiguous_volume()
@@ -124,3 +125,65 @@ def test_fields_not_researched_or_generated_are_not_review_items():
     assert not keys & {"country", "city_name", "source_withdrawal_contribution_m3_day",
                        "total_city_water_withdrawals_year", "population_served_millions"}
     assert {"pod_latitude", "reservoir_names", "water_type"} <= keys
+
+# --- simple review: reject, pick another, no reasons --------------------------------------------
+
+def two_jurisdiction_candidates():
+    world = World()
+    world.doc(UTIL, "Toronto Water and the City of Toronto Water Division supply drinking water.",
+              source_type="OTHER")
+    state, _ = resolve(world,
+                       claim("jurisdiction", "Ontario", (UTIL, "Toronto Water")),
+                       claim("jurisdiction", "Quebec", (UTIL, "City of Toronto")))
+    [spec] = [s for s in items_for(state, world) if s.field_key == "jurisdiction"]
+    return world, state, spec
+
+def test_decisions_need_no_reason():
+    world, state, spec = two_jurisdiction_candidates()
+    for n, kind in enumerate(["MARK_UNKNOWN", "MARK_NA", "DEFER", "REJECT", "APPROVE"]):
+        uids = spec.candidate_claim_uids[:1] if kind in ("REJECT", "APPROVE") else []
+        d = dec(spec, kind, n, claim_uids=uids)
+        assert validate_decision(d, as_item(spec), FIELDS["jurisdiction"], lambda _: None) == []
+        assert decision_basis(d)  # a plain description is stored instead of a typed reason
+
+def test_rejecting_one_candidate_leaves_the_others_to_the_rules():
+    world, state, spec = two_jurisdiction_candidates()
+    ontario, quebec = spec.candidate_claim_uids
+    reject = dec(spec, "REJECT", claim_uids=[quebec])
+    applied = apply_decisions(state, FIELDS, [as_item(spec)], [stored(reject, 1)], world.index,
+                              lambda _: None)
+    assert applied.log[0]["to_status"] == "SENT_BACK_TO_RULES"
+    fs = applied.research.fields["jurisdiction"]
+    assert fs.claim(quebec).review_status == "REJECTED"
+    assert fs.claim(ontario).review_status != "REJECTED"
+    assert fs.status is not S.NEEDS_RESEARCH  # a usable candidate is left
+
+def test_rejecting_every_candidate_means_needs_research_not_unknown():
+    world, state, spec = two_jurisdiction_candidates()
+    reject = dec(spec, "REJECT", claim_uids=spec.candidate_claim_uids)
+    applied = apply_decisions(state, FIELDS, [as_item(spec)], [stored(reject, 4)], world.index,
+                              lambda _: None)
+    fs = applied.research.fields["jurisdiction"]
+    assert fs.status is S.NEEDS_RESEARCH and fs.selected_claim is None
+    [entity] = fs.resolution.entities
+    assert (entity.status, entity.rule, entity.decided_by, entity.review_decision_id) == (
+        S.NEEDS_RESEARCH, "REVIEW_REJECT", "REVIEWER", 4)
+    assert applied.hitl[0]["result"] == "REJECTED"
+    # Settled for this run: no further review item, and the rules don't reopen it.
+    again, _ = resolve_research(applied.research, FIELDS, world.index)
+    assert again.fields["jurisdiction"].status is S.NEEDS_RESEARCH
+    assert not [s for s in items_for(again, world, 2) if s.field_key == "jurisdiction"]
+
+def test_picking_another_value_records_the_rejected_one():
+    world, state, spec = two_jurisdiction_candidates()
+    ontario, quebec = spec.candidate_claim_uids
+    pick = dec(spec, "APPROVE", claim_uids=[ontario], rejected_claim_uids=[quebec])
+    assert validate_decision(pick, as_item(spec), FIELDS["jurisdiction"], lambda _: None) == []
+    assert decision_basis(pick).startswith("Accepted another value found")
+    both = dec(spec, "APPROVE", 1, claim_uids=[ontario], rejected_claim_uids=[ontario])
+    assert validate_decision(both, as_item(spec), FIELDS["jurisdiction"], lambda _: None)
+    applied = apply_decisions(state, FIELDS, [as_item(spec)], [stored(pick, 2)], world.index,
+                              lambda _: None)
+    fs = applied.research.fields["jurisdiction"]
+    assert fs.status is S.RESOLVED and fs.selected_claim.claim_uid == ontario
+    assert fs.claim(quebec).review_status == "REJECTED"

@@ -40,6 +40,8 @@ def test_run_pauses_for_review_and_finishes_after_decisions(engine):
     assert result["partial"]
     assert result["research_state"]["fields"][W]["status"] == "HITL_REQUIRED"
 
+    progress = w.client.get(f"/research/runs/{w.run_id}/review/progress").json()
+    assert (progress["total"], progress["decided"]) == (2, 0)
     # resuming before every item has a decision is refused
     r = w.resume()
     assert r.status_code == 409 and len(r.json()["detail"]["undecided_items"]) == 2
@@ -52,6 +54,8 @@ def test_run_pauses_for_review_and_finishes_after_decisions(engine):
     r = w.decide(correct, unknown)
     assert r.status_code == 200, r.text
     assert all(d["created"] for d in r.json()["decisions"])
+    progress = w.client.get(f"/research/runs/{w.run_id}/review/progress").json()
+    assert (progress["decided"], progress["remaining_items"]) == (2, [])
     assert w.resume().status_code == 202
     assert w.job().status is JobStatus.QUEUED
 
@@ -108,8 +112,9 @@ def test_invalid_stale_and_duplicate_decisions(engine):
     r = w.decide(decision(withdrawal, "CORRECT", value="lots", reason="x",
                           evidence={"url": "https://example.org/report"}))
     assert r.status_code == 422 and "not a number" in str(r.json())
-    r = w.decide(decision(w.item("water_type"), "MARK_NA"))
-    assert r.status_code == 422 and "reason" in str(r.json())
+    # an override is only for approving a claim that failed validation
+    r = w.decide(decision(w.item("water_type"), "MARK_NA", override_validation=True))
+    assert r.status_code == 422 and "override_validation" in str(r.json())
     # claims that weren't shown can't be named
     r = w.decide(decision(withdrawal, "REJECT", claim_uids=["not-a-claim"]))
     assert r.status_code == 422
@@ -146,31 +151,67 @@ def test_reviewer_supplied_source_is_marked_as_such(engine):
 
 # --- several rounds ---------------------------------------------------------------------------
 
-def test_rejection_sends_the_field_back_and_opens_a_second_round(engine):
+def test_rejecting_the_only_candidate_marks_needs_research_without_another_round(engine):
     w = World(engine)
     w.work()
     withdrawal = w.item(W)
     uid = withdrawal["payload"]["candidates"][0]["claim_uid"]
-    w.decide(decision(withdrawal, "REJECT", claim_uids=[uid], reason="contradicts its quote"),
-             decision(w.item("water_type"), "MARK_NA", reason="test"))
+    w.decide(decision(withdrawal, "REJECT", claim_uids=[uid]),
+             decision(w.item("water_type"), "MARK_UNKNOWN"))
     assert w.resume().status_code == 202
     w.work()
     job = w.job()
-    assert job.status is JobStatus.AWAITING_REVIEW and job.review_round == 2
-    [item] = w.pending()["items"]
-    assert (item["field_key"], item["round"], item["reason_codes"]) == (
-        W, 2, ["ALL_CLAIMS_REJECTED"])
-    assert item["payload"]["allowed_decisions"] == ["CORRECT", "MARK_UNKNOWN", "MARK_NA",
-                                                    "DEFER"]
-    w.decide(decision(item, "DEFER", reason="ask the utility for the 2023 figure"))
+    # No second review round and no new research: the run finishes with a gap.
+    assert job.status is JobStatus.SUCCEEDED and job.review_round == 1
+    assert job.completion == "FINALIZED_WITH_GAPS"
+    states = {s["field_key"]: s for s in w.evidence.field_states(w.run_id)}
+    assert states[W]["status"] == "NEEDS_RESEARCH"  # not a reviewer's Unknown
+    assert states["water_type"]["status"] == "UNAVAILABLE"  # the explicit Unknown
+    rejected = next(c for c in w.evidence.claims(w.run_id) if c["field_key"] == W)
+    assert not rejected["is_selected"]  # kept for the audit trail, never selected
+    # The standardized cell reads Unknown; provenance keeps NEEDS_RESEARCH.
+    records = w.client.get(f"/research/runs/{w.run_id}/records").json()
+    checks = {c["code"]: c for c in records["quality"]}
+    assert checks["NEEDS_RESEARCH"]["result"] == "WARN"
+    assert W in checks["NEEDS_RESEARCH"]["detail"]
+    trace = w.client.get(f"/research/runs/{w.run_id}/records/"
+                         f"{records['records'][0]['record_key']}/trace",
+                         params={"field_key": W}).json()
+    assert trace["value"]["resolution_status"] == "NEEDS_RESEARCH"
+    assert trace["value"]["value_status"] == "UNKNOWN"
+    prov = w.client.get(f"/research/runs/{w.run_id}/export",
+                        params={"format": "csv", "kind": "provenance"}).text
+    total_rows = [line for line in prov.splitlines() if W in line]
+    assert any("NEEDS_RESEARCH" in line for line in total_rows)
+    assert not any("UNAVAILABLE" in line for line in total_rows)
+
+def test_review_audit_is_filled_in_automatically(engine):
+    w = World(engine)
+    w.work()
+    withdrawal = w.item(W)
+    uid = withdrawal["payload"]["candidates"][0]["claim_uid"]
+    # Approving a claim that failed validation needs a deliberate override.
+    r = w.decide(decision(withdrawal, "APPROVE", claim_uids=[uid]))
+    assert r.status_code == 422
+    r = w.decide(decision(withdrawal, "APPROVE", claim_uids=[uid], override_validation=True),
+                 decision(w.item("water_type"), "MARK_NA"), reviewer="  Sarina   Lab ")
+    assert r.status_code == 200, r.text
     w.resume()
     w.work()
     assert w.job().status is JobStatus.SUCCEEDED
-    states = {s["field_key"]: s for s in w.evidence.field_states(w.run_id)}
-    assert states[W]["status"] == "UNAVAILABLE"
-    assert states["water_type"]["status"] == "NOT_APPLICABLE"
-    rejected = next(c for c in w.evidence.claims(w.run_id) if c["field_key"] == W)
-    assert not rejected["is_selected"]  # kept for the audit trail, never selected
+    by_field = {d["field_key"]: d for d in w.reviews.decisions(w.run_id)}
+    approve = by_field[W]
+    assert (approve["reviewer"], approve["reviewer_key"]) == ("Sarina Lab", "sarina lab")
+    assert approve["validation_override"] and approve["reason"] is None
+    assert "despite a failed validation check" in approve["decision_basis"]
+    assert (approve["status_before"], approve["status_after"]) == ("HITL_REQUIRED", "RESOLVED")
+    assert approve["original_value"] == 450000 and approve["created_at"]
+    assert by_field["water_type"]["status_after"] == "NOT_APPLICABLE"
+    assert by_field["water_type"]["decision_basis"] == "Marked Not applicable"
+    applied = {r["field_key"]: r for r in w.evidence.resolutions(w.run_id)
+               if r["decided_by"] == "REVIEWER"}
+    assert applied[W]["rule"] == "REVIEW_APPROVE_OVERRIDE"
+    assert applied[W]["review_decision_id"] == approve["id"]
 
 # --- queue lifecycle and recovery -------------------------------------------------------------
 

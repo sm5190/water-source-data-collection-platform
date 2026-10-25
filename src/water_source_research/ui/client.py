@@ -51,6 +51,9 @@ class ResearchApiClient:
     def review_pending(self, run_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/review/pending")
 
+    def review_progress(self, run_id: str) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/review/progress")
+
     def review_item(self, run_id: str, item_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/review/items/{item_id}")
 

@@ -56,14 +56,35 @@ class ReviewDecisionIn(BaseModel):
     correction_category: str | None = Field(default=None, max_length=64)
     evidence: ReviewEvidence | None = None
     entity_key: str | None = None  # ASSIGN_SOURCE target
+    # APPROVE of another candidate: the proposed claim(s) the reviewer rejected in favour of it.
+    rejected_claim_uids: list[str] = Field(default_factory=list)
+    # APPROVE of a claim that failed validation: the reviewer deliberately confirmed (after
+    # checking the source) that the value is right. Recorded in the audit trail.
+    override_validation: bool = False
 
     @field_validator("decision", mode="before")
     @classmethod
     def _select_is_approve(cls, value: Any) -> Any:
         return DecisionType.APPROVE if value == "SELECT" else value
 
+def clean_reviewer(value: str) -> str:
+    """Reviewer as typed, with surrounding and repeated whitespace removed."""
+    return " ".join(value.split())
+
+def reviewer_key(value: str) -> str:
+    """Identity used to group a reviewer's decisions ("Sarina " and "sarina" are one person)."""
+    return clean_reviewer(value).casefold()
+
 class ReviewSubmission(BaseModel):
     reviewer: str = Field(min_length=1, max_length=128)
+
+    @field_validator("reviewer")
+    @classmethod
+    def _clean(cls, value: str) -> str:
+        value = clean_reviewer(value)
+        if not value:
+            raise ValueError("reviewer is empty")
+        return value
     decisions: list[ReviewDecisionIn] = Field(min_length=1, max_length=200)
 
 class ResumeRequest(BaseModel):

@@ -281,6 +281,19 @@ def create_app(queue: ResearchQueue | None = None,
         return {"run": job.public(), "round": job.review_round,
                 "items": [{**i, "decision": latest.get(i["id"])} for i in items]}
 
+    @app.get("/research/runs/{run_id}/review/progress")
+    async def review_progress(run_id: str):
+        """How far the reviewer is in the round the run waits on: decided vs open items."""
+        job = require_run(run_id)
+        if job.status is not JobStatus.AWAITING_REVIEW:
+            return {"round": job.review_round, "total": 0, "decided": 0, "remaining_items": []}
+        items = reviews.items(run_id, job.review_round, status="OPEN")
+        decided = _latest_by_item(reviews.decisions(run_id, job.review_round))
+        remaining = [{"id": i["id"], "field_key": i["field_key"], "entity_key": i["entity_key"]}
+                     for i in items if i["id"] not in decided]
+        return {"round": job.review_round, "total": len(items),
+                "decided": len(items) - len(remaining), "remaining_items": remaining}
+
     @app.get("/research/runs/{run_id}/review/items/{item_id}")
     async def review_item(run_id: str, item_id: str):
         """One item with the full text of each cited chunk, for checking quotes in context."""

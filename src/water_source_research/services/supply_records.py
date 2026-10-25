@@ -463,6 +463,14 @@ def check_quality(rs: RecordSet, research: CityResearchState,
     if not_researched:
         q.append(QualityCheck(code="NOT_RESEARCHED", result="WARN",
                               detail="exported as Unknown: " + ", ".join(not_researched)))
+    needs_research = sorted({rv.field_key for rv, _ in values
+                             if rv.resolution_status == S.NEEDS_RESEARCH.value})
+    if needs_research:
+        # Every candidate was rejected by a reviewer: a gap for a later run, not an Unknown
+        # anyone decided. The export cell reads "Unknown"; provenance keeps NEEDS_RESEARCH.
+        q.append(QualityCheck(code="NEEDS_RESEARCH", result="WARN",
+                              detail="candidates rejected, needs further research (exported "
+                                     "as Unknown): " + ", ".join(needs_research)))
     rs.quality = q
     if any(c.result == "FAIL" for c in q):
         rs.completion = "INCOMPLETE"

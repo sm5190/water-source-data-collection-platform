@@ -8,7 +8,7 @@ earlier one, and the applied result is recorded in field_resolutions (decided_by
 
 from datetime import datetime
 from typing import Any
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .models import Base, JSONType, utcnow
 
@@ -52,4 +52,11 @@ class ReviewDecisionRecord(Base):
     target_entity_key: Mapped[str | None] = mapped_column(String(255))  # ASSIGN_SOURCE
     status_before: Mapped[str] = mapped_column(String(32))
     supersedes_id: Mapped[int | None] = mapped_column(Integer)
+    # 0011: who (normalized), what in plain words, deliberate overrides, and the outcome.
+    reviewer_key: Mapped[str | None] = mapped_column(String(128), index=True)
+    decision_basis: Mapped[str | None] = mapped_column(String(255))
+    rejected_claim_uids: Mapped[list[str] | None] = mapped_column(JSONType, nullable=True)
+    validation_override: Mapped[bool | None] = mapped_column(Boolean)
+    # Field status after the decision was applied (written once, when the run resumes).
+    status_after: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
