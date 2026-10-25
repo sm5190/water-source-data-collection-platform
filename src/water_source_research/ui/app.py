@@ -14,6 +14,7 @@ import streamlit as st
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.ui.client import ApiError, ResearchApiClient
 from water_source_research.ui.evaluation import render_evaluation
+from water_source_research.ui.review import render_simple_review
 
 ACTIVE = {"QUEUED", "RUNNING"}
 STATUS_ICON = {"QUEUED": "⏳", "RUNNING": "🔄", "AWAITING_REVIEW": "🧑‍⚖️", "SUCCEEDED": "✅",
@@ -33,8 +34,10 @@ with st.sidebar:
                                                       "http://localhost:8000"))
     refresh_seconds = st.slider("Auto-refresh (seconds)", 2, 30, 3)
     # Recorded with every review decision (there is no login; this is the audit identity).
-    reviewer = st.text_input("Reviewer", key="reviewer",
-                             help="Your name or email, recorded with each review decision")
+    # Kept for this browser session only (never in the URL).
+    reviewer = " ".join(st.text_input(
+        "Your name", key="reviewer",
+        help="Recorded with each review decision. Kept for this browser session.").split())
     mode = st.radio("Mode", ["Research", "Evaluation"], horizontal=True, key="mode",
                     help="Evaluation compares saved research runs with the reference workbook")
 client: Any = st.session_state.get("client") or ResearchApiClient(api_url)
@@ -268,9 +271,9 @@ DECISION_LABEL = {
 CLAIM_DECISIONS = {"APPROVE", "REJECT", "ASSIGN_SOURCE"}
 
 def render_decisions(run: dict[str, Any]) -> None:
-    """Review queue: pending items of the round the run is waiting on, and decision forms."""
+    """Technical review form (behind a toggle under the simple review): every decision type,
+    claim ids, validation checks and chunk quotes. Submitting happens in the simple view."""
     if run["status"] != "AWAITING_REVIEW":
-        st.info(f"This run is {run['status']}: nothing is waiting for review.")
         render_history()
         return
     pending = client.review_pending(run_id)
@@ -278,21 +281,8 @@ def render_decisions(run: dict[str, Any]) -> None:
     decided = sum(1 for i in items if i.get("decision"))
     st.markdown(f"**Review round {pending['round']}** · {len(items)} item(s) · "
                 f"{decided} decided")
-    if not reviewer:
-        st.warning("Enter your name or email as **Reviewer** in the sidebar to decide.")
     for item in items:
         render_item(item)
-    st.divider()
-    if st.button("✅ Submit decisions & resume the run", type="primary",
-                 disabled=not reviewer or decided < len(items)):
-        try:
-            client.resume_review(run_id, reviewer)
-            st.success("Run resumed: it is back in the queue.")
-            st.rerun()
-        except ApiError as exc:
-            st.error(str(exc))
-    if decided < len(items):
-        st.caption("Every item needs a decision before the run can resume.")
     render_history()
 
 def render_item(item: dict[str, Any]) -> None:
@@ -486,7 +476,8 @@ def dashboard() -> None:
     with progress_tab:
         render_progress(client.steps(run_id))
     with queue_tab:
-        render_decisions(selected_run)
+        render_simple_review(client, selected_run, reviewer,
+                             advanced=lambda: render_decisions(selected_run))
     with review_tab:
         render_review(client.review(run_id))
     with fields_tab:

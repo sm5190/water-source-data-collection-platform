@@ -139,7 +139,7 @@ def two_jurisdiction_candidates():
     return world, state, spec
 
 def test_decisions_need_no_reason():
-    world, state, spec = two_jurisdiction_candidates()
+    _, _, spec = two_jurisdiction_candidates()
     for n, kind in enumerate(["MARK_UNKNOWN", "MARK_NA", "DEFER", "REJECT", "APPROVE"]):
         uids = spec.candidate_claim_uids[:1] if kind in ("REJECT", "APPROVE") else []
         d = dec(spec, kind, n, claim_uids=uids)

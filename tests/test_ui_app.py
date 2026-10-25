@@ -267,45 +267,143 @@ def test_filters_reset_when_switching_runs():
 
 # --- review queue -----------------------------------------------------------------------------
 
-def test_waiting_run_shows_candidates_side_by_side_with_evidence():
-    at = app(FakeClient(status="AWAITING_REVIEW"))
+OTHER = {**REVIEW_ITEM["payload"]["candidates"][0], "claim_uid": "c2", "value": 980000,
+         "normalized_value": 980000,
+         "validation": {"outcome": "VALID", "checks": [
+             {"code": "VALUE_IN_QUOTE", "result": "PASS", "detail": None}]}}
+
+class ReviewClient(FakeClient):
+    def __init__(self, item=None, **kw):
+        super().__init__(status="AWAITING_REVIEW", **kw)
+        self.item = item or REVIEW_ITEM
+
+    def review_pending(self, run_id):
+        return {"round": 1, "items": [self.item]}
+
+def reviewing(client, name="analyst@example.org") -> AppTest:
+    at = app(client)
+    at.text_input(key="reviewer").set_value(name).run()
+    assert not at.exception, at.exception
+    return at
+
+def save(at):
+    return next(b for b in at.button if b.label == "Save")
+
+def test_review_card_is_plain_and_shows_value_quote_and_source():
+    at = app(ReviewClient())
     text = all_text(at)
     assert any("waiting for human review" in w.value for w in at.warning)
-    assert "**Review round 1** · 1 item(s) · 0 decided" in text
+    assert "### Toronto, Canada" in text
+    assert any(e.label.endswith("Total City Water Withdrawals (m3/d)") for e in at.expander)
+    assert "### 450,000 m³/day" in text and "Reporting year: 2023" in text
     assert "> produced an average of 980,000 cubic metres per day" in text
-    assert "VALUE_IN_QUOTE: 450000 does not match the quote's numbers: 980000" in text
-    assert any(b.label == "Open source" for b in at.get("link_button"))
-    # no reviewer yet: deciding and resuming are disabled
-    resume = next(b for b in at.button if "resume" in b.label)
-    assert resume.disabled
+    assert "Source: [Annual Report](https://toronto.ca/report.pdf), page 2" in text
+    warnings = " ".join(w.value for w in at.warning)
+    assert "may not clearly support this value" in warnings
+    # no codes, claim ids or confidence on the simple review screen
+    tab = at.tabs[1]
+    review_text = " ".join([m.value for m in tab.markdown] + [c.value for c in tab.caption]
+                           + [w.value for w in tab.warning])
+    assert "Annual Report" in review_text
+    assert "VALUE_IN_QUOTE" not in review_text and "c1" not in review_text
+    assert "confidence" not in review_text.lower()
+    # no reviewer yet: saving and submitting are disabled
+    assert any("Type your name" in w.value for w in at.warning)
+    assert next(b for b in at.button if "Submit review" in b.label).disabled
+    assert "1 field still needs a decision" in text
 
-def test_reviewer_corrects_a_value_with_a_chunk_quote_and_resumes():
-    client = FakeClient(status="AWAITING_REVIEW")
-    at = app(client)
-    at.text_input(key="reviewer").set_value("analyst@example.org").run()
+def test_reviewer_name_is_kept_in_the_session_not_the_url():
+    at = reviewing(ReviewClient(), "  Sarina   Lab ")
+    assert "Reviewing as **Sarina Lab**" in all_text(at)
+    assert dict(at.query_params) == {}
+
+def test_accepting_a_value_that_failed_a_check_needs_a_deliberate_confirmation():
+    client = ReviewClient()
+    at = reviewing(client)
+    at.radio(key="choice:item-1").set_value("Accept").run()
+    assert save(at).disabled  # the confirmation box isn't ticked yet
+    at.checkbox(key="override:item-1").check().run()
+    save(at).click().run()
+    assert not at.exception, at.exception
+    [(reviewer, [body])] = client.decisions
+    assert reviewer == "analyst@example.org"
+    assert body["decision"] == "APPROVE" and body["claim_uids"] == ["c1"]
+    assert body["override_validation"] is True and "reason" not in body
+    assert len(body["decision_key"]) == 32
+
+def test_reject_and_unknown_need_no_typing():
+    client = ReviewClient()
+    at = reviewing(client)
+    at.radio(key="choice:item-1").set_value("Reject").run()
+    assert "Needs more research" in all_text(at)
+    save(at).click().run()
+    at.radio(key="choice:item-1").set_value("Unknown").run()
+    save(at).click().run()
+    bodies = [b for _, [b] in client.decisions]
+    assert [(b["decision"], b.get("claim_uids")) for b in bodies] == [
+        ("REJECT", ["c1"]), ("MARK_UNKNOWN", None)]
+
+def test_correct_by_picking_another_value_found():
+    item = {**REVIEW_ITEM, "payload": {**REVIEW_ITEM["payload"],
+                                       "candidates": [REVIEW_ITEM["payload"]["candidates"][0],
+                                                      OTHER]}}
+    client = ReviewClient(item)
+    at = reviewing(client)
+    # the valid candidate is proposed first; the invalid one is listed under other values
+    assert "### 980,000 m³/day" in all_text(at)
+    at.radio(key="choice:item-1").set_value("Correct").run()
+    at.radio(key="how:item-1").set_value("c1").run()
+    assert save(at).disabled  # c1 failed a check: needs the confirmation
+    at.checkbox(key="override:item-1").check().run()
+    save(at).click().run()
+    [(_, [body])] = client.decisions
+    assert body["decision"] == "APPROVE" and body["claim_uids"] == ["c1"]
+    assert body["rejected_claim_uids"] == ["c2"] and body["override_validation"]
+
+def test_correct_by_entering_a_value_requires_a_source_link():
+    client = ReviewClient()
+    at = reviewing(client)
+    at.radio(key="choice:item-1").set_value("Correct").run()
+    at.text_input(key="value:item-1").set_value("980,000").run()
+    assert save(at).disabled
+    at.text_input(key="url:item-1").set_value("toronto.ca/report").run()
+    assert save(at).disabled and "must start with http" in all_text(at)
+    at.text_input(key="url:item-1").set_value("https://toronto.ca/report.pdf").run()
+    save(at).click().run()
+    [(_, [body])] = client.decisions
+    assert body["decision"] == "CORRECT" and body["value"] == 980000
+    assert body["evidence"] == {"url": "https://toronto.ca/report.pdf"}
+
+def test_saved_decisions_show_progress_and_enable_submit():
+    item = {**REVIEW_ITEM, "decision": {"decision": "REJECT", "reviewer": "analyst@example.org"}}
+    client = ReviewClient(item)
+    at = reviewing(client)
+    text = all_text(at)
+    assert "Saved: **Rejected (needs more research)** by analyst@example.org" in " ".join(
+        s.value for s in at.success)
+    assert "1 of 1 fields reviewed" in [b.proto.text for b in at.get("progress")]
+    submit = next(b for b in at.button if "Submit review" in b.label)
+    assert not submit.disabled and "still need" not in text
+    submit.click().run()
+    assert client.resumed == [("run-1", "analyst@example.org")]
+
+def test_technical_form_is_behind_a_toggle():
+    client = ReviewClient()
+    at = reviewing(client)
+    assert not any(b.label == "Save decision" for b in at.button)
+    at.toggle(key="adv:run-1").set_value(True).run()
+    text = all_text(at)
+    assert "VALUE_IN_QUOTE: 450000 does not match the quote's numbers: 980000" in text
     at.radio(key="kind:item-1").set_value("CORRECT")
     at.text_input(key="value:item-1").set_value("980000")
-    at.text_area(key="reason:item-1").set_value("the quote says 980,000")
     at.selectbox(key="chunk:item-1").set_value("ch-9")
     at.text_area(key="quote:item-1").set_value("980,000 cubic metres")
     at.multiselect(key="claims:item-1").set_value(["c1"])
     next(b for b in at.button if b.label == "Save decision").click().run()
     assert not at.exception, at.exception
-    [(reviewer, [body])] = client.decisions
-    assert reviewer == "analyst@example.org"
+    [(_, [body])] = client.decisions
     assert body["decision"] == "CORRECT" and body["value"] == 980000
     assert body["evidence"] == {"chunk_id": "ch-9", "quote": "980,000 cubic metres"}
-    assert body["claim_uids"] == ["c1"] and body["item_id"] == "item-1"
-    assert len(body["decision_key"]) == 32
-
-    REVIEW_ITEM["decision"] = {"decision": "CORRECT", "reviewer": "analyst@example.org",
-                               "reason": "the quote says 980,000"}
-    try:
-        at.run()
-        next(b for b in at.button if "resume" in b.label).click().run()
-        assert client.resumed == [("run-1", "analyst@example.org")]
-    finally:
-        REVIEW_ITEM["decision"] = None
 
 # --- records & export -------------------------------------------------------------------------
 
