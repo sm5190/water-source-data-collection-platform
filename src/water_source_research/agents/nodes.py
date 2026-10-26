@@ -23,7 +23,7 @@ from water_source_research.schemas.events import (
 )
 from water_source_research.schemas.records import RecordSet
 from water_source_research.schemas.research import (
-    CityResearchState, FieldClaim, FieldDefinition,
+    CityResearchState, ClaimQualifiers, FieldClaim, FieldDefinition,
 )
 from water_source_research.context_manager import (
     ContextBundle, ContextPurpose, ContextService, ContextStatus,
@@ -221,15 +221,47 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
                            "evidence_chunks": chunks, "events": events}
     return updates, len(outcome.records), len(new_chunks)
 
+# Fields that define the run's entities: later rounds may name additional legitimate values
+# (another water source, the utility's own documents), so they are re-extracted when
+# materially new relevant evidence arrives even though they already have candidates.
+REEXTRACT_FIELDS = ("water_source", "utility_name", "reservoir_names")
+MAX_REEXTRACTIONS_PER_FIELD = 2  # per run; at most one per round
+
+def reextraction_targets(context_service: ContextService, state: GraphState,
+                         already: list[str]) -> dict[str, int]:
+    """field -> number of new relevant chunks, for entity-defining fields that already have
+    candidates, are still researched, have re-extractions left and got new evidence."""
+    if "fields_needing_evidence" not in state:  # first pass: everything is extracted anyway
+        return {}
+    research = CityResearchState.model_validate(state["research_state"])
+    researched = set(state.get("unresolved_fields") or research.fields)
+    done = state.get("reextractions") or {}
+    seen = {(c, k) for c, k in state.get("seen_evidence", [])}
+    chunks = state.get("evidence_chunks", [])
+    out: dict[str, int] = {}
+    for key in REEXTRACT_FIELDS:
+        fs = research.fields.get(key)
+        if (key in already or key not in researched or fs is None or not fs.candidate_claims
+                or fs.status in FINAL_STATUSES
+                or done.get(key, 0) >= MAX_REEXTRACTIONS_PER_FIELD):
+            continue
+        new = context_service.manager.new_relevant_evidence(key, research, chunks, seen)
+        if new:
+            out[key] = len(new)
+    return out
+
 def make_extract_node(context_service: ContextService, gateway: LLMGateway):
     async def extract_node(state: GraphState) -> GraphState:
         run_id = state["run_id"]
-        # First pass: every unresolved field. Re-entry after discovery: only fields that
-        # previously lacked evidence (others already have candidate claims).
+        # First pass: every unresolved field. Re-entry after discovery: fields that lacked
+        # evidence, plus entity-defining fields with materially new relevant evidence.
         if "fields_needing_evidence" in state:
             fields = list(state["fields_needing_evidence"])
         else:
             fields = list(state.get("unresolved_fields", []))
+        again = reextraction_targets(context_service, state, fields)
+        fields += list(again)
+        extraction_round = max(1, state.get("discovery_rounds", 0))
 
         with get_tracer().start_as_current_span("graph.extract") as span:
             span.set_attribute("graph.run_id", run_id)
@@ -245,24 +277,39 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             bundle_ids = dict(state.get("context_bundle_ids", {}))
             events = list(state.get("events", []))
             needing: list[str] = []
+            reextractions = dict(state.get("reextractions") or {})
             for field_key, bundle, new_claims, calls in results:
                 if bundle.bundle_id:
                     bundle_ids[field_key] = bundle.bundle_id
                 if bundle.status is ContextStatus.NOT_NEEDED:
                     continue
+                re_run = field_key in again
+                if re_run:
+                    reextractions[field_key] = reextractions.get(field_key, 0) + 1
+                attrs: dict[str, object] = {"bundle_status": bundle.status.value,
+                                            "claims": len(new_claims),
+                                            "discovery_round": extraction_round,
+                                            **llm_usage(calls)}
+                if re_run:
+                    attrs.update(reextraction=reextractions[field_key],
+                                 new_chunks=again[field_key])
                 events = append_event(events, kind=EventKind.NODE, node="extract",
-                                      field_key=field_key, strategy=bundle.status.value,
-                                      attrs={"bundle_status": bundle.status.value,
-                                             "claims": len(new_claims),
-                                             **llm_usage(calls)})
+                                      field_key=field_key,
+                                      strategy=("reextract:" if re_run else "")
+                                      + bundle.status.value, attrs=attrs)
                 if bundle.status is ContextStatus.NO_SUFFICIENT_EVIDENCE:
-                    needing.append(field_key)
+                    if not re_run:
+                        needing.append(field_key)
                     continue
                 # The LLM has now seen these chunks for this field; don't resend them.
                 seen |= bundle.consumed
                 if not new_claims:
-                    needing.append(field_key)
+                    if not re_run:  # a re-extraction that found nothing keeps its candidates
+                        needing.append(field_key)
                     continue
+                for c in new_claims:
+                    q = c.qualifiers or ClaimQualifiers()
+                    c.qualifiers = q.model_copy(update={"extraction_round": extraction_round})
                 fs = research.fields[field_key]
                 fs.candidate_claims.extend(new_claims)
                 if fs.status is FieldResolutionStatus.UNRESOLVED:
@@ -281,6 +328,7 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             "claims": claims,
             "context_bundle_ids": bundle_ids,
             "fields_needing_evidence": needing,
+            "reextractions": reextractions,
             "events": events,
         }
 

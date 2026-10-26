@@ -18,6 +18,8 @@ class GraphState(TypedDict, total=False):
     acquired_documents: list[dict]
     evidence_chunks: list[dict]  # serialized EvidenceChunk (fetched document text only)
     seen_evidence: list[list[str]]  # [chunk_id, field_key] pairs already sent to the LLM
+    # Re-extractions per entity-defining field (bounded; see agents/nodes.py::REEXTRACT_FIELDS)
+    reextractions: dict[str, int]
     fields_needing_evidence: list[str]  # set by extract; non-empty routes back to discover
     discovery_rounds: int
     context_bundle_ids: dict[str, str]  # field_key -> persisted ContextBundle id

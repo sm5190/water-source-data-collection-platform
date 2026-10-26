@@ -290,7 +290,8 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     claim = claim.model_copy(update={"original_value": original, "value": original})
     uid = claim.claim_uid or claim_uid(claim)
     checks = _Checks()
-    qualifiers = ClaimQualifiers()
+    qualifiers = ClaimQualifiers(
+        extraction_round=claim.qualifiers.extraction_round if claim.qualifiers else None)
     normalized: Any = None
 
     if definition is None:

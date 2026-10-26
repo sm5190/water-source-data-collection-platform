@@ -763,6 +763,29 @@ class ContextManager:
             meta.append({"locality": locality, "hydronym_local": hydronym_local})
         return out, meta
 
+    def new_relevant_evidence(
+        self,
+        field_key: str,
+        state: CityResearchState,
+        raw_chunks: Sequence[EvidenceChunk | Mapping[str, Any]],
+        seen: Iterable[tuple[str, str]],
+    ) -> list[str]:
+        """Chunk ids not yet shown to the model for ``field_key`` that are materially relevant
+        to it: about the target city (TARGET locality on the matching sentences) and either
+        naming a water body (source fields) or matching the field's terms. Deliberately not a
+        score threshold: a weaker passage can still name an additional legitimate source."""
+        seen_pairs = set(seen)
+        chunks = [c for c in (_as_chunk(c) for c in raw_chunks)
+                  if (c.chunk_id, field_key) not in seen_pairs]
+        if not chunks:
+            return []
+        terms = {field_key: self._terms(field_key)}
+        tf = self._term_frequencies(chunks, terms)
+        _, meta = self._score(chunks, [field_key], terms, tf, state, set())
+        return [c.chunk_id for c, m, row in zip(chunks, meta, tf, strict=True)
+                if m["locality"].get(field_key) == "TARGET"
+                and (m["hydronym_local"] or row)]
+
     def _terms(self, key: str) -> list[str]:
         d = self.fields[key]
         return [k.lower() for k in d.keywords] or key.split("_")

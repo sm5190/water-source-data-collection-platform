@@ -93,6 +93,9 @@ class ClaimQualifiers(BaseModel):
     measurement_basis: str | None = None  # average | maximum | capacity | annual
     source_types: list[str] = Field(default_factory=list)
     source_dates: list[str] = Field(default_factory=list)
+    # Discovery round whose extraction produced the claim (1 = first pass; later rounds are
+    # re-extractions on new evidence). Provenance only: never part of the claim's identity.
+    extraction_round: int | None = None
 
 class FieldClaim(BaseModel):
     field_key: str

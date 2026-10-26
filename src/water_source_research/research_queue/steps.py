@@ -71,6 +71,7 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
                          "confidence": c.get("confidence"),
                          "citations": len(c.get("evidence", []))} for c in new_claims][:100],
             context_bundles=len(state.get("context_bundle_ids", {})),
+            reextractions=state.get("reextractions", {}),
         )
     elif node == "validate":
         outcomes: dict[str, int] = {}
