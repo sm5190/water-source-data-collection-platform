@@ -340,3 +340,24 @@ def test_a_reviewer_value_that_differs_is_attributed_to_review(engine, tmp_path)
     # ...and the extraction diagnosis is still about the model's 450,000, not the review.
     raw = [d for d in store.diagnoses(eval_id) if d["field_key"] == W and d["stage"] == "RAW"]
     assert raw[0]["root_cause"] == "EXTRACTION_FAILURE"
+
+def test_a_final_stage_reviewed_from_the_reference_is_not_independent(engine, tmp_path):
+    from water_source_research.evaluation.views import performance
+    w, dataset = paused_run(engine, tmp_path)
+    item = w.item(W)
+    w.decide(decision(item, "CORRECT", value=980000,
+                      claim_uids=[item["payload"]["candidates"][0]["claim_uid"]],
+                      evidence={"url": "https://example.org/workbook-source"}),
+             decision(w.item("water_type"), "MARK_UNKNOWN"),
+             reviewer="Sarina workbook (applied by Claude)")
+    w.resume()
+    w.work()
+    store = EvaluationStore(engine)
+    eval_id = run_evaluation(engine, w.run_id, dataset)
+    assert store.run(eval_id)["config"]["final_basis"] == "REFERENCE_DERIVED"
+    final = [m for m in store.metrics(eval_id) if m["scope"] == "stage"
+             and m["scope_key"] == "FINAL"]
+    assert final and all(m["detail"].get("reference_derived") for m in final)
+    perf = performance(store)
+    assert perf["cities"][0]["final_reference_derived"]
+    assert "FINAL" not in perf["stages"]  # never pooled into the automated scores

@@ -15,3 +15,7 @@ city_point_km: 25                # city centre coordinates
 pod_point_km: 2                  # point of diversion / intake
 placeholders: ["HYBAS ID"]       # reference cells that are labels, not values
 scope_flags: [GEOGRAPHIC_SCOPE, MEASUREMENT_BASIS, APPROXIMATE_VALUE]
+# Reviewers whose decisions were taken from the reference workbook itself (reviewer_key,
+# casefolded). A FINAL stage reviewed by them is labelled reference-derived and excluded from
+# performance aggregates: it agrees with the workbook by construction.
+reference_reviewers: ["sarina workbook (applied by claude)"]

@@ -65,6 +65,9 @@ def city_comparison(view: dict[str, Any], stage: str) -> dict[str, Any]:
         by_stage[r["stage"]].append(r)
     stages = [s for s in SIMPLE_STAGES if s in view["run"]["stages"]]
     summaries = {s: {**simple_scores(by_stage[s]), "label": STAGE_LABEL[s]} for s in stages}
+    if "FINAL" in summaries and reference_derived(view):
+        summaries["FINAL"]["reference_derived"] = True
+        summaries["FINAL"]["label"] += " (reference-derived, not independent)"
     labels = _record_labels(view["results"])
     proposed = {(r["record_key"], r["field_key"]): r for r in by_stage.get("PROPOSED", [])}
     present = {(r["record_key"], r["field_key"]): r for r in by_stage.get(stage, [])}
@@ -78,6 +81,7 @@ def city_comparison(view: dict[str, Any], stage: str) -> dict[str, Any]:
                              stage))
     return {"run": view["run"], "stage": stage, "stage_label": STAGE_LABEL.get(stage, stage),
             "stages": stages, "summaries": summaries, "rows": rows,
+            "sources": source_scores(view),
             "metrics_basis": view["metrics_basis"], "judge_validated": JUDGE_VALIDATED}
 
 def _row(key: str, header: str, record_key: str, record_label: str | None,
@@ -119,6 +123,21 @@ def _row(key: str, header: str, record_key: str, record_label: str | None,
             "proposed_not_accepted": stage == "PROPOSED" and p.get("source") == "PROPOSED",
             "provisional": is_provisional(r), "explanation": explanation, "details": details}
 
+def reference_derived(view: dict[str, Any]) -> bool:
+    """The FINAL stage was reviewed from the reference itself (agrees by construction)."""
+    return ((view["run"].get("config") or {}).get("final_basis") == "REFERENCE_DERIVED")
+
+def source_scores(view: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Per stage: source precision / recall with matched, missing and extra sources."""
+    out: dict[str, dict[str, Any]] = {}
+    for m in view["metrics"]:
+        if m["scope"] != "source":
+            continue
+        entry = out.setdefault(m["scope_key"], {**(m["detail"] or {})})
+        entry[m["metric"]] = {"numerator": m["numerator"], "denominator": m["denominator"],
+                              "value": m["value"]}
+    return out
+
 def _record_labels(results: list[dict[str, Any]]) -> dict[str, str]:
     """Reference record key -> its water source name (from the reference)."""
     out = {}
@@ -149,9 +168,20 @@ def performance(store: EvaluationStore) -> dict[str, Any]:
     by_field: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     field_cities: dict[tuple[str, str], set[str]] = defaultdict(set)
     judged = verified = agreed = 0
+    source_totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for v in views:
         rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        derived = reference_derived(v)
+        for stage, sc in source_scores(v).items():
+            if stage == "FINAL" and derived:
+                continue
+            for k in ("source_precision", "source_recall"):
+                if k in sc:
+                    source_totals[stage][f"{k}_num"] += sc[k]["numerator"] or 0
+                    source_totals[stage][f"{k}_den"] += sc[k]["denominator"] or 0
         for r in v["results"]:
+            if r["stage"] == "FINAL" and derived:
+                continue  # agrees with the reference by construction: never pooled
             if r["stage"] in SIMPLE_STAGES:
                 rows[r["stage"]].append(r)
                 pooled[r["stage"]].append(r)
@@ -166,6 +196,8 @@ def performance(store: EvaluationStore) -> dict[str, Any]:
                        "research_run_id": v["run"]["research_run_id"],
                        "created_at": v["run"]["created_at"],
                        "metrics_basis": v["metrics_basis"],
+                       "final_reference_derived": derived,
+                       "sources": source_scores(v),
                        "scores": {s: simple_scores(rows[s]) for s in rows}})
     stages = [s for s in SIMPLE_STAGES if pooled.get(s)]
     fields = []
@@ -189,8 +221,13 @@ def performance(store: EvaluationStore) -> dict[str, Any]:
                       else None,
                       "missing_data_rate": round(1 - pooled_scores["coverage"], 4)
                       if pooled_scores["coverage"] is not None else None}
+    sources = {stage: {k: {"numerator": t[f"{k}_num"], "denominator": t[f"{k}_den"],
+                           "value": round(t[f"{k}_num"] / t[f"{k}_den"], 4)
+                           if t[f"{k}_den"] else None}
+                       for k in ("source_precision", "source_recall")}
+               for stage, t in source_totals.items()}
     return {"cities": cities, "stages": stages, "stage_labels": STAGE_LABEL, "fields": fields,
-            "dataset": dataset, "history": history(store),
+            "dataset": dataset, "history": history(store), "sources": sources,
             "judge": {"judged": judged, "verified": verified,
                       "agreement_with_people": round(agreed / verified, 4) if verified else None,
                       "provisional": judged - verified, "validated": JUDGE_VALIDATED}}

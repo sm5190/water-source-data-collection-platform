@@ -139,7 +139,12 @@ def render_city(client: Any, reviewer: str | None) -> None:
         st.caption("Final reviewed results appear after the city's review is finished and the "
                    "run is evaluated again.")
     data = client.eval_comparison(eval_id, stage)
+    if data["summaries"].get(stage, {}).get("reference_derived"):
+        st.warning("These final values were reviewed from the manual workbook itself, so they "
+                   "agree with it by construction. They are not an independent accuracy "
+                   "measure and are left out of the research performance totals.")
     render_summary(data, stage)
+    render_sources(data, stage)
     rows = data["rows"]
     st.dataframe(pd.DataFrame([{
         "Field": r["field"] + (f" — {r['record_label']}" if r.get("record_label") and len(
@@ -158,6 +163,24 @@ def render_city(client: Any, reviewer: str | None) -> None:
                          + (f" ({r['record_label']})" if r.get("record_label") else "")):
             render_details(client, eval_id, r, reviewer)
     render_new_evaluation(client, "city")
+
+def render_sources(data: dict[str, Any], stage: str) -> None:
+    """Water sources: which of the workbook's sources the system identified."""
+    s = (data.get("sources") or {}).get(stage)
+    if not s:
+        return
+    p, r = s.get("source_precision") or {}, s.get("source_recall") or {}
+    with st.expander(f"💧 Water sources — found {ratio(r.get('numerator'), r.get('denominator'))}"
+                     f" of the workbook's sources; "
+                     f"{ratio(p.get('numerator'), p.get('denominator'))} of the system's "
+                     "sources are in the workbook"):
+        for m in s.get("matched") or []:
+            how = " (meaning check, provisional)" if m["method"].startswith("JUDGE") else ""
+            st.markdown(f"- 🟢 {m['reference']} ↔ {m['predicted']}{how}")
+        for name in s.get("missing") or []:
+            st.markdown(f"- ⚪ {name} — not found by the system")
+        for name in s.get("extra") or []:
+            st.markdown(f"- 🔴 {name} — found by the system, not in the workbook")
 
 def automated_cell(r: dict[str, Any]) -> str:
     text = r["automated"] or "—"
@@ -274,6 +297,17 @@ def render_performance(client: Any) -> None:
         for c in perf["cities"] if "PROPOSED" in c["scores"]}
     if chart:
         st.bar_chart(pd.DataFrame(chart).T)
+
+    if perf.get("sources"):
+        st.markdown("**Water sources** (pooled; one workbook source can be matched once)")
+        st.dataframe(pd.DataFrame([{
+            "Results": labels.get(stage, stage),
+            "Source precision": ratio(v["source_precision"]["numerator"],
+                                      v["source_precision"]["denominator"]),
+            "Source recall": ratio(v["source_recall"]["numerator"],
+                                   v["source_recall"]["denominator"]),
+        } for stage, v in perf["sources"].items() if stage in labels]),
+            hide_index=True, width="stretch")
 
     st.markdown("**Accuracy and coverage by field** (pooled over cities)")
     st.dataframe(pd.DataFrame([{

@@ -63,24 +63,29 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
     auto = auto_decisions(snap)
     records = snap["records"]
     pairing = {
-        "RAW": _pair(ref_city.records, _raw_sources(claims), policy),
-        "AUTO": _pair(ref_city.records, _auto_sources(auto, snap), policy),
+        "RAW": _pair(ref_city.records, _raw_sources(claims), policy, judge),
+        "AUTO": _pair(ref_city.records, _auto_sources(auto, snap), policy, judge),
     }
     pairing["PROPOSED"] = pairing["RAW"]
     if "FINAL" in stages:
         pairing["FINAL"] = _pair(ref_city.records, [
-            (r["record_key"], r.get("water_source") or "") for r in records["records"]], policy)
+            (r["record_key"], r.get("water_source") or "") for r in records["records"]
+            if r.get("water_source")], policy, judge)
 
     researched = set(snap["run"].get("field_keys") or fields)
+    multi = len(ref_city.records) > 1
     results: list[dict[str, Any]] = []
-    for scope, record, d in _cells(ref_city, fields):
-        ref = ref_city.value(d.key, record.record_key if record else "")
+    for scope, record, d, ref, tags in _cells(ref_city, fields):
         rkey = record.record_key if record else ""
         for stage in stages:
             if stage != "FINAL" and (d.derived or d.generated):
                 continue
             pred_key = pairing[stage]["pairs"].get(rkey) if record else None
-            if stage == "RAW":
+            if record is not None and multi and pred_key is None:
+                # The run never identified this water source: nothing it produced for the
+                # city as a whole is credited to this source's row.
+                r = _unidentified(stage, d, ref, policy, ref_city)
+            elif stage == "RAW":
                 r = _raw_cell(d, ref, claims, pred_key, scope, ref_city, policy)
             elif stage == "PROPOSED":
                 r = _proposed_cell(d, ref, auto, claims, pred_key, scope, ref_city, policy,
@@ -89,6 +94,9 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
                 r = _auto_cell(d, ref, auto, claims, pred_key, scope, ref_city, policy)
             else:
                 r = _final_cell(d, ref, records, pred_key, scope, ref_city, policy)
+            if tags:
+                r["comparison"] = {**r["comparison"],
+                                   "tags": [*r["comparison"].get("tags", []), *tags]}
             if d.key not in researched and r["status"] == "MISSING_PREDICTION":
                 r = {**r, "status": "NOT_RESEARCHED",
                      "comparison": {**r["comparison"], "status": "NOT_RESEARCHED",
@@ -98,6 +106,12 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
                             "reference": _ref_dict(ref)})
 
     judge_info = apply_judge(results, judge, snap) if judge is not None else None
+    final_basis = None
+    if "FINAL" in stages:
+        refs = {k.casefold() for k in policy.reference_reviewers}
+        derived = [d for d in snap["review_decisions"]
+                   if (d.get("reviewer_key") or (d.get("reviewer") or "").casefold()) in refs]
+        final_basis = "REFERENCE_DERIVED" if derived else "INDEPENDENT"
     diagnoser = Diagnoser(snap, fields, policy)
     diagnoses = []
     by_cell: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
@@ -112,62 +126,101 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
     diagnoses += _run_level_findings(snap, pairing)
     evidence = check_evidence(snap, fields)
     metrics = compute_metrics(results, diagnoses, evidence, snap, fields)
+    metrics += source_metrics(pairing)
+    if final_basis == "REFERENCE_DERIVED":
+        for m in metrics:
+            if m["scope"] == "stage" and m["scope_key"] == "FINAL":
+                m["detail"] = {**(m["detail"] or {}), "reference_derived": True}
     gaps = [g for g in INSTRUMENTATION_GAPS if not (
         g["code"] == "RAW_SEARCH_RESULTS" and snap.get("discovery_results"))]
     return {"stages": stages, "pairing": pairing, "results": results,
             "diagnoses": diagnoses, "evidence": evidence, "metrics": metrics,
             "gaps": gaps, "evaluated_at": datetime.now(UTC).isoformat(),
-            "judge": judge_info}
+            "judge": judge_info, "final_basis": final_basis}
 
 # --- semantic judge ---------------------------------------------------------------------------
 
-JUDGED_STAGES = ("PROPOSED", "AUTO", "FINAL")
+JUDGED_STAGES = ("RAW", "PROPOSED", "AUTO", "FINAL")
+_JUDGMENT_KEYS = ("verdict", "overlapping_facts", "missing_facts", "differing_facts",
+                  "same_meaning_of_measure", "same_geographic_scope", "same_reporting_period",
+                  "justification")
 
 def apply_judge(results: list[dict[str, Any]], judge: SemanticJudge,
                 snap: dict[str, Any]) -> dict[str, Any]:
-    """Refine undecided cells (``judge.eligible``) with the semantic judge, in place. The
-    deterministic status is kept next to the judged one; a cell the judge couldn't decide
-    (model unavailable or failed) needs a person (NEEDS_REVIEW)."""
+    """Refine undecided comparisons (``judge.eligible``) with the semantic judge, in place, at
+    every stage: each RAW candidate is judged like the PROPOSED / AUTO / FINAL value, so the
+    same value gets the same verdict everywhere (and is judged once: the judge caches by
+    input). The deterministic status is kept next to the judged one; a comparison the judge
+    couldn't decide (model unavailable or failed) needs a person (NEEDS_REVIEW)."""
     claims = {c["claim_uid"]: c for c in snap["claims"] if c.get("claim_uid")}
-    judged = unavailable = 0
+    counts = {"judged": 0, "unavailable": 0}
+
+    def quotes(uids: list[str]) -> list[str]:
+        return [x["quote"] for u in uids for x in (claims.get(u) or {}).get("citations") or []
+                if x.get("quote")]
+
     for r in results:
-        if r["stage"] not in JUDGED_STAGES or not eligible(r):
+        if r["stage"] not in JUDGED_STAGES:
             continue
-        p, ref = r["predicted"], r["reference"]
+        ref = r["reference"]
+        if r["stage"] == "RAW":
+            cands = r["predicted"]["candidates"]
+            for c in cands:
+                probe = {"field_key": r["field_key"], "status": c["status"],
+                         "comparison": {"tags": c.get("tags") or []}}
+                if not eligible(probe):
+                    continue
+                cmp = _judged(judge, r["field_key"], ref, c.get("value"),
+                              quotes([c["claim_uid"]]), {k: c.get(k) for k in Comparison.model_fields},
+                              c["status"], counts)
+                c.update(cmp)
+            if cands and any("judgment_id" in c or "deterministic_status" in c for c in cands):
+                best = min(cands, key=lambda x: RANK.get(x["status"], 9))
+                r["comparison"] = {k: best.get(k) for k in (*Comparison.model_fields,
+                                                            "judgment_id", "judgment",
+                                                            "deterministic_status")
+                                   if k in best}
+                r["status"] = best["status"]
+                top = r["predicted"].get("top_candidate")
+                r["predicted"]["top_candidate_status"] = next(
+                    (c["status"] for c in cands if c["claim_uid"] == top), None)
+            continue
+        if not eligible(r):
+            continue
+        p = r["predicted"]
         uids = p.get("selected_claim_uids") or p.get("claim_uids") or []
-        selected = [claims[u] for u in uids if u in claims]
-        # Years are compared in their own fields (e.g. water_quality_year): a year attached to
-        # only one side must not make the same description look different.
-        x = judge.make_input(
-            r["field_key"], _text(ref.get("raw") if ref.get("raw") not in (None, "")
-                                  else ref.get("normalized")),
-            None, _text(p.get("value")), None,
-            [x["quote"] for c in selected for x in c.get("citations") or [] if x.get("quote")])
-        j = judge.judge(x)
-        cmp = dict(r["comparison"] or {})
-        cmp["deterministic_status"] = r["status"]
-        if j is None:
-            unavailable += 1
-            reason = judge.unavailable or (judge.errors[-1] if judge.errors else "model error")
-            cmp.update(status="NEEDS_REVIEW", tags=[*cmp.get("tags", []), "SEMANTIC_UNAVAILABLE"],
-                       detail=f"semantic check unavailable ({reason}); needs a person")
-        else:
-            judged += 1
-            out = j["output"]
-            cmp.update(status=j["status"], judgment_id=j["judgment_id"],
-                       detail=out["justification"],
-                       judgment={k: out[k] for k in (
-                           "verdict", "overlapping_facts", "missing_facts", "differing_facts",
-                           "same_meaning_of_measure", "same_geographic_scope",
-                           "same_reporting_period", "justification")}
-                       | {"model": j["model"], "provider": j["provider"],
-                          "prompt_version": j["prompt_version"], "cached": j["cached"]})
+        cmp = _judged(judge, r["field_key"], ref, p.get("value"), quotes(uids),
+                      dict(r["comparison"] or {}), r["status"], counts)
         r["comparison"] = cmp
         r["status"] = cmp["status"]
     return {"prompt_version": JUDGE_PROMPT_VERSION, "provider": judge.provider,
-            "model": judge.model, "judged": judged, "unavailable_cells": unavailable,
-            "new_calls": judge.calls, "errors": judge.errors[-5:],
-            "unavailable": judge.unavailable}
+            "model": judge.model, "judged": counts["judged"],
+            "unavailable_cells": counts["unavailable"], "new_calls": judge.calls,
+            "errors": judge.errors[-5:], "unavailable": judge.unavailable}
+
+def _judged(judge: SemanticJudge, field_key: str, ref: dict[str, Any], value: Any,
+            quote_texts: list[str], cmp: dict[str, Any], status: str,
+            counts: dict[str, int]) -> dict[str, Any]:
+    # Years are compared in their own fields (e.g. water_quality_year): a year attached to
+    # only one side must not make the same description look different.
+    x = judge.make_input(
+        field_key, _text(ref.get("raw") if ref.get("raw") not in (None, "")
+                         else ref.get("normalized")), None, _text(value), None, quote_texts)
+    j = judge.judge(x)
+    cmp = {**cmp, "deterministic_status": status}
+    if j is None:
+        counts["unavailable"] += 1
+        reason = judge.unavailable or (judge.errors[-1] if judge.errors else "model error")
+        cmp.update(status="NEEDS_REVIEW", tags=[*(cmp.get("tags") or []), "SEMANTIC_UNAVAILABLE"],
+                   detail=f"semantic check unavailable ({reason}); needs a person")
+        return cmp
+    counts["judged"] += 1
+    out = j["output"]
+    cmp.update(status=j["status"], judgment_id=j["judgment_id"], detail=out["justification"],
+               judgment={k: out[k] for k in _JUDGMENT_KEYS}
+               | {"model": j["model"], "provider": j["provider"],
+                  "prompt_version": j["prompt_version"], "cached": j["cached"]})
+    return cmp
 
 def _text(value: Any) -> str:
     if isinstance(value, list):
@@ -177,15 +230,49 @@ def _text(value: Any) -> str:
 # --- cells and pairing -----------------------------------------------------------------------
 
 def _cells(city: ReferenceCity, fields: Mapping[str, FieldDefinition]):
-    """(scope, reference record or None, field) for every evaluated reference cell."""
+    """(scope, reference record or None, field, reference value, tags) for every evaluated
+    reference cell. A source-level field whose workbook value is the same in every row of a
+    multi-source city (e.g. one utility) is one city-wide fact: one cell, so one prediction
+    can't be credited once per row."""
     for d in fields.values():
         if d.generated:
             continue
         if d.scope in ("city", "time_series"):
-            yield "CITY", None, d
+            yield "CITY", None, d, city.value(d.key, ""), []
+            continue
+        refs = [city.value(d.key, rec.record_key) for rec in city.records]
+        if len(refs) > 1 and d.key != ENTITY and _same_values(refs):
+            yield "CITY", None, d, refs[0], ["CITY_WIDE_IN_REFERENCE"]
         else:
-            for rec in city.records:
-                yield "RECORD", rec, d
+            for rec, ref in zip(city.records, refs, strict=True):
+                yield "RECORD", rec, d, ref, []
+
+def _same_values(refs: list[ReferenceValue | None]) -> bool:
+    keys = {(r.value_status, repr(r.normalized)) if r is not None else None for r in refs}
+    return len(keys) == 1 and None not in keys
+
+def _unidentified(stage: str, d: FieldDefinition, ref: ReferenceValue | None,
+                  policy: ComparePolicy, city: ReferenceCity) -> dict[str, Any]:
+    """Result for a reference source the run never identified (multi-source cities)."""
+    cmp = compare(d, ref, None, policy, _other_lat(d, ref, city)).model_dump(mode="json")
+    if cmp["status"] not in ("MISSING_REFERENCE", "NOT_COMPARABLE"):
+        cmp = Comparison(status="MISSING_PREDICTION", tags=["SOURCE_NOT_IDENTIFIED"],
+                         detail="the run did not identify this water source").model_dump(
+                             mode="json")
+    predicted: dict[str, Any] = {
+        "RAW": {"candidates": [], "top_candidate": None, "top_candidate_status": None,
+                "paired_source": None},
+        "PROPOSED": {"source": None, "value": None, "selected_claim_uids": [],
+                     "selection_reason": "the run did not identify this water source",
+                     "candidate_count": 0, "reference_year": None, "citations": [],
+                     "candidates": []},
+        "AUTO": {"outcome": "NO_DECISION", "value": None, "claim_uids": [], "rule": None,
+                 "to_status": None, "reason_codes": [], "entity_key": None},
+    }.get(stage, {"value": None, "value_status": None, "resolution_status": None,
+                  "reference_year": None, "origin": None, "review_decision_ids": [],
+                  "calculation": None, "claim_uids": []})
+    return {"status": cmp["status"], "comparison": cmp, "predicted": predicted,
+            "links": {"claim_uids": []}}
 
 def _raw_sources(claims: list[dict[str, Any]]) -> list[tuple[str, str]]:
     seen: dict[str, str] = {}
@@ -206,10 +293,17 @@ def _auto_sources(auto: dict[tuple[str, str], dict[str, Any]],
     return out
 
 def _pair(records: list[ReferenceRecord], predicted: list[tuple[str, str]],
-          policy: ComparePolicy) -> dict[str, Any]:
-    """Reference record -> predicted entity key, by name/alias only."""
+          policy: ComparePolicy, judge: SemanticJudge | None = None) -> dict[str, Any]:
+    """Reference record -> predicted source entity, one to one (no duplicate credit).
+
+    1. the same name or a configured alias;
+    2. with a judge, for what is still unpaired: the semantic judge says the two names are
+       the same source (EQUIVALENT only; provisional until a person verifies it).
+    A reservoir and the river it is on are different sources here."""
     pairs: dict[str, str | None] = {}
+    method: dict[str, str] = {}
     used: set[str] = set()
+    labels = dict(predicted)
     for rec in records:
         keys = entity_keys(rec.water_source or "", policy) if rec.water_source else set()
         hit = next((k for k, label in predicted if k not in used
@@ -219,9 +313,47 @@ def _pair(records: list[ReferenceRecord], predicted: list[tuple[str, str]],
         pairs[rec.record_key] = hit
         if hit:
             used.add(hit)
-    return {"pairs": pairs,
+            method[rec.record_key] = "NAME"
+    if judge is not None and judge.llm is not None:
+        for rec in records:
+            if pairs[rec.record_key] is not None or not rec.water_source:
+                continue
+            for k, label in predicted:
+                if k in used:
+                    continue
+                j = judge.judge(judge.make_input("water_source", rec.water_source, None, label,
+                                                 None, []))
+                if j is not None and j["status"] == "MATCH":
+                    pairs[rec.record_key] = k
+                    used.add(k)
+                    method[rec.record_key] = f"JUDGE:{j['judgment_id']}"
+                    break
+    return {"pairs": pairs, "method": method,
+            "predicted": [{"key": k, "label": label} for k, label in predicted],
             "missing": [r.record_key for r in records if pairs.get(r.record_key) is None],
+            "missing_labels": [r.water_source or r.record_key for r in records
+                               if pairs.get(r.record_key) is None],
+            "matched": [{"reference": r.water_source, "predicted": labels.get(pairs[
+                r.record_key] or "", pairs[r.record_key]), "method": method[r.record_key]}
+                for r in records if pairs.get(r.record_key)],
             "extra": [{"key": k, "label": label} for k, label in predicted if k not in used]}
+
+def source_metrics(pairing: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Source-level precision and recall per stage: predicted sources vs reference rows,
+    paired one to one. Judge-made pairs are counted and reported as provisional."""
+    from .metrics import metric
+    out = []
+    for stage, p in pairing.items():
+        matched = len(p.get("matched") or [])
+        provisional = sum(1 for m in p.get("matched") or [] if m["method"].startswith("JUDGE"))
+        predicted = len(p.get("predicted") or [])
+        reference = len(p["pairs"])
+        detail = {"missing": p.get("missing_labels") or [],
+                  "extra": [e["label"] for e in p["extra"]], "provisional": provisional,
+                  "matched": p.get("matched") or []}
+        out += [metric("source", stage, "source_precision", matched, predicted, **detail),
+                metric("source", stage, "source_recall", matched, reference, **detail)]
+    return out
 
 # --- stages -----------------------------------------------------------------------------------
 
@@ -293,6 +425,11 @@ def _auto_cell(d: FieldDefinition, ref: ReferenceValue | None,
     if d.key == ENTITY:
         keys = [pred_key] if pred_key else []
     decision = next((auto[(d.key, k)] for k in keys if (d.key, k) in auto), None)
+    if decision is None and scope == "CITY" and d.scope not in ("city", "time_series"):
+        # a city-wide reference fact the run decided per source: its first accepted value
+        decision = next((v for (f, _), v in sorted(auto.items()) if f == d.key
+                         and v["to_status"] == "RESOLVED"), None) or next(
+            (v for (f, _), v in sorted(auto.items()) if f == d.key), None)
     by_uid = {c["claim_uid"]: c for c in claims}
     lat = _other_lat(d, ref, city)
     if decision is None:
@@ -403,7 +540,13 @@ def _final_cell(d: FieldDefinition, ref: ReferenceValue | None, records: dict[st
                 policy: ComparePolicy) -> dict[str, Any]:
     by_source = {r["source_key"]: r["record_key"] for r in records["records"]}
     rv = None
-    if scope == "CITY" or d.scope in ("city", "time_series"):
+    if scope == "CITY" and d.scope not in ("city", "time_series"):
+        # city-wide reference fact of a source-level field: the records' (shared) value
+        values = [(records["record_values"].get(r["record_key"]) or {}).get(d.key)
+                  for r in records["records"]]
+        known = [v for v in values if v and v.get("value_status") == "KNOWN"]
+        rv = (known or [v for v in values if v] or [None])[0]
+    elif scope == "CITY" or d.scope in ("city", "time_series"):
         rv = records["city_values"].get(d.key)
     elif pred_key is not None:
         rk = by_source.get(pred_key, pred_key)
@@ -495,4 +638,5 @@ def run_evaluation(engine, research_run_id: str, dataset_id: str | None = None,
                           config={"reference_policy": ds.policy_version,
                                   "snapshot_version": snap["version"],
                                   "pairing": evaluation["pairing"],
-                                  "judge": evaluation["judge"]})
+                                  "judge": evaluation["judge"],
+                                  "final_basis": evaluation["final_basis"]})

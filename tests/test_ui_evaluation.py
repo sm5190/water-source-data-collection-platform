@@ -130,6 +130,13 @@ class EvalClient(FakeClient):
     def eval_comparison(self, eval_id, stage):
         self.comparisons.append(stage)
         return {"stage": stage, "stages": ["PROPOSED", "AUTO"], "rows": ROWS,
+                "sources": {"PROPOSED": {
+                    "source_precision": {"numerator": 1, "denominator": 3, "value": 1 / 3},
+                    "source_recall": {"numerator": 1, "denominator": 4, "value": 0.25},
+                    "matched": [{"reference": "Thika River", "predicted": "Thika",
+                                 "method": "JUDGE:7"}],
+                    "missing": ["Chania River"], "extra": ["Reservoirs/Dams"],
+                    "provisional": 1}},
                 "metrics_basis": "as evaluated", "judge_validated": False,
                 "summaries": {"PROPOSED": summary("Proposed", 6, 2, 8, 6, 16, 22, 1),
                               "AUTO": summary("Auto-accepted", 4, 0, 0, 18, 4, 22)}}
@@ -327,3 +334,12 @@ def test_new_evaluation_and_empty_state():
     assert "No completed evaluations yet." in all_text(at)
     next(b for b in at.button if b.label == "Evaluate").click().run()
     assert client.evaluations == [("run-1", None)]
+
+def test_water_sources_panel_shows_found_missing_and_extra():
+    at = evaluation_app(EvalClient())
+    panel = next(e for e in at.expander if e.label.startswith("💧 Water sources"))
+    assert "1/4 (25%)" in panel.label and "1/3 (33%)" in panel.label
+    text = all_text(at)
+    assert "Thika River ↔ Thika (meaning check, provisional)" in text
+    assert "Chania River — not found by the system" in text
+    assert "Reservoirs/Dams — found by the system, not in the workbook" in text

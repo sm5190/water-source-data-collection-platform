@@ -15,7 +15,7 @@ from water_source_research.core.paths import CONFIG_DIR
 # Bump when reference import/normalization behaviour changes (part of the dataset version).
 REFERENCE_POLICY_VERSION = "reference-1"
 # Bump when comparison, evidence, diagnosis or metric rules change.
-COMPARE_POLICY_VERSION = "compare-5"
+COMPARE_POLICY_VERSION = "compare-6"
 
 EVALUATION_CONFIG = CONFIG_DIR / "evaluation.yaml"
 ALIASES_CONFIG = CONFIG_DIR / "evaluation_aliases.yaml"
@@ -32,6 +32,10 @@ class ComparePolicy(BaseModel):
     scope_flags: list[str] = Field(default_factory=lambda: [
         "GEOGRAPHIC_SCOPE", "MEASUREMENT_BASIS", "APPROXIMATE_VALUE"])
     aliases: dict[str, list[str]] = Field(default_factory=dict)  # canonical -> aliases
+    # Reviewer keys whose decisions came from the reference itself: a FINAL stage built from
+    # them agrees with the reference by construction and is not an independent measure.
+    reference_reviewers: list[str] = Field(default_factory=lambda: [
+        "sarina workbook (applied by claude)"])
 
     def tolerance(self, field_key: str) -> float:
         return self.field_tolerance.get(field_key, self.numeric_tolerance)

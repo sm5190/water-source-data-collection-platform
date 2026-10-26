@@ -1,32 +1,24 @@
-"""Review a city run's open items using the manually researched workbook as the reviewer.
+"""Show what the manually researched workbook says about a run's open review items.
 
     uv run python scripts/review_from_reference.py <run_id> [--dataset <version>]
-        [--api http://localhost:8000] [--apply] [--rounds 3]
+        [--api http://localhost:8000]
 
-Without --apply it only prints the decision it would make for each open item. With --apply it
-submits the decisions through the API (the same checks as the dashboard), resumes the run and,
-if the run pauses again for a further review round, decides that round too.
+Read-only: prints, per open item, the decision the workbook would imply. It never submits
+decisions: the workbook is the evaluation reference and must stay independent of research
+values (a run reviewed from it would agree with it by construction). Earlier workbook-applied
+reviews (reviewer "Sarina workbook (applied by Claude)") are labelled reference-derived by the
+evaluation and excluded from its aggregates.
 
-Per item, against the workbook value for that field (and water source):
+Per item, the implied decision against the workbook value for that field (and source):
   workbook N/A -> Not applicable; workbook Unknown -> Unknown;
   blank / placeholder / invalid cell, or a source the workbook doesn't list -> Defer;
-  a candidate that matches the workbook value -> Accept it (with the validation override
-  when it failed a check: the workbook is the confirmation);
-  otherwise -> Correct to the workbook value, citing the workbook's own source URL for the
-  field (REVIEWER_SUPPLIED); with no URL in the workbook the candidates are rejected
-  (needs research) or the item is deferred.
-Every decision is recorded with reviewer "Sarina workbook (applied by Claude)" and a reason
-naming the workbook row, so the audit trail shows exactly where it came from.
-
-Note: once a run is reviewed from the workbook, its FINAL stage agrees with the workbook by
-construction; only RAW / PROPOSED / AUTO measure the automated pipeline against it.
+  a candidate that matches the workbook value -> Accept;
+  otherwise -> Correct to the workbook value (or reject / defer without a workbook URL).
 """
 
 import argparse
-import hashlib
 import json
 import sys
-import time
 from typing import Any
 from water_source_research.db.session import get_engine
 from water_source_research.evaluation.compare import Prediction, compare, entity_keys
@@ -34,9 +26,8 @@ from water_source_research.evaluation.policy import load_policy
 from water_source_research.evaluation.reference import ReferenceCity, ReferenceValue
 from water_source_research.evaluation.store import EvaluationStore
 from water_source_research.services.field_state import load_field_definitions
-from water_source_research.ui.client import ApiError, ResearchApiClient
+from water_source_research.ui.client import ResearchApiClient
 
-REVIEWER = "Sarina workbook (applied by Claude)"
 WORKBOOK = "Sarina Water Source.xlsx"
 
 def prediction(c: dict[str, Any]) -> Prediction:
@@ -153,56 +144,22 @@ class Reviewer:
                     "differs from the workbook, which cites no source for it")
         return {"decision": "DEFER"}, "the workbook cites no source for its value"
 
-def key(body: dict[str, Any]) -> str:
-    return hashlib.sha1(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:32]
-
-def review_round(client: ResearchApiClient, run_id: str, reviewer: Reviewer, apply: bool,
-                 counts: dict[str, int]) -> bool:
+def show_round(client: ResearchApiClient, run_id: str, reviewer: Reviewer) -> None:
+    """Print what the workbook implies for each open item (nothing is submitted)."""
     pending = client.review_pending(run_id)
     items = [i for i in pending["items"] if not i.get("decision")]
-    print(f"round {pending['round']}: {len(items)} open item(s)")
+    print(f"round {pending['round']}: {len(items)} open item(s) (read-only comparison)")
     for item in items:
         body, why = reviewer.decide(item)
-        allowed = item["payload"].get("allowed_decisions") or []
-        if body["decision"] not in allowed:
-            body, why = {"decision": "DEFER"}, f"{body['decision']} not allowed here; {why}"
-        ref_note = f"From {WORKBOOK}: {why}"
-        full = {"item_id": item["id"], "round": item["round"], "reason": ref_note[:1900],
-                **body}
-        full["decision_key"] = key(full)
         label = item["field_key"] + (f" [{item.get('label') or item['entity_key']}]"
                                      if item["entity_key"] not in ("city", "*") else "")
         print(f"  {body['decision']:<14} {label:<60} {why}"[:200])
-        if not apply:
-            continue
-        try:
-            client.submit_decisions(run_id, REVIEWER, [full])
-        except ApiError as exc:
-            fallback = {"item_id": item["id"], "round": item["round"], "decision": "DEFER",
-                        "reason": f"From {WORKBOOK}: could not apply ({str(exc)[:200]})"}
-            fallback["decision_key"] = key(fallback)
-            print(f"    -> refused ({str(exc)[:120]}); deferred instead")
-            client.submit_decisions(run_id, REVIEWER, [fallback])
-            body = fallback
-        counts[body["decision"]] = counts.get(body["decision"], 0) + 1
-    return bool(items)
-
-def wait(client: ResearchApiClient, run_id: str, timeout: float = 900) -> dict[str, Any]:
-    end = time.time() + timeout
-    while time.time() < end:
-        run = next(r for r in client.runs(limit=500) if r["run_id"] == run_id)
-        if run["status"] not in ("QUEUED", "RUNNING"):
-            return run
-        time.sleep(3)
-    raise TimeoutError(f"run {run_id} still running after {timeout}s (is a worker running?)")
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("run_id")
     parser.add_argument("--dataset", default=None)
     parser.add_argument("--api", default="http://localhost:8000")
-    parser.add_argument("--apply", action="store_true")
-    parser.add_argument("--rounds", type=int, default=3)
     args = parser.parse_args()
     client = ResearchApiClient(args.api, timeout=120)
     run = next((r for r in client.runs(limit=500) if r["run_id"] == args.run_id), None)
@@ -217,19 +174,11 @@ def main() -> int:
         print(f"no workbook row for {run['city_name']}")
         return 2
     reviewer = Reviewer(city)
-    counts: dict[str, int] = {}
-    for _ in range(args.rounds):
-        if run["status"] != "AWAITING_REVIEW":
-            break
-        review_round(client, args.run_id, reviewer, args.apply, counts)
-        if not args.apply:
-            return 0
-        client.resume_review(args.run_id, REVIEWER)
-        run = wait(client, args.run_id)
-        print(f"  -> run is {run['status']}" + (f" (round {run.get('review_round')})"
-                                                 if run["status"] == "AWAITING_REVIEW" else ""))
-    print(f"decisions: {counts}; run {run['status']}")
-    return 0 if run["status"] == "SUCCEEDED" else 1
+    if run["status"] != "AWAITING_REVIEW":
+        print(f"run is {run['status']}: nothing waits for review")
+        return 0
+    show_round(client, args.run_id, reviewer)
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
