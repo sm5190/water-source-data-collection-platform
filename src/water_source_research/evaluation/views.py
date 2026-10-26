@@ -21,6 +21,17 @@ SUB_LABEL = {"TEMPORAL_MISMATCH": "different year", "SCOPE_MISMATCH": "different
 FIELD_ORDER = {key: n for n, (key, _) in enumerate(COLUMNS)}
 JUDGE_VALIDATED = False  # set only after the Toronto calibration cases are reviewed and pass
 
+def manual_text(ref: dict[str, Any]) -> str:
+    """The manual value as a researcher would write it (no internal status codes)."""
+    status = ref.get("value_status")
+    if not ref or status in (None, "BLANK"):
+        return ""
+    if status == "KNOWN":
+        return reference_text(ref)
+    return {"NOT_APPLICABLE": "N/A", "UNKNOWN": "Unknown", "NONE_REPORTED": "None Reported",
+            "PLACEHOLDER": f"{ref.get('raw')} (placeholder, not a value)"}.get(
+                status, str(ref.get("raw") or ""))
+
 def automated_text(r: dict[str, Any]) -> str:
     p = r["predicted"]
     stage = r["stage"]
@@ -101,7 +112,7 @@ def _row(key: str, header: str, record_key: str, record_label: str | None,
         "adjudication": r.get("adjudication"),
     }
     explanation = judgment.get("justification") or cmp.get("detail") or ""
-    return {**base, "result_id": r["id"], "manual": reference_text(r["reference"]),
+    return {**base, "result_id": r["id"], "manual": manual_text(r["reference"]),
             "automated": automated_text(r), "status": r["status"],
             "group": GROUP.get(r["status"], "MISMATCH"),
             "sub_label": SUB_LABEL.get(r["status"]),

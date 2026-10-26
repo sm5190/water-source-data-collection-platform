@@ -180,7 +180,8 @@ def render_card(client: Any, run_id: str, item: dict[str, Any], reviewer: str,
 def render_candidate(c: dict[str, Any], unit: str | None, big: bool = False) -> None:
     year = (c.get("qualifiers") or {}).get("reference_year")
     value = show_value(candidate_value(c), unit)
-    line = f"### {value}" if big else f"- **{value}**"
+    # A short value reads as a headline; a long description stays normal text.
+    line = (f"### {value}" if len(value) <= 80 else f"**{value}**") if big else f"- **{value}**"
     st.markdown(line + (f"  \n*Reporting year: {year}*" if year else ""))
     hints = [CHECK_HINT[k["code"]] for k in (c.get("validation") or {}).get("checks", [])
              if k["result"] != "PASS" and k["code"] in CHECK_HINT]

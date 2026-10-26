@@ -312,6 +312,16 @@ def test_review_card_is_plain_and_shows_value_quote_and_source():
     assert next(b for b in at.button if "Submit review" in b.label).disabled
     assert "1 field still needs a decision" in text
 
+def test_long_proposed_text_is_not_a_headline():
+    long_text = "Toronto's water distribution system is divided into six pressure zones " * 2
+    cand = {**REVIEW_ITEM["payload"]["candidates"][0], "value": long_text,
+            "normalized_value": long_text}
+    item = {**REVIEW_ITEM, "payload": {**REVIEW_ITEM["payload"], "candidates": [cand],
+                                       "field": {"key": "water_system", "type": "text"}},
+            "field_key": "water_system"}
+    text = all_text(app(ReviewClient(item)))
+    assert f"**{long_text.strip()}**" in text and f"### {long_text.strip()}" not in text
+
 def test_reviewer_name_is_kept_in_the_session_not_the_url():
     at = reviewing(ReviewClient(), "  Sarina   Lab ")
     assert "Reviewing as **Sarina Lab**" in all_text(at)

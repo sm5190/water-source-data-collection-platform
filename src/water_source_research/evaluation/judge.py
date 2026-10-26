@@ -31,7 +31,7 @@ from water_source_research.core.paths import CONFIG_DIR
 from water_source_research.db.evaluation_models import EvalJudgmentRecord
 from water_source_research.llm.base import LLMError
 
-JUDGE_PROMPT_VERSION = "judge-1"
+JUDGE_PROMPT_VERSION = "judge-2"
 DESCRIPTIONS = CONFIG_DIR / "field_descriptions.yaml"
 # Fields the judge may see: free text, and names of things.
 JUDGED_FIELDS = frozenset({
@@ -120,8 +120,15 @@ others are missing or different. DIFFERENT: they do not describe the same thing.
 INSUFFICIENT_CONTEXT: you cannot tell from what you were given.
 - List the facts that overlap, the MANUAL facts missing from AUTOMATED, and facts stated \
 differently. Keep each fact short. Justification: one or two plain sentences.
-- Answer each dimension yes / no / unclear / not_applicable (not_applicable when the field has \
-no geographic scope or reporting period of its own)."""
+- Dimensions (yes / no / unclear / not_applicable):
+  same_meaning_of_measure: do both values describe the kind of thing the field asks for, in the \
+same sense (e.g. both drinking-water infrastructure, both raw-water quality, both a city \
+population)? Extra, missing or more detailed facts do NOT make this "no"; describing a \
+different kind of thing does.
+  same_geographic_scope: do both refer to the same place (the city, or this water source)? \
+not_applicable if neither value has a geographic scope of its own.
+  same_reporting_period: do both refer to the same year or period? not_applicable if neither \
+value states or implies a period."""
 
 def user_prompt(x: JudgeInput) -> str:
     quotes = "\n".join(f"- \"{q[:600]}\"" for q in x.automated_quotes[:3]) or "- (none)"

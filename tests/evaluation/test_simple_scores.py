@@ -51,3 +51,12 @@ def test_proposed_candidate_order_never_uses_confidence():
               {**claim("official-later"), "confidence": 0.8}]
     assert [c["claim_uid"] for c in proposal_order(d, claims)] == [
         "official", "official-later", "academic", "warned", "invalid"]
+
+def test_manual_values_are_shown_without_internal_codes():
+    from water_source_research.evaluation.views import manual_text
+    assert manual_text({"value_status": "NOT_APPLICABLE", "raw": "N/A"}) == "N/A"
+    assert manual_text({"value_status": "UNKNOWN", "raw": "Unknown"}) == "Unknown"
+    assert manual_text({"value_status": "PLACEHOLDER", "raw": "HYBAS ID"}) ==         "HYBAS ID (placeholder, not a value)"
+    assert manual_text({"value_status": "KNOWN", "normalized": 1159745,
+                        "reference_year": 2024}) == "1159745 (2024)"
+    assert manual_text({}) == ""
