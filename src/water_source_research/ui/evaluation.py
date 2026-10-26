@@ -1,8 +1,13 @@
-"""Evaluation mode of the dashboard: how saved research output compares with the manually
-researched reference, where it failed, adjudication, and report downloads.
+"""Evaluation mode of the dashboard.
 
-Talks only to the API (`/evaluation/*`). Adjudications here are evaluation judgments (is this
-comparison / diagnosis right?), recorded separately from research review decisions."""
+Main view (for researchers): per city, Field | Manual Data | Automated Data | Match Status for
+the Proposed, Auto-accepted or Final reviewed stage, with accuracy (strict and lenient) and
+coverage, each as numerator/denominator; evidence and a Verify control per field in
+expanders. Research performance: the same scores by city, by field and overall. Everything
+technical (stage matrix, diagnoses, probe trails, evidence checks, reports) is in Advanced.
+
+Talks only to the API (`/evaluation/*`). Verifications here are evaluation adjudications (is
+this comparison right?), recorded separately from research review decisions."""
 
 import json
 from typing import Any, get_args
@@ -34,11 +39,22 @@ def fraction(m: dict[str, Any] | None) -> str:
     return f"{m['numerator']:g}/{m['denominator']:g} ({m['value']:.0%})"
 
 def render_evaluation(client: Any, reviewer: str | None) -> None:
-    st.title("🧪 Research evaluation")
-    st.caption("Saved research output compared with the manually researched reference. "
-               "Evaluation reads research data only; adjudications here never change it.")
+    st.title("🧪 Automated research vs manual data")
+    st.caption("What the system collected, what the manually researched workbook says, and "
+               "how well they match. Evaluation never changes research data.")
+    city_tab, perf_tab, advanced_tab = st.tabs(
+        ["🏙️ City comparison", "📊 Research performance", "🛠 Advanced"])
+    with city_tab:
+        render_city(client, reviewer)
+    with perf_tab:
+        render_performance(client)
+    with advanced_tab:
+        render_advanced(client, reviewer)
+
+def render_advanced(client: Any, reviewer: str | None) -> None:
+    """The technical evaluation views: stage matrix, diagnoses, evidence checks, reports."""
     overview_tab, compare_tab, field_tab, reports_tab = st.tabs(
-        ["📊 Overview", "🏙️ City comparison", "🔎 Field investigation", "📄 Reports"])
+        ["Overview", "Stage matrix", "Field investigation", "Reports"])
     with overview_tab:
         render_overview(client)
         render_new_evaluation(client)
@@ -51,9 +67,9 @@ def render_evaluation(client: Any, reviewer: str | None) -> None:
     labels = {r["id"]: f"{r['city_key']} · {'/'.join(r['stages'])} · "
                        f"{(r['created_at'] or '')[:16].replace('T', ' ')} · {r['id'][:8]}"
               for r in runs}
-    with st.sidebar:
-        eval_id = st.selectbox("Evaluation run", list(labels), format_func=labels.get,
-                               key="eval_run")
+    with overview_tab:
+        eval_id = st.selectbox("Evaluation run (for the other Advanced tabs)", list(labels),
+                               format_func=labels.get, key="eval_run")
     run = client.eval_run(eval_id)
     with compare_tab:
         render_comparison(client, run)
@@ -61,6 +77,247 @@ def render_evaluation(client: Any, reviewer: str | None) -> None:
         render_investigation(client, run, reviewer)
     with reports_tab:
         render_reports(client, run)
+
+# --- city comparison (main view) ------------------------------------------------------------
+
+GROUP_BADGE = {"MATCH": "🟢 Match", "PARTIAL": "🟡 Partial match", "MISMATCH": "🔴 Mismatch",
+               "MISSING_AUTOMATED": "⚪ Missing in automated data",
+               "MISSING_MANUAL": "▫️ Missing in manual data",
+               "NEEDS_VERIFICATION": "🟠 Needs verification",
+               "NOT_COMPARABLE": "▫️ Not comparable (manual cell is a placeholder)",
+               "NOT_RESEARCHED": "▫️ Not researched in this run",
+               "NOT_EVALUATED": "▫️ Not produced at this stage"}
+STAGE_HELP = {
+    "PROPOSED": "What the system extracted and put forward for each field, before any person "
+                "(accepted automatically, or proposed and sent to review).",
+    "AUTO": "Only the values the system accepted on its own, without a person.",
+    "FINAL": "Values after researchers reviewed and corrected them.",
+}
+VERIFY = [("They match", {"decision": "CONFIRM_MATCH"}),
+          ("Partly match", {"decision": "OVERRIDE_STATUS", "status": "PARTIAL_MATCH"}),
+          ("They don't match", {"decision": "CONFIRM_MISMATCH"}),
+          ("The manual value is wrong", {"decision": "REFERENCE_ERROR"})]
+
+def ratio(num: float | None, den: float | None) -> str:
+    """'n/d (x%)', or 'Not enough data' when there is nothing to divide by."""
+    if not den:
+        return "Not enough data"
+    return f"{num:g}/{den:g} ({num / den:.0%})"
+
+def badge(row: dict[str, Any]) -> str:
+    text = GROUP_BADGE.get(row["group"], row["group"])
+    if row.get("sub_label"):
+        text += f" ({row['sub_label']})"
+    if row.get("provisional"):
+        text += " · provisional"
+    return text
+
+def render_city(client: Any, reviewer: str | None) -> None:
+    cities = client.eval_cities()
+    if not cities:
+        st.info("No completed evaluations yet.")
+        render_new_evaluation(client, "city")
+        return
+    keys = [c["city_key"] for c in cities]
+    city_key = st.selectbox("City", keys, key="eval_city",
+                            format_func=lambda k: k.split("|")[0].title()
+                            + (f", {k.split('|')[1].title()}" if "|" in k else ""))
+    city = next(c for c in cities if c["city_key"] == city_key)
+    eval_id = city["latest_eval_run_id"]
+    latest = city["evaluations"][0]
+    available = [s for s in ("PROPOSED", "AUTO", "FINAL") if s in latest["stages"]]
+    if not available:
+        st.warning("This evaluation predates the Proposed stage: evaluate the run again "
+                   "(Advanced → Overview).")
+        return
+    labels = {"PROPOSED": "Proposed (automated)", "AUTO": "Auto-accepted (automated)",
+              "FINAL": "Final reviewed"}
+    stage = st.radio("Results", available, format_func=labels.get, horizontal=True,
+                     key=f"eval_stage:{city_key}", help=" ".join(
+                         f"{labels[s]}: {STAGE_HELP[s]}" for s in available))
+    if "FINAL" not in available:
+        st.caption("Final reviewed results appear after the city's review is finished and the "
+                   "run is evaluated again.")
+    data = client.eval_comparison(eval_id, stage)
+    render_summary(data, stage)
+    rows = data["rows"]
+    st.dataframe(pd.DataFrame([{
+        "Field": r["field"] + (f" — {r['record_label']}" if r.get("record_label") and len(
+            {x["record_key"] for x in rows if x["record_key"]}) > 1 else ""),
+        "Manual Data": r["manual"] or "—",
+        "Automated Data": automated_cell(r),
+        "Match Status": badge(r),
+    } for r in rows]), hide_index=True, width="stretch")
+    st.caption(f"Evaluated {(latest['created_at'] or '')[:16].replace('T', ' ')} · research run "
+               f"`{latest['research_run_id'][:8]}` · {data['metrics_basis']}")
+    st.markdown("**Evidence and details** (open a field)")
+    for r in rows:
+        if r["status"] == "NOT_EVALUATED":
+            continue
+        with st.expander(f"{badge(r)} — {r['field']}"
+                         + (f" ({r['record_label']})" if r.get("record_label") else "")):
+            render_details(client, eval_id, r, reviewer)
+    render_new_evaluation(client, "city")
+
+def automated_cell(r: dict[str, Any]) -> str:
+    text = r["automated"] or "—"
+    details = r.get("details") or {}
+    n = details.get("candidate_count") or 0
+    if r.get("proposed_not_accepted"):
+        text += " (proposed — sent to review)"
+    if n > 1 and r["automated"]:
+        text += f" [1 of {n} values found]"
+    return text
+
+def render_summary(data: dict[str, Any], stage: str) -> None:
+    s = data["summaries"][stage]
+    a, b, c = st.columns(3)
+    a.metric("Accuracy (strict)", ratio(s["match"], s["answered"]),
+             help="Matching fields ÷ fields the system answered. Only full matches count.")
+    b.metric("Accuracy (lenient)", ratio(s["match"] + 0.5 * s["partial"], s["answered"]),
+             help="Like strict, but a partial match counts as half a match.")
+    c.metric("Coverage", ratio(s["answered"], s["comparable"]),
+             help="Fields the system answered ÷ fields that have a manual value to compare "
+                  "with. Missing automated values lower coverage, not accuracy.")
+    st.markdown(f"🟢 {s['match']} match · 🟡 {s['partial']} partial · 🔴 {s['mismatch']} "
+                f"mismatch · ⚪ {s['missing_automated']} missing in automated · ▫️ "
+                f"{s['missing_manual']} missing in manual · 🟠 {s['needs_verification']} "
+                "need verification")
+    others = [x for x in ("PROPOSED", "AUTO") if x != stage and x in data["summaries"]]
+    for other in others:
+        o = data["summaries"][other]
+        st.caption(f"{o['label']}: accuracy {ratio(o['match'], o['answered'])} strict, "
+                   f"{ratio(o['match'] + 0.5 * o['partial'], o['answered'])} lenient; "
+                   f"coverage {ratio(o['answered'], o['comparable'])}")
+    if s["provisional"]:
+        st.info(f"{s['provisional']} result(s) come from the automatic meaning check and are "
+                "**provisional** until a person verifies them (open the field below)."
+                + ("" if data.get("judge_validated") else
+                   " The meaning check has not been validated yet."))
+
+def render_details(client: Any, eval_id: str, r: dict[str, Any], reviewer: str | None) -> None:
+    d = r.get("details") or {}
+    left, right = st.columns(2)
+    with left:
+        st.markdown(f"**Manual data:** {r['manual'] or '—'}")
+        if d.get("manual_year"):
+            st.caption(f"Reporting year: {d['manual_year']}")
+        for url in d.get("manual_sources") or []:
+            st.markdown(f"- [{url}]({url})")
+    with right:
+        st.markdown(f"**Automated data:** {r['automated'] or '—'}")
+        if d.get("automated_year"):
+            st.caption(f"Reporting year: {d['automated_year']}")
+        for cite in d.get("citations") or []:
+            if cite.get("quote"):
+                st.markdown("> " + cite["quote"].replace("\n", " ")[:600])
+            if cite.get("url"):
+                page = f", page {cite['page_number']}" if cite.get("page_number") else ""
+                st.markdown(f"Source: [{cite.get('title') or cite['url']}]({cite['url']}){page}")
+    if r.get("explanation"):
+        st.markdown(f"**Why:** {r['explanation']}")
+    cands = d.get("candidates") or []
+    if len(cands) > 1:
+        st.markdown(f"**All {len(cands)} values the system found** (the compared one is marked)")
+        for c in cands:
+            st.markdown(f"- {'**→** ' if c['selected'] else ''}{c['value']}")
+    j = d.get("judgment")
+    if j:
+        facts = [("Agree", j.get("overlapping_facts")), ("Missing", j.get("missing_facts")),
+                 ("Different", j.get("differing_facts"))]
+        for label, items in facts:
+            if items:
+                st.caption(f"{label}: " + "; ".join(items))
+        st.caption(("Provisional — " if r.get("provisional") else "Verified by a person — ")
+                   + f"decided by the automatic meaning check ({j.get('model')}, "
+                   f"{j.get('prompt_version')}).")
+    if d.get("adjudication"):
+        a = d["adjudication"]
+        st.caption(f"Verified by {a['reviewer']}: {a['decision'].replace('_', ' ').lower()}")
+    if r.get("result_id") is None:
+        return
+    st.caption("Verify this comparison:")
+    cols = st.columns(len(VERIFY))
+    for col, (label, body) in zip(cols, VERIFY, strict=True):
+        if col.button(label, key=f"verify:{r['result_id']}:{body['decision']}"
+                                  f":{body.get('status', '')}", disabled=not reviewer):
+            try:
+                client.adjudicate(eval_id, {"target": "FIELD_RESULT",
+                                            "target_id": r["result_id"], "reviewer": reviewer,
+                                            "status": body.get("status"), "root_cause": None,
+                                            "note": None, "decision": body["decision"]})
+                st.success("Saved.")
+                st.rerun()
+            except ApiError as exc:
+                st.error(str(exc))
+    if not reviewer:
+        st.caption("Type your name in the sidebar to verify.")
+
+# --- research performance -------------------------------------------------------------------
+
+def render_performance(client: Any) -> None:
+    perf = client.eval_performance()
+    if not perf["cities"]:
+        st.info("No completed evaluations yet.")
+        return
+    stages = [s for s in ("PROPOSED", "AUTO", "FINAL") if s in perf["stages"]]
+    labels = perf["stage_labels"]
+    st.markdown("**Accuracy and coverage by city** (latest evaluation per city)")
+    st.dataframe(pd.DataFrame([{
+        "City": c["city_key"].split("|")[0].title(),
+        **{f"{labels[s]} {k}": v for s in stages if s in c["scores"]
+           for k, v in score_cells(c["scores"][s]).items()},
+    } for c in perf["cities"]]), hide_index=True, width="stretch")
+    chart = {c["city_key"].split("|")[0].title(): {
+        "Proposed (strict)": c["scores"]["PROPOSED"]["accuracy_strict"],
+        "Proposed (lenient)": c["scores"]["PROPOSED"]["accuracy_lenient"]}
+        for c in perf["cities"] if "PROPOSED" in c["scores"]}
+    if chart:
+        st.bar_chart(pd.DataFrame(chart).T)
+
+    st.markdown("**Accuracy and coverage by field** (pooled over cities)")
+    st.dataframe(pd.DataFrame([{
+        "Field": f["field"],
+        **{f"{labels[s]} {k}": v for s in stages for k, v in score_cells(f[s]).items()},
+        "Cities": max((f[s]["n_cities"] for s in stages), default=0),
+    } for f in perf["fields"]]), hide_index=True, width="stretch")
+
+    st.markdown("**Whole dataset**")
+    rows = []
+    for s in stages:
+        d = perf["dataset"][s]
+        rows.append({"Results": labels[s], **score_cells(d),
+                     "Average of cities (strict)": pct(d["mean_city_accuracy_strict"]),
+                     "Average of cities (lenient)": pct(d["mean_city_accuracy_lenient"]),
+                     "Missing-data rate": pct(d["missing_data_rate"]),
+                     "Cities": d["n_cities"]})
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption("Averages of cities need at least two evaluated cities.")
+    j = perf["judge"]
+    st.markdown(f"**Automatic meaning check:** {j['judged']} result(s) decided by it, "
+                f"{j['verified']} verified by a person"
+                + (f", agreeing {j['agreement_with_people']:.0%} of the time"
+                   if j["agreement_with_people"] is not None else "")
+                + (". Validated on the Toronto calibration cases." if j["validated"] else
+                   ". **Not validated yet**: its results are provisional."))
+    if perf["history"]:
+        st.markdown("**Earlier evaluations**")
+        st.dataframe(pd.DataFrame([{
+            "When": (h["created_at"] or "")[:16].replace("T", " "),
+            "City": h["city_key"].split("|")[0].title(), "Rules": h["compare_policy_version"],
+            **{f"{labels[s]} accuracy": fraction(h["scores"][s]["accuracy_strict"])
+               for s in stages if s in h["scores"]},
+            **{f"{labels[s]} coverage": fraction(h["scores"][s]["answer_coverage"])
+               for s in stages if s in h["scores"]},
+        } for h in perf["history"]]), hide_index=True, width="stretch")
+
+def score_cells(s: dict[str, Any]) -> dict[str, str]:
+    return {"accuracy (strict)": ratio(s["match"], s["answered"]),
+            "accuracy (lenient)": ratio(s["match"] + 0.5 * s["partial"], s["answered"]),
+            "coverage": ratio(s["answered"], s["comparable"])}
+
+def pct(value: float | None) -> str:
+    return "Not enough data" if value is None else f"{value:.0%}"
 
 # --- overview -------------------------------------------------------------------------------
 
@@ -85,7 +342,7 @@ def render_overview(client: Any) -> None:
         st.markdown("**Failure categories (earliest demonstrable cause)**")
         st.bar_chart(pd.DataFrame({"cells": causes}).sort_values("cells", ascending=False))
 
-def render_new_evaluation(client: Any) -> None:
+def render_new_evaluation(client: Any, where: str = "adv") -> None:
     with st.expander("➕ Evaluate a research run"):
         runs = [r for r in client.runs(limit=200)
                 if r["status"] in ("SUCCEEDED", "AWAITING_REVIEW")]
@@ -97,15 +354,15 @@ def render_new_evaluation(client: Any) -> None:
                                f"{(r['created_at'] or '')[:16].replace('T', ' ')} · "
                                f"{r['run_id'][:8]}" for r in runs}
         research_run = st.selectbox("Research run", list(labels), format_func=labels.get,
-                                    key="eval_new_run")
+                                    key=f"eval_new_run:{where}")
         datasets = {"": "Latest dataset containing this city"} | {
             d["id"]: f"{d['filename']} · {', '.join(d['cities'])} · {d['id'][:8]}"
             for d in references}
         dataset = st.selectbox("Reference dataset", list(datasets), format_func=datasets.get,
-                               key="eval_new_dataset")
+                               key=f"eval_new_dataset:{where}")
         st.caption("A run waiting for review is evaluated at RAW and AUTO only; evaluate it "
                    "again after review for FINAL. Every evaluation is kept.")
-        if st.button("Evaluate", key="eval_new_go"):
+        if st.button("Evaluate", key=f"eval_new_go:{where}"):
             try:
                 made = client.evaluate(research_run, dataset or None)
                 st.session_state["eval_run"] = made["id"]
