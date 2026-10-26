@@ -35,7 +35,7 @@ def test_default_queries_per_field_type_and_kind():
                for k in ("web", "academic")}
     assert by_kind["web"] == [
         ("utility", "utility_name", "Toronto Canada drinking water utility"),
-        ("water_source", "water_source", "Toronto Canada drinking water sources reservoirs"),
+        ("water_source", "water_source", "Toronto Canada water supply sources rivers springs groundwater"),
     ]  # city_identity is skipped; derived fields never drive discovery
     assert [q[2] for q in by_kind["academic"]] == ["Toronto municipal drinking water supply",
                                                    "Toronto drinking water supply sources"]
@@ -48,7 +48,7 @@ def test_planned_queries_come_first_and_are_bounded_and_deduped():
                        already_run={"toronto drinking water supply sources"})
     assert [(q.kind, q.query) for q in qs] == [
         ("web", "Toronto Water source report"),  # whitespace normalized, case-dup dropped
-        ("web", "Toronto Water drinking water sources reservoirs"),  # utility replaces place
+        ("web", "Toronto Water water supply sources rivers springs groundwater"),  # utility replaces place
     ]
 
 def test_previous_queries_read_from_trusted_events():

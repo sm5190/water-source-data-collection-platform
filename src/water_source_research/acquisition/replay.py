@@ -43,7 +43,7 @@ class ReplayAcquisition:
 
     async def acquire_round(self, candidates: list[Mapping[str, Any]],
                             previous: list[Mapping[str, Any]],
-                            round_no: int = 1) -> AcquisitionOutcome:
+                            round_no: int = 1, priority_hosts: Any = ()) -> AcquisitionOutcome:
         """The parent's documents of ``round_no`` (candidates are ignored: nothing is
         discovered or fetched in a replay)."""
         self.served.append(round_no)

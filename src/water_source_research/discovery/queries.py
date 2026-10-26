@@ -8,7 +8,10 @@ earlier round (read back from the trusted TOOL_CALL events) are not repeated.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Literal
+import yaml
+from water_source_research.core.paths import CONFIG_DIR
 from water_source_research.schemas.research import FieldDefinition
 
 QueryKind = Literal["web", "academic"]
@@ -19,7 +22,9 @@ TOPICS: dict[str, tuple[str, str] | None] = {
     "references": None,
     "population": ("population served drinking water utility", "urban water supply population"),
     "utility": ("drinking water utility", "municipal drinking water supply"),
-    "water_source": ("drinking water sources reservoirs", "drinking water supply sources"),
+    # Sources, not reservoirs: "reservoirs" steered results to storage reservoirs.
+    "water_source": ("water supply sources rivers springs groundwater",
+                     "drinking water supply sources"),
     "source_type": ("drinking water source surface water groundwater",
                     "groundwater surface water supply"),
     "transfer_system": ("water supply aqueduct pipeline transfer", "inter-basin water transfer"),
@@ -29,6 +34,24 @@ TOPICS: dict[str, tuple[str, str] | None] = {
     "withdrawal": ("water production annual report", "urban water withdrawals"),
     "water_quality": ("drinking water quality report", "drinking water quality"),
 }
+
+# Field types worth a site-restricted search of the city's own utility website.
+UTILITY_SITE_TOPICS = {"water_source": "water sources", "infrastructure": "treatment plant intake",
+                       "withdrawal": "annual report water production",
+                       "water_quality": "water quality report"}
+QUERY_LANGUAGES = CONFIG_DIR / "query_languages.yaml"
+
+@lru_cache
+def _local_topics() -> dict[str, dict[str, str]]:
+    """country (casefolded) -> field_type -> local-language topic."""
+    if not QUERY_LANGUAGES.exists():
+        return {}
+    data = yaml.safe_load(QUERY_LANGUAGES.read_text(encoding="utf-8")) or {}
+    out: dict[str, dict[str, str]] = {}
+    for lang in (data.get("languages") or {}).values():
+        for country in lang.get("countries") or []:
+            out.setdefault(str(country).casefold(), dict(lang.get("topics") or {}))
+    return out
 
 @dataclass(frozen=True, slots=True)
 class PlannedQuery:
@@ -52,7 +75,10 @@ def build_queries(
     planned_queries: Mapping[str, Sequence[str]] | None = None,
     already_run: set[str] = frozenset(),  # type: ignore[assignment]
     max_per_kind: int = 6,
+    utility_hosts: Sequence[str] = (),
 ) -> list[PlannedQuery]:
+    """``utility_hosts``: hosts of documents already identified as the city's utility; their
+    site gets one restricted query for the fields that live on utility websites."""
     groups: dict[str, str] = {}  # field_type -> first target field
     for key in field_keys:
         d = fields.get(key)
@@ -69,7 +95,14 @@ def build_queries(
         if topic:
             web_topic, academic_topic = topic
             subject = utility or place
+            if utility_hosts and field_type in UTILITY_SITE_TOPICS:
+                web.append(PlannedQuery("web", f"site:{utility_hosts[0]} "
+                                        f"{UTILITY_SITE_TOPICS[field_type]}", field_type,
+                                        field_key))
             web.append(PlannedQuery("web", f"{subject} {web_topic}", field_type, field_key))
+            local = _local_topics().get((country or "").casefold(), {}).get(field_type)
+            if local:
+                web.append(PlannedQuery("web", f"{city} {local}", field_type, field_key))
             academic.append(PlannedQuery("academic", f"{city} {academic_topic}", field_type,
                                          field_key))
         candidates["web"].append(web)

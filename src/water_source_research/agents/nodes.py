@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Mapping
+from urllib.parse import urlsplit
 from uuid import uuid4
 from langgraph.types import interrupt
 from water_source_research.acquisition.service import AcquisitionService, DocStatus
@@ -100,6 +101,18 @@ def make_discover_node(
         return {**state, **updates, "discovery_rounds": rounds}
     return discover_node
 
+def utility_hosts(state: GraphState) -> list[str]:
+    """Hosts of successfully acquired documents classified as the city's utility, most
+    documents first (site-restricted queries and acquisition priority)."""
+    counts: dict[str, int] = {}
+    for d in state.get("acquired_documents", []):
+        if d.get("status") == "OK" and (d.get("source_type") or "").upper() == "UTILITY":
+            host = (urlsplit(d.get("final_url") or d.get("requested_url") or "").hostname
+                    or "").removeprefix("www.")
+            if host:
+                counts[host] = counts.get(host, 0) + 1
+    return sorted(counts, key=lambda h: -counts[h])
+
 async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefinition],
                     state: GraphState) -> GraphState:
     """One discovery round for the fields that still need evidence. Never raises."""
@@ -116,7 +129,8 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
         utility=str(utility.selected_claim.value) if utility and utility.selected_claim
         and utility.status is FieldResolutionStatus.RESOLVED else None,
         field_keys=targets, fields=fields, planned_queries=state.get("planned_queries"),
-        already_run=previous_queries(events), max_per_kind=settings.max_queries_per_round)
+        already_run=previous_queries(events), max_per_kind=settings.max_queries_per_round,
+        utility_hosts=utility_hosts(state))
     status = dict(state.get("discovery_provider_status", {}))
     if not queries:
         return {"events": events, "discovery_provider_status": status,
@@ -187,7 +201,8 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
     does raise, so the run is retried rather than recorded without it."""
     previous = list(state.get("acquired_documents", []))
     outcome = await acquisition.acquire_round(state.get("discovery_candidates", []), previous,
-                                              round_no=state.get("discovery_rounds", 1))
+                                              round_no=state.get("discovery_rounds", 1),
+                                              priority_hosts=utility_hosts(state))
     chunks = list(state.get("evidence_chunks", []))
     known = {c["chunk_id"] for c in chunks}
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]

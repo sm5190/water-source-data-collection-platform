@@ -122,6 +122,20 @@ _ACADEMIC_TLD = re.compile(r"\.(edu|ac\.[a-z]{2}|edu\.[a-z]{2})$")
 _TECHNICAL = re.compile(r"\b(technical report|master plan|feasibility|assessment|"
                         r"study|annual report|water quality report|ccr)\b", re.IGNORECASE)
 
+# Directory-style pages (lists, members, profiles) of networks and aggregators.
+_DIRECTORY_PATH = re.compile(r"/(members?|directory|list|lists|profiles?|utilities|conflict|"
+                             r"companies)(/|$)", re.IGNORECASE)
+# Corporate reporting of companies outside the water sector (energy, oil, banking): never a
+# technical water source, whatever its format.
+_CORPORATE_REPORT = re.compile(r"\b(annual|financial|integrated|sustainability)[\s_-]+report|"
+                               r"annual[\s_-]+financial|\b10-?k\b", re.IGNORECASE)
+_WATER_CONTEXT = re.compile(r"water|wasser|agua|água|eau|acqua|vatten|vesi|woda|utilit|sewer|"
+                            r"sanita|hydro|municip|city|council|gov", re.IGNORECASE)
+
+def _non_water_corporate_report(url: str, host: str, title: str) -> bool:
+    return bool(_CORPORATE_REPORT.search(f"{title} {url}")) and not (
+        _WATER_CONTEXT.search(host) or _WATER_CONTEXT.search(title))
+
 def classify_source_type(url: str | None, title: str | None = None, provider: str = "",
                          doi: str | None = None, city: str | None = None) -> str:
     """Heuristic source tier used for ranking discovery candidates.
@@ -150,6 +164,8 @@ def classify_source_type(url: str | None, title: str | None = None, provider: st
         return "GOVERNMENT"
     if _REGULATORY.search(title):
         return "REGULATORY"
+    if _non_water_corporate_report(url or "", host, title):
+        return "OTHER"
     if _TECHNICAL.search(title) or (url or "").lower().split("?")[0].endswith(".pdf"):
         return "TECHNICAL"
     return "OTHER"
@@ -170,6 +186,8 @@ def _is_utility(url: str, host: str, title: str, city: str | None) -> bool:
             return True
     if _EDITORIAL_PATH.search(path) or _EDITORIAL_TITLE.search(title):
         return False
+    if _DIRECTORY_PATH.search(path):
+        return False  # a list/member/profile page of a network or directory site
     return (any(_WATER_LABEL.match(label) for label in labels)
             or bool(host and _UTILITY.search(host.removeprefix("www.")))
             or bool(_UTILITY_PHRASE.search(title)))

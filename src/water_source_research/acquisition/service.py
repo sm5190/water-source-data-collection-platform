@@ -11,7 +11,7 @@ import asyncio
 import hashlib
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
@@ -50,10 +50,17 @@ def doc_key(url: str | None) -> str:
 
 def select_candidates(candidates: list[Mapping[str, Any]],
                       attempted: set[str], settings: AcquisitionSettings,
-                      budget: int) -> list[Mapping[str, Any]]:
+                      budget: int, priority_hosts: Sequence[str] = ()) -> list[Mapping[str, Any]]:
     """Up to ``budget`` (<= per-round cap) unattempted candidates, official tiers first,
-    keeping discovery's ranking within a tier, at most ``max_per_host`` per host."""
+    keeping discovery's ranking within a tier, at most ``max_per_host`` per host. Pages on a
+    host already identified as the city's utility (``priority_hosts``) come first."""
+    preferred = {h.removeprefix("www.") for h in priority_hosts}
+
+    def on_preferred(c: Mapping[str, Any]) -> bool:
+        return (urlsplit(c.get("url") or "").hostname or "").removeprefix("www.") in preferred
+
     ordered = sorted(enumerate(candidates), key=lambda ic: (
+        0 if on_preferred(ic[1]) else 1,
         TIER_ORDER.get((ic[1].get("source_type") or "").upper(), OTHER_TIER), ic[0]))
     chosen: list[Mapping[str, Any]] = []
     per_host: dict[str, int] = {}
@@ -89,7 +96,8 @@ class AcquisitionService:
 
     async def acquire_round(self, candidates: list[Mapping[str, Any]],
                             previous: list[Mapping[str, Any]],
-                            round_no: int = 1) -> AcquisitionOutcome:
+                            round_no: int = 1,
+                            priority_hosts: Sequence[str] = ()) -> AcquisitionOutcome:
         """Acquire new documents for one round. ``previous`` are earlier document records
         (any status), used for de-duplication and the per-run budget. Never raises."""
         attempted = set()
@@ -105,7 +113,7 @@ class AcquisitionService:
         outcome = AcquisitionOutcome()
         if budget <= 0:
             return outcome
-        chosen = select_candidates(candidates, attempted, self.s, budget)
+        chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts)
         results = await asyncio.gather(*(self._fetch_one(c) for c in chosen))
 
         # Sequential, in selection order: deterministic de-duplication and chunking.

@@ -1,0 +1,52 @@
+# Local-language discovery topics (discovery/queries.py): for a city in one of these countries,
+# one extra web query per field type is built from "<city> <topic>" in the local language, so
+# utility and government pages that exist only in that language can be found.
+# Topics are generic methodology vocabulary (water supply, sources, quality), never city
+# names, hosts or expected answers.
+languages:
+  pt:
+    countries: [Angola, Portugal, Brazil, Mozambique, Cabo Verde, Guinea-Bissau,
+                "Sao Tome and Principe", Timor-Leste]
+    topics:
+      water_source: "abastecimento de água captação rio nascente aquífero"
+      utility: "empresa de abastecimento de água"
+      infrastructure: "estação de tratamento de água captação adutora"
+      withdrawal: "produção de água m3 por dia relatório anual"
+      water_quality: "qualidade da água bruta relatório"
+  es:
+    countries: [Spain, Mexico, Colombia, Chile, Argentina, Peru, Ecuador, Bolivia,
+                "Bolivia (Plurinational State of)", Venezuela,
+                "Venezuela (Bolivarian Republic of)", Guatemala, Honduras, El Salvador,
+                Nicaragua, Costa Rica, Panama, Paraguay, Uruguay, Cuba, Dominican Republic]
+    topics:
+      water_source: "abastecimiento de agua potable fuentes río captación acuífero"
+      utility: "empresa de agua potable"
+      infrastructure: "planta potabilizadora captación acueducto"
+      withdrawal: "producción de agua m3 por día informe anual"
+      water_quality: "calidad del agua cruda informe"
+  fr:
+    countries: [France, Senegal, Cameroon, "Côte d'Ivoire", Mali, Burkina Faso, Niger,
+                Guinea, Togo, Benin, Chad, Madagascar, Belgium, Switzerland, Morocco, Tunisia,
+                Algeria, Haiti, Congo, Democratic Republic of the Congo]
+    topics:
+      water_source: "alimentation en eau potable ressources fleuve captage nappe"
+      utility: "société de distribution d'eau potable"
+      infrastructure: "usine de traitement d'eau captage adduction"
+      withdrawal: "production d'eau m3 par jour rapport annuel"
+      water_quality: "qualité de l'eau brute rapport"
+  de:
+    countries: [Germany, Austria, Switzerland]
+    topics:
+      water_source: "Wasserversorgung Quellen Grundwasser Fluss"
+      utility: "Wasserversorgung Stadtwerke"
+      infrastructure: "Wasserwerk Hochquellenleitung Aufbereitung"
+      withdrawal: "Wasserabgabe m3 pro Tag Jahresbericht"
+      water_quality: "Rohwasserqualität Bericht"
+  it:
+    countries: [Italy]
+    topics:
+      water_source: "approvvigionamento idrico fonti sorgenti falda fiume"
+      utility: "gestore servizio idrico"
+      infrastructure: "impianto di potabilizzazione acquedotto captazione"
+      withdrawal: "prelievo idrico m3 al giorno relazione annuale"
+      water_quality: "qualità dell'acqua grezza relazione"
