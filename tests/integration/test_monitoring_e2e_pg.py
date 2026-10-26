@@ -141,6 +141,8 @@ def test_crash_recovery_usage_alerts_and_dashboard(pg_engine, drop_checkpoints, 
         assert {e["kind"] for e in detail["lifecycle"]} >= {
             "JOB_INTERRUPTED", "JOB_RECLAIMED", "CHECKPOINT_RECOVERY_ATTEMPTED", "JOB_RESUMED"}
         assert detail["time"]["other_wait_s"] > 0  # time lost to the crash, not "processing"
+        assert detail["pipeline"]["documents"].get("OK", 0) >= 1
+        assert detail["pipeline"]["chunks"] > 0 and detail["pipeline"]["search_results"] > 0
         assert any(t["kind"] == "RECOVERY" and t["sampled"] for t in detail["traces"])
         workers = {w["instance_id"]: w for w in api.get("/monitoring/workers").json()}
         assert workers[hb["instance_id"]]["status"] == "EXITED"

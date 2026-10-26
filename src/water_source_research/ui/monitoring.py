@@ -105,7 +105,10 @@ def render_overview(client: Any) -> None:
     c[1].metric("Awaiting review", runs["awaiting_review"])
     c[2].metric("Succeeded (all time)", runs["succeeded_total"])
     c[3].metric("Failed (all time)", runs["failed_total"])
-    st.caption(f"Finished in this period: {runs['finished_in_window'] or 'none'}")
+    finished = runs["finished_in_window"] or {}
+    st.caption("Finished in this period: " + (", ".join(
+        f"{n} {status.lower().replace('_', ' ')}" for status, n in sorted(finished.items()))
+        or "none"))
     st.subheader("Workers")
     c = st.columns(4)
     for i, status in enumerate(("ALIVE", "STALE", "EXITED", "STOPPED")):
@@ -250,8 +253,11 @@ def render_workers(client: Any) -> None:
             "Private MB": UNKNOWN if w.get("private_mb") is None else w["private_mb"],
             "Last heartbeat": ("—" if w.get("heartbeat_age_s") is None
                                else f"{duration(w['heartbeat_age_s'])} ago"),
-            "Running": ", ".join(f"{k[:8]} ({v.get('stage')})"
-                                 for k, v in (w.get("active_runs") or {}).items()) or "—",
+            # what its last heartbeat said; for a worker that is gone, what it was doing
+            "Runs (last heartbeat)": ((("was running " if w["status"] != "ALIVE" else "")
+                                       + ", ".join(f"{k[:8]} ({v.get('stage')})" for k, v in
+                                                   (w.get("active_runs") or {}).items()))
+                                      if w.get("active_runs") else "—"),
             "Ended as": w.get("termination_class") or "—"} for w in ws]),
             hide_index=True, width="stretch")
     st.subheader("Crashes")

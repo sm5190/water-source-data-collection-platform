@@ -92,7 +92,7 @@ class MonitoringClient(FakeClient):
                  "termination_class": None},
                 {"instance_id": "host-dead", "pid": 999, "status": "EXITED",
                  "cpu_percent": None, "rss_mb": None, "private_mb": None,
-                 "heartbeat_age_s": 3600, "active_runs": {},
+                 "heartbeat_age_s": 3600, "active_runs": {"r-oslo-0002": {"stage": "acquire"}},
                  "termination_class": "UNKNOWN_TERMINATION"}]
 
     def mon_crashes(self, hours=24 * 7):
@@ -132,6 +132,7 @@ def test_overview_shows_runs_workers_durations_usage_and_errors():
     assert metric(at, "Input tokens") == "1,200 (+1 Unknown)"
     assert metric(at, "Estimated cost") == "Unknown"
     assert "No alerts" in all_text(at)
+    assert "Finished in this period: 3 succeeded" in all_text(at)
     frames = [f.value for f in at.dataframe]
     assert any("boom" in str(df.values) for df in frames)
     assert any("DISABLED" in str(df.values) for df in frames)
@@ -163,6 +164,8 @@ def test_workers_and_crashes_with_unknown_values_and_evidence():
     workers = next(df for df in frames if "Worker" in df.columns)
     assert list(workers["Status"]) == ["ALIVE", "EXITED"]
     assert workers.iloc[1]["CPU %"] == "Unknown"
+    assert workers.iloc[0]["Runs (last heartbeat)"] == "r-lima-0 (extract)"
+    assert workers.iloc[1]["Runs (last heartbeat)"] == "was running r-oslo-0 (acquire)"
     assert any("exit 15 (0x0000000F) · UNKNOWN_TERMINATION [UNKNOWN]" in e.label
                for e in at.expander)
 

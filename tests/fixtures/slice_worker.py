@@ -35,6 +35,7 @@ from water_source_research.research_queue.diagnostics import (
 )
 from water_source_research.research_queue.queue import ResearchQueue
 from water_source_research.research_queue.worker import ResearchWorker
+from water_source_research.services.evidence_store import EvidenceRepository
 
 async def main(a) -> None:
     settings = get_settings()
@@ -55,7 +56,7 @@ async def main(a) -> None:
     async with open_checkpointer(settings, pool_size=3) as saver:
         graph = build_graph(gateway=gateway, discovery=make_discovery(),
                             acquisition=acquisition, max_discovery_rounds=2,
-                            checkpointer=saver)
+                            evidence_store=EvidenceRepository(engine), checkpointer=saver)
         worker = ResearchWorker(ResearchQueue(engine, settings.research_queue), graph,
                                 settings.research_queue, worker_id=a.instance_id,
                                 events=sink)
