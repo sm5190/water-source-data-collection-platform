@@ -123,6 +123,11 @@ class ResearchJobRecord(Base):
     # claims and evidence; no new discovery, acquisition or model calls).
     mode: Mapped[str] = mapped_column(String(16), default="RESEARCH")
     parent_run_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    # Tracing: explicitly selected for a full trace (set only by our API/CLI), and the W3C
+    # context the worker continues (written by submit / review resume; never from headers).
+    trace_requested: Mapped[bool] = mapped_column(Boolean, default=False,
+                                                  server_default=text("false"))
+    trace_context: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

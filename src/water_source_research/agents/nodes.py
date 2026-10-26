@@ -283,7 +283,12 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             span.set_attribute("graph.fields", fields)
             span.set_attribute("graph.discovery_round", state.get("discovery_rounds", 0))
             results = await asyncio.gather(*(
-                _extract_field(context_service, gateway, state, run_id, f) for f in fields
+                _extract_field(context_service, gateway, state, run_id, f,
+                               extraction_round=extraction_round,
+                               reextraction=(f in again),
+                               attempt=1 + (state.get("reextractions") or {}).get(f, 0)
+                               if f in again else 1)
+                for f in fields
             ))
 
             research = CityResearchState.model_validate(state["research_state"])
@@ -378,19 +383,32 @@ async def _extract_field(
     state: GraphState,
     run_id: str,
     field_key: str,
+    *,
+    extraction_round: int = 1,
+    reextraction: bool = False,
+    attempt: int = 1,
 ) -> tuple[str, ContextBundle, list[FieldClaim], list[dict]]:
-    bundle = await context_service.get_context(
-        run_id=run_id, field_key=field_key, operation=ContextPurpose.EXTRACT, graph_state=state,
-    )
-    if bundle.status is not ContextStatus.READY:
-        return field_key, bundle, [], []
-    calls: list[dict] = []  # model calls made for this field (set in this task's context)
-    llm_call_log.set(calls)
-    claims = await gateway.extract(bundle, run_id=run_id, field_key=field_key)
-    wrong = sorted({c.field_key for c in claims if c.field_key != field_key})
-    if wrong:
-        raise ValueError(f"Gateway returned claims for {wrong} when extracting {field_key!r}")
-    return field_key, bundle, claims, calls
+    with get_tracer().start_as_current_span("extraction.field") as span:
+        span.set_attribute("research.run_id", run_id)
+        span.set_attribute("research.field_key", field_key)
+        span.set_attribute("research.discovery_round", extraction_round)
+        span.set_attribute("extraction.reextraction", reextraction)
+        span.set_attribute("extraction.attempt", attempt)
+        bundle = await context_service.get_context(
+            run_id=run_id, field_key=field_key, operation=ContextPurpose.EXTRACT,
+            graph_state=state)
+        span.set_attribute("context.status", bundle.status.value)
+        if bundle.status is not ContextStatus.READY:
+            return field_key, bundle, [], []
+        calls: list[dict] = []  # model calls made for this field (set in this task's context)
+        llm_call_log.set(calls)
+        claims = await gateway.extract(bundle, run_id=run_id, field_key=field_key)
+        wrong = sorted({c.field_key for c in claims if c.field_key != field_key})
+        if wrong:
+            raise ValueError(f"Gateway returned claims for {wrong} when extracting "
+                             f"{field_key!r}")
+        span.set_attribute("extraction.claims", len(claims))
+        return field_key, bundle, claims, calls
 
 def llm_usage(calls: list[dict]) -> dict[str, object]:
     """Model usage of one extraction for its trusted event: real model requests (a response

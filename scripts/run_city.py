@@ -1,6 +1,9 @@
 """Dev: run the graph inline for one city, no queue and no database writes.
 
 Usage: python scripts/run_city.py Toronto [--country Canada] [--fields a,b,c] [--no-acquire]
+           [--trace]
+--trace: trace this run in full (needs OBSERVABILITY__OTEL_ENABLED=true; sampled whatever
+OBSERVABILITY__SAMPLE_RATIO is).
 For a real, persisted run use the API + worker or scripts/vertical_slice_smoke.py.
 """
 
@@ -13,12 +16,23 @@ from water_source_research.agents.graph import build_graph
 from water_source_research.core.config import get_settings
 from water_source_research.discovery.service import build_discovery_service
 from water_source_research.llm.extraction import build_extraction_gateway
+from water_source_research.observability.otel import (
+    TRACE_REQUESTED, configure_telemetry, get_tracer, shutdown_telemetry,
+)
 from water_source_research.services.field_state import (
     initialize_city_state, select_fields, unresolved_fields,
 )
 
 async def main(city_name: str, country: str | None, fields: list[str] | None,
-               acquire: bool) -> None:
+               acquire: bool, trace: bool = False) -> None:
+    attrs = {"research.city": city_name, **({TRACE_REQUESTED: True} if trace else {})}
+    with get_tracer().start_as_current_span("research.run", attributes=attrs) as span:
+        await _main(city_name, country, fields, acquire)
+        print("trace_id:", f"{span.get_span_context().trace_id:032x}"
+              if span.get_span_context().trace_flags.sampled else "not sampled")
+
+async def _main(city_name: str, country: str | None, fields: list[str] | None,
+                acquire: bool) -> None:
     settings = get_settings()
     state = initialize_city_state(city_name, country)
     graph = build_graph(gateway=build_extraction_gateway(settings),
@@ -47,6 +61,12 @@ if __name__ == "__main__":
     parser.add_argument("--country", default=None)
     parser.add_argument("--fields", default=None, help="comma-separated field keys")
     parser.add_argument("--no-acquire", action="store_true", help="skip document acquisition")
+    parser.add_argument("--trace", action="store_true", help="trace this run in full")
     args = parser.parse_args()
     keys = select_fields([k.strip() for k in args.fields.split(",")] if args.fields else None)
-    asyncio.run(main(" ".join(args.city), args.country, keys, not args.no_acquire))
+    configure_telemetry("cli")
+    try:
+        asyncio.run(main(" ".join(args.city), args.country, keys, not args.no_acquire,
+                         args.trace))
+    finally:
+        shutdown_telemetry()

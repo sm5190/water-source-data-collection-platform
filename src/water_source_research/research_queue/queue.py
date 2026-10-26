@@ -27,7 +27,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from water_source_research.db.models import utcnow
 from water_source_research.db.research_models import ResearchJobRecord, ResearchRunStepRecord
-from water_source_research.observability.otel import get_tracer
+from opentelemetry import trace as otel_trace
+from opentelemetry.context import Context
+from water_source_research.observability.otel import TRACE_REQUESTED, get_tracer
+from water_source_research.observability.tracing import carrier
 from . import telemetry
 from .config import ResearchQueueSettings
 
@@ -71,6 +74,8 @@ class Job:
     # worker crashed or stalled): who held it and until when. Diagnostics only.
     reclaimed_from: str | None = None
     reclaimed_lease_until: datetime | None = None
+    trace_requested: bool = False  # selected for a full trace (our API/CLI only)
+    trace_context: dict[str, Any] | None = None  # W3C context the worker continues
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -106,7 +111,8 @@ class ResearchQueue:
 
     # --- producers ----------------------------------------------------------------------
 
-    def submit_reprocess(self, parent_run_id: str, priority: int = 0) -> SubmitResult:
+    def submit_reprocess(self, parent_run_id: str, priority: int = 0,
+                         trace: bool = False) -> SubmitResult:
         """Enqueue a REPROCESS of a finished run (same city and field subset). Returns the
         city's active run instead if there is one."""
         parent = self.get(parent_run_id)
@@ -116,14 +122,27 @@ class ResearchQueue:
             raise ValueError(f"run {parent_run_id} is {parent.status.value}; only SUCCEEDED "
                              "runs can be reprocessed")
         return self.submit(parent.city_name, parent.country, priority, parent.field_keys,
-                           mode="REPROCESS", parent_run_id=parent_run_id)
+                           mode="REPROCESS", parent_run_id=parent_run_id, trace=trace)
 
     def submit(self, city_name: str, country: str | None = None, priority: int = 0,
                field_keys: list[str] | None = None, mode: str = "RESEARCH",
-               parent_run_id: str | None = None) -> SubmitResult:
-        """Enqueue a city run (``field_keys``: optional, already-validated field subset)."""
+               parent_run_id: str | None = None, trace: bool = False) -> SubmitResult:
+        """Enqueue a city run (``field_keys``: optional, already-validated field subset).
+
+        ``trace=True`` selects the run for a full trace whatever the sampling ratio: the
+        submit span starts a new sampled trace (linked to the caller's span, e.g. the HTTP
+        request), and the worker continues it from the stored context."""
         key = city_key(city_name, country)
-        with get_tracer().start_as_current_span("research_queue.submit") as span:
+        if trace:
+            caller = otel_trace.get_current_span().get_span_context()
+            span_cm = get_tracer().start_as_current_span(
+                "research_queue.submit", context=Context(),
+                attributes={TRACE_REQUESTED: True},
+                links=[otel_trace.Link(caller)] if caller.is_valid else None)
+        else:
+            span_cm = get_tracer().start_as_current_span("research_queue.submit")
+        with span_cm as span:
+            stored = carrier(span)
             existing = self._active_for(key)
             if existing is None:
                 now = self.clock()
@@ -135,7 +154,8 @@ class ResearchQueue:
                                       priority=priority, max_attempts=self.s.max_attempts,
                                       available_at=now, created_at=now, updated_at=now,
                                       field_keys=list(field_keys) if field_keys else None,
-                                      mode=mode, parent_run_id=parent_run_id))
+                                      mode=mode, parent_run_id=parent_run_id,
+                                      trace_requested=trace, trace_context=stored))
                     job = self.get(run_id)
                     assert job is not None
                     result = SubmitResult(job, True)
@@ -259,6 +279,14 @@ class ResearchQueue:
         if n:
             telemetry.jobs_finished.add(1, {"status": JobStatus.AWAITING_REVIEW.value})
         return bool(n)
+
+    def set_trace_context(self, run_id: str, stored: dict[str, Any] | None) -> None:
+        """Point the next execution at a new parent context (e.g. a review resume)."""
+        if stored is None:
+            return
+        with Session(self.engine) as session, session.begin():
+            session.execute(update(J).where(J.run_id == run_id)
+                            .values(trace_context=stored))
 
     def resume_review(self, run_id: str, round_no: int) -> bool:
         """AWAITING_REVIEW (for this round) -> QUEUED with a fresh attempt budget. False if
@@ -424,7 +452,8 @@ def _job(r: ResearchJobRecord) -> Job:
                started_at=r.started_at, finished_at=r.finished_at,
                field_keys=list(r.field_keys) if r.field_keys else None,
                review_round=r.review_round or 0, completion=r.completion,
-               mode=r.mode or "RESEARCH", parent_run_id=r.parent_run_id)
+               mode=r.mode or "RESEARCH", parent_run_id=r.parent_run_id,
+               trace_requested=bool(r.trace_requested), trace_context=r.trace_context)
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

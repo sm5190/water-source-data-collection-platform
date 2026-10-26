@@ -132,3 +132,37 @@ def test_events_without_a_database_stay_in_the_local_file(tmp_path, probe):
     events.emit("JOB_RECLAIMED", "worker", run_id="r1")  # must not raise
     lines = (tmp_path / "logs" / "events" / "w.jsonl").read_text().splitlines()
     assert len(lines) == 1 and '"JOB_RECLAIMED"' in lines[0]
+
+class IncompleteCheckpoint:
+    """The real graph, except the first state read returns what a process killed before
+    LangGraph persisted its first steps leaves behind: values, no pending step, no finalize."""
+
+    def __init__(self, graph) -> None:
+        self.graph = graph
+        self.checkpointer = graph.checkpointer
+        self.first = True
+
+    async def aget_state(self, config):
+        if self.first:
+            self.first = False
+            from types import SimpleNamespace
+            return SimpleNamespace(next=(), values={"run_id": "x", "city_name": "Oslo"},
+                                   interrupts=(), config={})
+        return await self.graph.aget_state(config)
+
+    def astream(self, *args, **kwargs):
+        return self.graph.astream(*args, **kwargs)
+
+def test_unfinished_checkpoint_without_pending_steps_is_run_not_recorded(tmp_path, engine,
+                                                                        probe):
+    q = make_queue(engine)
+    run_id = q.submit("Oslo", "Norway").job.run_id
+    worker = make_worker(q, IncompleteCheckpoint(make_graph()), "w",
+                         events=sink(tmp_path, engine, "w"))
+    run(worker.drain())
+    assert q.get(run_id).status is JobStatus.SUCCEEDED
+    assert probe.acquire_calls[run_id] == 1  # the run really executed
+    assert q.result(run_id)["finalized"] is True
+    ev = by_kind(engine, run_id)
+    assert ev["CHECKPOINT_RECOVERY_ATTEMPTED"][0]["facts"]["restart_from_input"] is True
+    assert ev["JOB_RESUMED"][0]["facts"]["outcome"] == "SUCCEEDED"

@@ -32,4 +32,10 @@ if __name__ == "__main__":
     parser.add_argument("run_ids", nargs="+")
     parser.add_argument("--max-rounds", type=int, default=None)
     args = parser.parse_args()
-    sys.exit(run_async(main(args.run_ids, args.max_rounds)))
+    from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
+    configure_telemetry("replay")  # optional (OBSERVABILITY__OTEL_ENABLED)
+    try:
+        code = run_async(main(args.run_ids, args.max_rounds))
+    finally:
+        shutdown_telemetry()
+    sys.exit(code)

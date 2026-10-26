@@ -27,6 +27,7 @@ from water_source_research.agents.runtime import build_production_graph
 from water_source_research.core.config import get_settings
 from water_source_research.db.session import get_engine
 from water_source_research.llm.router import llm_requests_in_flight
+from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
 from water_source_research.observability.worker_events import (
     EventKind, atomic_write_json, build_sink,
 )
@@ -134,4 +135,10 @@ if __name__ == "__main__":
     log_dir = args.log_dir or Path(get_settings().observability.log_dir)
     instance = args.instance_id or f"{socket.gethostname()}-{os.getpid()}-{uuid4().hex[:6]}"
     configure_worker_logging(log_dir)
-    run_async(main(args.once, args.concurrency, log_dir, instance, args.supervisor_id))
+    # Tracing (optional, OBSERVABILITY__OTEL_ENABLED). A killed worker loses unexported
+    # spans; its crash evidence comes from the supervisor, not from traces.
+    configure_telemetry("worker", instance_id=instance)
+    try:
+        run_async(main(args.once, args.concurrency, log_dir, instance, args.supervisor_id))
+    finally:
+        shutdown_telemetry()

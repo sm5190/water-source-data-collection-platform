@@ -28,6 +28,8 @@ class RunCityRequest(BaseModel):
     priority: int = 0
     # Optional subset of field keys to research (e.g. a test run); omitted = all fields.
     field_keys: list[str] | None = None
+    # Select this run for a full trace (whatever OBSERVABILITY__SAMPLE_RATIO says).
+    trace: bool = False
 
     @field_validator("field_keys")
     @classmethod
@@ -68,19 +70,19 @@ def create_app(queue: ResearchQueue | None = None,
     @app.post("/research/city", status_code=202)
     async def submit_city(request: RunCityRequest):
         submitted = queue.submit(request.city_name, request.country, request.priority,
-                                 request.field_keys)
+                                 request.field_keys, trace=request.trace)
         body = {**submitted.job.public(), "created": submitted.created,
                 "status_url": f"/research/runs/{submitted.job.run_id}"}
         # 202 for a new run; 200 when an active run for this city already existed.
         return JSONResponse(body, status_code=202 if submitted.created else 200)
 
     @app.post("/research/runs/{run_id}/reprocess", status_code=202)
-    async def reprocess_run(run_id: str):
+    async def reprocess_run(run_id: str, trace: bool = False):
         """Re-run validation, resolution, review and assembly on a finished run's stored
         claims and evidence (a new run; no discovery, fetching or model calls). 200 with the
         city's active run if it already has one."""
         try:
-            submitted = queue.submit_reprocess(run_id)
+            submitted = queue.submit_reprocess(run_id, trace=trace)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
         except ValueError as exc:
@@ -115,6 +117,48 @@ def create_app(queue: ResearchQueue | None = None,
         # While awaiting review this is the state the run paused in (partial).
         return {"run_id": run_id, "partial": job.status is JobStatus.AWAITING_REVIEW,
                 **(queue.result(run_id) or {})}
+
+    def _trace_review_resume(job) -> None:
+        """The continuation after a review is its own trace (a review can take days),
+        linked to the run's earlier trace; the worker continues it."""
+        from opentelemetry.context import Context
+        from water_source_research.observability.otel import TRACE_REQUESTED, get_tracer
+        from water_source_research.observability.tracing import (
+            TraceStore, carrier, link_from,
+        )
+        try:
+            earlier = link_from(job.trace_context, **{"link.kind": "before_review"})
+            attrs = {"research.run_id": job.run_id, "review.round": job.review_round}
+            if job.trace_requested:
+                attrs[TRACE_REQUESTED] = True
+            with get_tracer().start_as_current_span(
+                    "research.review_resume", context=Context(), attributes=attrs,
+                    links=[earlier] if earlier else None) as span:
+                stored = carrier(span)
+                if stored:
+                    queue.set_trace_context(job.run_id, {**stored, "kind": "review_resume"})
+                TraceStore(queue.engine).record(job.run_id, "REVIEW_RESUME", span)
+        except Exception as exc:  # noqa: BLE001 - tracing never blocks a review
+            import logging
+            logging.getLogger(__name__).warning("review resume trace not recorded (%s)",
+                                                type(exc).__name__)
+
+    @app.get("/research/runs/{run_id}/traces")
+    async def get_traces(run_id: str):
+        """Trace ids of this run's submission, executions, recoveries and review resumes
+        (the run_id is the stable key; a resumed run may continue under a new trace)."""
+        from water_source_research.observability.tracing import TraceStore
+        job = queue.get(run_id)
+        if job is None:
+            raise HTTPException(404, "run not found")
+        ui = settings.observability.trace_ui_url.rstrip("/")
+        rows = TraceStore(queue.engine).list(run_id)
+        submit = (job.trace_context or {}).get("traceparent", "")
+        return {"run": job.public(), "trace_requested": job.trace_requested,
+                "submit_traceparent": submit or None,
+                "traces": [{**r, "created_at": r["created_at"].isoformat(),
+                            "url": f"{ui}/trace/{r['trace_id']}" if r["sampled"] else None}
+                           for r in rows]}
 
     @app.get("/research/runs/{run_id}/lifecycle")
     async def get_lifecycle(run_id: str):
@@ -365,6 +409,7 @@ def create_app(queue: ResearchQueue | None = None,
             raise HTTPException(409, {"undecided_items": undecided})
         if not queue.resume_review(run_id, job.review_round):
             raise HTTPException(409, "run is no longer waiting on this review round")
+        _trace_review_resume(job)
         resumed = queue.get(run_id)
         return {**resumed.public(), "resumed_by": body.reviewer} if resumed else {}
 
@@ -436,4 +481,12 @@ def _transition(ok: bool) -> dict:
         raise HTTPException(409, "version not in a state that allows this transition")
     return {"ok": True}
 
-app = create_app()
+def _instrument(application: FastAPI) -> FastAPI:
+    """Tracing for the API process when enabled (OBSERVABILITY__OTEL_ENABLED)."""
+    from water_source_research.observability.otel import configure_telemetry
+    if configure_telemetry("api") is not None:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(application, excluded_urls="health")
+    return application
+
+app = _instrument(create_app())

@@ -12,6 +12,7 @@ get ``shutdown_grace_seconds`` and are then released back to the queue.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import socket
@@ -20,9 +21,13 @@ from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 from langgraph.types import Command
+from opentelemetry.context import Context
 from opentelemetry.trace import Status, StatusCode
-from water_source_research.observability.otel import get_tracer
-from water_source_research.observability.worker_events import EventKind, EventSink
+from water_source_research.observability.otel import TRACE_REQUESTED, get_tracer
+from water_source_research.observability.tracing import (
+    TraceStore, ids, link, link_from, trusted_context,
+)
+from water_source_research.observability.worker_events import EventKind, EventSink, EventStore
 from water_source_research.services.field_state import initialize_city_state, unresolved_fields
 from water_source_research.services.reprocess import reprocess_input
 from . import telemetry
@@ -66,6 +71,7 @@ class ResearchWorker:
         # run_id -> live diagnostics (stage, attempt, recovery, last trace/span), published
         # in the heartbeat file that the supervisor reads when this process dies.
         self.active: dict[str, dict[str, Any]] = {}
+        self.traces = TraceStore(queue.engine)  # run -> trace ids (soft writes)
 
     def activity(self) -> dict[str, Any]:
         return {"active_runs": {k: dict(v) for k, v in self.active.items()},
@@ -152,16 +158,66 @@ class ResearchWorker:
                 facts = {"previous_owner": job.reclaimed_from,
                          "lease_until": job.reclaimed_lease_until.isoformat()
                          if job.reclaimed_lease_until else None}
-                await self._emit(EventKind.JOB_LEASE_EXPIRED, job, facts=facts)
-                await self._emit(EventKind.JOB_RECLAIMED, job,
-                                 facts={**facts, "new_owner": self.worker_id})
+                await self._before_run(job, self._emit(EventKind.JOB_LEASE_EXPIRED, job,
+                                                       facts=facts))
+                await self._before_run(job, self._emit(
+                    EventKind.JOB_RECLAIMED, job, facts={**facts, "new_owner": self.worker_id}))
             await self._execute_traced(job)
         finally:
             self.active.pop(job.run_id, None)
 
+    async def _before_run(self, job: Job, awaitable: Any) -> Any:
+        """Bookkeeping before the run starts: a shutdown arriving now still hands the job
+        back (as the run's own cancellation handling does)."""
+        try:
+            return await awaitable
+        except asyncio.CancelledError:
+            await asyncio.to_thread(self.queue.release, job.run_id, self.worker_id)
+            raise
+
+    def _trace_parent(self, job: Job) -> tuple[Context, list | None, str]:
+        """Where this execution's ``research.run`` span hangs: the first execution continues
+        the context stored at submit (or review resume); later ones (retry, reclaim after a
+        crash) start a new trace linked to that context and to the previous attempt."""
+        stored = job.trace_context or {}
+        previous = None
+        with contextlib.suppress(Exception):
+            previous = self.traces.latest(job.run_id, ("RUN", "RECOVERY"))
+        kind = "RECOVERY" if job.reclaimed_from else "RUN"
+        if stored and not stored.get("consumed"):
+            parent = trusted_context(stored)
+            if parent is not None:
+                with contextlib.suppress(Exception):
+                    self.queue.set_trace_context(job.run_id, {**stored, "consumed": True})
+                return parent, None, kind
+        links = [lk for lk in (
+            link_from(stored, **{"link.kind": stored.get("kind", "submit")}),
+            link(previous["trace_id"], previous["span_id"], **{"link.kind": "previous_attempt"})
+            if previous else None) if lk is not None]
+        return Context(), links or None, kind
+
+    def _last_interruption(self, run_id: str) -> dict[str, Any] | None:
+        """The supervisor's record of the worker death that interrupted this run, if any."""
+        with contextlib.suppress(Exception):
+            hits = [e for e in EventStore(self.queue.engine).events(run_id=run_id)
+                    if e["kind"] == EventKind.JOB_INTERRUPTED]
+            return hits[-1] if hits else None
+        return None
+
     async def _execute_traced(self, job: Job) -> None:
         tracer = get_tracer()
-        with tracer.start_as_current_span("research.run") as span:
+        parent, links, kind = await self._before_run(
+            job, asyncio.to_thread(self._trace_parent, job))
+        attributes: dict[str, Any] = {"research.run_id": job.run_id}
+        if job.trace_requested:
+            attributes[TRACE_REQUESTED] = True  # selected run: sampled whatever the ratio
+        with tracer.start_as_current_span("research.run", context=parent, links=links,
+                                          attributes=attributes) as span:
+            trace_id, span_id, _ = ids(span)
+            self.active.setdefault(job.run_id, {}).update(trace_id=trace_id, span_id=span_id)
+            await self._before_run(job, asyncio.to_thread(
+                self.traces.record, job.run_id, kind, span, attempt=job.attempts,
+                instance_id=self.worker_id))
             span.set_attribute("research.run_id", job.run_id)
             span.set_attribute("research_queue.attempt", job.attempts)
             span.set_attribute("research_queue.worker_id", self.worker_id)
@@ -197,26 +253,56 @@ class ResearchWorker:
         """(final values, resumed from a checkpoint, review round the graph paused on)."""
         config = {"configurable": {"thread_id": job.run_id}}
         snapshot = await self.graph.aget_state(config)
+        log.info("run %s attempt %d: checkpoint next=%s, has_values=%s", job.run_id,
+                 job.attempts, list(snapshot.next), bool(snapshot.values))
         if snapshot.next:
             paused = paused_round(snapshot)
             if paused is not None and paused > job.review_round:
                 # Paused earlier but never recorded as waiting (crash): park it again.
                 return dict(snapshot.values), True, paused
             telemetry.runs_resumed.add(1)
+            recovery_span = contextlib.nullcontext()
             if paused is None:  # a crashed or failed attempt, not a review resume
                 self.active.setdefault(job.run_id, {})["recovery"] = True
-                await self._emit(EventKind.CHECKPOINT_RECOVERY_ATTEMPTED, job, facts={
-                    "next_nodes": list(snapshot.next),
-                    "checkpoint_id": (snapshot.config or {}).get("configurable", {})
-                    .get("checkpoint_id"),
-                    "reclaimed_from": job.reclaimed_from})
+                crash = await asyncio.to_thread(self._last_interruption, job.run_id)
+                crashed = link(crash.get("trace_id"), crash.get("span_id"),
+                               **{"link.kind": "interrupted_attempt"}) if crash else None
+                recovery_span = get_tracer().start_as_current_span(
+                    "research.recovery", links=[crashed] if crashed else None,
+                    attributes={"research.run_id": job.run_id,
+                                "research.recovery.next_nodes": list(snapshot.next),
+                                "research.recovery.reclaimed_from": job.reclaimed_from or "",
+                                "research.recovery.crash_event_id":
+                                    (crash or {}).get("event_id") or ""})
             # Resumed review round (the node reads the decisions from the database), or a
             # run that crashed/failed mid-graph: continue from the checkpoint.
             graph_input = Command(resume={"round": paused}) if paused is not None else None
-            final = await self._stream(job, graph_input, config, dict(snapshot.values))
+            with recovery_span as rspan:
+                if paused is None:
+                    await self._emit(EventKind.CHECKPOINT_RECOVERY_ATTEMPTED, job, facts={
+                        "next_nodes": list(snapshot.next),
+                        "checkpoint_id": (snapshot.config or {}).get("configurable", {})
+                        .get("checkpoint_id"),
+                        "reclaimed_from": job.reclaimed_from,
+                        "recovery_trace_id": ids(rspan)[0],
+                        "recovery_span_id": ids(rspan)[1]})
+                final = await self._stream(job, graph_input, config, dict(snapshot.values))
             return dict(final.values), True, paused_round(final)
-        if snapshot.values:  # graph finished but the job was never marked complete
+        if snapshot.values and snapshot.values.get("finalized"):
+            # The graph finished but the job was never marked complete: just record it.
             return dict(snapshot.values), True, None
+        if snapshot.values:
+            # A checkpoint with values but no pending step and no finalize: the process died
+            # before LangGraph persisted its first steps (checkpoints are written
+            # asynchronously). Nothing is resumable, and this is not a finished run: start
+            # over from the run's input on the same thread.
+            log.warning("run %s: checkpoint has no pending step and the run never finalized; "
+                        "restarting it from its input", job.run_id)
+            self.active.setdefault(job.run_id, {})["recovery"] = True
+            await self._emit(EventKind.CHECKPOINT_RECOVERY_ATTEMPTED, job, facts={
+                "next_nodes": [], "restart_from_input": True,
+                "reason": "checkpoint without pending steps and not finalized",
+                "reclaimed_from": job.reclaimed_from})
         graph_input = await asyncio.to_thread(self._input_for, job)
         final = await self._stream(job, graph_input, config, {})
         return dict(final.values), False, paused_round(final)

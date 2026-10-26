@@ -27,6 +27,7 @@ dependencies = [
   "pypdfium2>=4.30",
   "openpyxl>=3.1",
   "psutil>=6.0",
+  "opentelemetry-instrumentation-fastapi>=0.66b1",
 ]
 
 [project.optional-dependencies]

@@ -11,7 +11,7 @@ heartbeat and resource sample only), so its size is bounded by the number of sta
 
 from datetime import datetime
 from typing import Any
-from sqlalchemy import DateTime, Index, Integer, String
+from sqlalchemy import Boolean, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from .models import Base, JSONType, utcnow
 
@@ -51,3 +51,20 @@ class WorkerEventRecord(Base):
     cause_confidence: Mapped[str | None] = mapped_column(String(16))
     rationale: Mapped[str | None] = mapped_column(String(2000))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class RunTraceRecord(Base):
+    """Which traces a run's executions produced (run_id stays the stable key; each attempt,
+    recovery and review resume may be its own trace). Written when the span
+    starts, so the ids survive even if the process dies before the span is exported."""
+
+    __tablename__ = "run_traces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(24))  # SUBMIT | RUN | RECOVERY | REVIEW_RESUME
+    attempt: Mapped[int | None] = mapped_column(Integer)
+    trace_id: Mapped[str] = mapped_column(String(32), index=True)
+    span_id: Mapped[str] = mapped_column(String(16))
+    sampled: Mapped[bool] = mapped_column(Boolean, default=False)
+    instance_id: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

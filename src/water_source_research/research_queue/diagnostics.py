@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import IO, Any
 import psutil
 from water_source_research.observability.evidence import commit_memory
+from water_source_research.observability.otel import TraceContextFilter
 from water_source_research.observability.worker_events import atomic_write_json, safe_name
 
 log = logging.getLogger("research_worker.diagnostics")
@@ -42,16 +43,21 @@ def configure_worker_logging(log_dir: Path, level: int = logging.INFO) -> Path:
     global _FAULT_FILE
     log_dir.mkdir(parents=True, exist_ok=True)
     path = log_dir / f"worker-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{os.getpid()}.log"
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+    # trace/span ids of the current span ('-' outside one or with tracing off): log lines
+    # can be matched to traces.
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s "
+                            "[trace=%(trace_id)s span=%(span_id)s] %(message)s")
     root = logging.getLogger()
     root.setLevel(level)
     file_handler = logging.FileHandler(path, mode="a", encoding="utf-8")
     file_handler.setFormatter(fmt)
+    file_handler.addFilter(TraceContextFilter())
     root.addHandler(file_handler)
     if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
                for h in root.handlers):
         stream = logging.StreamHandler()
         stream.setFormatter(fmt)
+        stream.addFilter(TraceContextFilter())
         root.addHandler(stream)
     # Native crashes (access violations, fatal errors) write their traceback here.
     _FAULT_FILE = open(path, "a", encoding="utf-8")  # noqa: SIM115 (kept open for faulthandler)

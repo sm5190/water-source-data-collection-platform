@@ -204,18 +204,24 @@ class SemanticJudge:
         unavailable or failed (the cell then needs a person; failures are not cached)."""
         if self.llm is None:
             return None
-        key = x.cache_key(self.provider, self.model)
-        cached = self.store.get(key)
-        if cached is not None:
-            return {**cached, "cached": True}
-        try:
-            self.calls += 1
-            j = self.llm.structured(SYSTEM, user_prompt(x), Judgment)
-        except LLMError as exc:
-            self.errors.append(f"{exc.kind.value}: {exc}"[:300])
-            return None
-        return {**self.store.put(key, x, j, map_verdict(j), self.provider, self.model),
-                "cached": False}
+        from water_source_research.observability.otel import get_tracer
+        with get_tracer().start_as_current_span("evaluation.judge") as span:
+            span.set_attribute("research.field_key", x.field_key)
+            key = x.cache_key(self.provider, self.model)
+            cached = self.store.get(key)
+            span.set_attribute("evaluation.judge_cached", cached is not None)
+            if cached is not None:
+                return {**cached, "cached": True}
+            try:
+                self.calls += 1
+                j = self.llm.structured(SYSTEM, user_prompt(x), Judgment)
+            except LLMError as exc:
+                self.errors.append(f"{exc.kind.value}: {exc}"[:300])
+                span.set_attribute("evaluation.judge_error", exc.kind.value)
+                return None
+            out = self.store.put(key, x, j, map_verdict(j), self.provider, self.model)
+            span.set_attribute("evaluation.verdict", str(out.get("verdict") or ""))
+            return {**out, "cached": False}
 
 def build_judge(engine: Engine, settings: Any = None) -> SemanticJudge:
     """The judge on the configured LLM provider; unavailable (not an error) without

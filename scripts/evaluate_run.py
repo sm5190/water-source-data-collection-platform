@@ -121,4 +121,10 @@ def compare(engine, args) -> int:
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
+    configure_telemetry("evaluation")  # optional (OBSERVABILITY__OTEL_ENABLED)
+    try:
+        code = main()
+    finally:
+        shutdown_telemetry()
+    sys.exit(code)

@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 from water_source_research.discovery.normalize import canonical_url
+from water_source_research.observability.otel import get_tracer
+from water_source_research.observability.tracing import safe_url
 from water_source_research.schemas.research import EvidenceChunk
 from water_source_research.services.evidence import chunk_document
 from .artifacts import ArtifactStore
@@ -155,7 +157,18 @@ class AcquisitionService:
         global _FETCHES_IN_FLIGHT
         _FETCHES_IN_FLIGHT += 1
         try:
-            return await self._fetch_one_counted(c)
+            with get_tracer().start_as_current_span("acquisition.fetch_document") as span:
+                span.set_attribute("acquisition.url", safe_url(c.get("url")))
+                span.set_attribute("acquisition.source_type", str(c.get("source_type") or ""))
+                record, doc, response = await self._fetch_one_counted(c)
+                span.set_attribute("acquisition.status", record["status"])
+                if record.get("error_kind"):
+                    span.set_attribute("acquisition.error_kind", record["error_kind"])
+                if record.get("byte_size") is not None:
+                    span.set_attribute("acquisition.bytes", record["byte_size"])
+                if record.get("acquisition_method"):
+                    span.set_attribute("acquisition.method", record["acquisition_method"])
+                return record, doc, response
         finally:
             _FETCHES_IN_FLIGHT -= 1
 
@@ -202,6 +215,16 @@ class AcquisitionService:
         return record, doc, response
 
     def _parse(self, r: FetchedResponse) -> AcquiredDocument:
+        with get_tracer().start_as_current_span("acquisition.parse_document") as span:
+            span.set_attribute("acquisition.media_type", (r.content_type or "")[:80])
+            span.set_attribute("acquisition.bytes", len(r.body))
+            doc = self._parse_body(r)
+            span.set_attribute("acquisition.method", doc.acquisition_method or "")
+            if doc.pages is not None:
+                span.set_attribute("acquisition.pages", len(doc.pages))
+            return doc
+
+    def _parse_body(self, r: FetchedResponse) -> AcquiredDocument:
         ctype = r.content_type.lower()
         if is_pdf(r.body, ctype):
             if len(r.body) > self.s.max_pdf_bytes:

@@ -84,8 +84,11 @@ class DiscoveryService:
                 calls.extend(await self._related(seeds, queries))
 
             found = [r for c in calls for r in c.results]
-            ranked = merge_and_rank(found, city, max_per_host=s.max_results_per_host,
-                                    limit=s.max_candidates_per_round)
+            with get_tracer().start_as_current_span("discovery.rank_results") as rank_span:
+                ranked = merge_and_rank(found, city, max_per_host=s.max_results_per_host,
+                                        limit=s.max_candidates_per_round)
+                rank_span.set_attribute("discovery.results_in", len(found))
+                rank_span.set_attribute("discovery.candidates_out", len(ranked))
             if self.crossref and s.crossref_verify_top_n > 0:
                 verify = await self._verify(ranked, queries)
                 if verify:

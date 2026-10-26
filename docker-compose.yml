@@ -33,6 +33,34 @@ services:
     restart: unless-stopped
     profiles: ["discovery"]
 
+  # Tracing (optional): docker compose --profile observability up -d
+  # The research processes export to the collector (OTLP :4317) only when
+  # OBSERVABILITY__OTEL_ENABLED=true; Jaeger UI on http://localhost:16686.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.130.0
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    volumes:
+      - ./config/otel/collector.yaml:/etc/otelcol/collector.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    mem_limit: 300m
+    depends_on: [jaeger]
+    restart: unless-stopped
+    profiles: ["observability"]
+
+  jaeger:
+    image: jaegertracing/jaeger:2.8.0
+    command: ["--config=/etc/jaeger/jaeger.yaml"]
+    volumes:
+      - ./config/otel/jaeger.yaml:/etc/jaeger/jaeger.yaml:ro
+    ports:
+      - "16686:16686"
+    mem_limit: 512m
+    restart: unless-stopped
+    profiles: ["observability"]
+
 volumes:
   postgres_data:
   minio_data:

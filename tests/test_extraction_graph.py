@@ -203,7 +203,8 @@ def test_spans_cover_every_context_phase_with_correct_nesting(spans):
         pid = by_name[name].parent.span_id
         return next(s.name for s in finished if s.context.span_id == pid)
 
-    assert parent("context.get_context") == "graph.extract"
+    assert parent("extraction.field") == "graph.extract"
+    assert parent("context.get_context") == "extraction.field"
     assert parent("context.load_state") == "context.get_context"
     assert parent("context.bundle_create") == "context.get_context"
     assert parent("context_manager.build") == "context.bundle_create"

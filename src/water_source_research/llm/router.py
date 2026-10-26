@@ -211,6 +211,12 @@ class ReliableStructuredLLM:
             finally:
                 stats.flush()
 
+    def _request_span(self, attempt: int, stats: "_CallStats"):
+        """One HTTP request to the provider (child of ``llm.call``; retries are siblings)."""
+        span = get_tracer().start_as_current_span("llm.request", record_exception=False,
+                                                  set_status_on_exception=False)
+        return _RequestSpan(span, attempt, stats.repairs)
+
     def _cached(self, key: str, schema: type[T], stats: "_CallStats") -> T | None:
         cached = self.cache.get(key)
         stats.cache_hit = cached is not None
@@ -223,15 +229,17 @@ class ReliableStructuredLLM:
         for attempt in range(attempts):
             self.limiter.acquire(self.sleep)
             started = self.clock()
-            try:
-                return stats.record(self.backend.complete(messages, schema),
-                                    self.clock() - started)
-            except LLMError as exc:
-                if not stats.failed(exc) or attempt == attempts - 1:
-                    raise
-                retry_after = exc.retry_after
-            finally:
-                self.limiter.release()
+            with self._request_span(attempt, stats) as span:
+                try:
+                    return _ok(span, stats.record(self.backend.complete(messages, schema),
+                                                  self.clock() - started))
+                except LLMError as exc:
+                    _failed(span, exc)
+                    if not stats.failed(exc) or attempt == attempts - 1:
+                        raise
+                    retry_after = exc.retry_after
+                finally:
+                    self.limiter.release()
             self.sleep(self._backoff(attempt, retry_after))
         raise AssertionError("unreachable")
 
@@ -241,15 +249,18 @@ class ReliableStructuredLLM:
         for attempt in range(attempts):
             await self.limiter.aacquire(self.asleep)
             started = self.clock()
-            try:
-                return stats.record(await self.backend.acomplete(messages, schema),
-                                    self.clock() - started)
-            except LLMError as exc:
-                if not stats.failed(exc) or attempt == attempts - 1:
-                    raise
-                retry_after = exc.retry_after
-            finally:
-                self.limiter.release()
+            with self._request_span(attempt, stats) as span:
+                try:
+                    return _ok(span, stats.record(
+                        await self.backend.acomplete(messages, schema),
+                        self.clock() - started))
+                except LLMError as exc:
+                    _failed(span, exc)
+                    if not stats.failed(exc) or attempt == attempts - 1:
+                        raise
+                    retry_after = exc.retry_after
+                finally:
+                    self.limiter.release()
             await self.asleep(self._backoff(attempt, retry_after))
         raise AssertionError("unreachable")
 
@@ -282,6 +293,36 @@ class ReliableStructuredLLM:
         if retry_after is not None:
             return min(retry_after, cap)
         return self.jitter() * min(cap, self.settings.backoff_base_seconds * 2 ** attempt)
+
+class _RequestSpan:
+    def __init__(self, cm, attempt: int, repair: int) -> None:
+        self.cm, self.attempt, self.repair = cm, attempt, repair
+
+    def __enter__(self):
+        span = self.cm.__enter__()
+        span.set_attribute("llm.attempt", self.attempt + 1)
+        span.set_attribute("llm.repair_turn", self.repair)
+        return span
+
+    def __exit__(self, *exc):
+        return self.cm.__exit__(*exc)
+
+def _ok(span, completion: Completion) -> Completion:
+    if completion.prompt_tokens is not None:
+        span.set_attribute("llm.prompt_tokens", completion.prompt_tokens)
+    if completion.completion_tokens is not None:
+        span.set_attribute("llm.completion_tokens", completion.completion_tokens)
+    return completion
+
+def _failed(span, exc: LLMError) -> None:
+    from opentelemetry.trace import Status, StatusCode
+    span.set_attribute("llm.error", exc.kind.value)
+    span.set_attribute("llm.retryable", exc.retryable)
+    if exc.status is not None:
+        span.set_attribute("http.status_code", exc.status)
+    if exc.retry_after is not None:
+        span.set_attribute("llm.retry_after_s", exc.retry_after)
+    span.set_status(Status(StatusCode.ERROR, exc.kind.value))
 
 class _CallStats:
     """Per-call telemetry, written to the ``llm.call`` span (provider/model/tokens/latency)."""

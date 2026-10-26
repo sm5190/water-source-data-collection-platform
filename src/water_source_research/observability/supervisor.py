@@ -154,6 +154,7 @@ class WorkerProcess:
     killed_by_supervisor: str | None = None
     heartbeat_missing: bool = False
     real_pid: int | None = None  # the interpreter under a venv launcher, once seen
+    heartbeat_seen: bool = False
     facts: dict[str, Any] = field(default_factory=dict)
 
 class Supervisor:
@@ -322,6 +323,8 @@ class Supervisor:
         hb = read_json(heartbeat_path(self.log_dir, w.instance_id)) or {}
         if w.real_pid is None:
             w.real_pid = self._worker_pid(w, hb) if hb else None
+        if hb.get("at"):
+            w.heartbeat_seen = True
         age = _age_seconds(hb.get("at"))
         if age is None:  # no heartbeat yet: count from the start
             age = self.clock() - w.started
@@ -344,7 +347,9 @@ class Supervisor:
             self.sink.emit(EventKind.HEARTBEAT_RESTORED, "supervisor",
                            supervisor_id=self.supervisor_id, instance_id=w.instance_id,
                            pid=w.proc.pid, facts={"heartbeat_age_seconds": round(age, 1)})
-        if self.s.kill_on_stall and age > self.s.stall_kill_seconds \
+        # Only a worker that was running (it sent a heartbeat) and then went silent: a
+        # process still starting up is not stalled.
+        if self.s.kill_on_stall and w.heartbeat_seen and age > self.s.stall_kill_seconds \
                 and w.killed_by_supervisor is None:
             self._kill(w, "stall")
 
@@ -359,6 +364,8 @@ class Supervisor:
     def _kill(self, w: WorkerProcess, reason: str) -> None:
         """Kill the whole process tree (a venv launcher runs the real interpreter as a
         child on Windows; killing only the launcher would leave the worker running)."""
+        if w.proc.poll() is not None:
+            return  # it already ended on its own: not killed by us
         w.killed_by_supervisor = reason
         log.warning("killing worker %s (%s)", w.instance_id, reason)
         with contextlib.suppress(psutil.Error):

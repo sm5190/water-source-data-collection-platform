@@ -4,6 +4,7 @@ Everything here is optional: with the defaults no telemetry backend is needed, a
 crash evidence (supervisor + local event files) works with no tracing at all.
 """
 
+from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 class ObservabilitySettings(BaseModel):
@@ -28,6 +29,22 @@ class ObservabilitySettings(BaseModel):
     stop_grace_seconds: float = Field(default=60.0, ge=0)  # graceful stop, then kill
     kill_on_stall: bool = False  # kill a worker whose heartbeat stopped (opt-in)
     stall_kill_seconds: float = Field(default=900.0, gt=0)
+
+    # --- tracing (Phase 2) ---------------------------------------------------------------
+    otel_enabled: bool = False  # off: no provider is installed, spans are no-ops
+    trace_exporter: Literal["otlp", "file", "none"] = "otlp"
+    otlp_endpoint: str = ""  # "" = top-level OTEL_EXPORTER_OTLP_ENDPOINT
+    # Root sampling ratio for ordinary runs. A run submitted with trace=true is always
+    # sampled in full; external trace headers can never force sampling.
+    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    environment: str = "local"
+    span_queue_size: int = Field(default=2048, ge=64)  # bounded: spans beyond are dropped
+    span_batch_size: int = Field(default=512, ge=1)
+    export_timeout_seconds: float = Field(default=5.0, gt=0)
+    trace_file: str = ""  # file exporter path ("" = <log_dir>/traces/<service>-<pid>.jsonl)
+    trace_file_max_mb: float = Field(default=20.0, gt=0)
+    trace_file_backups: int = Field(default=3, ge=0)
+    trace_ui_url: str = "http://localhost:16686"  # Jaeger UI (links in /research/runs/…/traces)
 
     @model_validator(mode="after")
     def _validate(self) -> "ObservabilitySettings":
