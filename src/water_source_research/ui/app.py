@@ -14,6 +14,7 @@ import streamlit as st
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.ui.client import ApiError, ResearchApiClient
 from water_source_research.ui.evaluation import render_evaluation
+from water_source_research.ui.monitoring import render_monitoring
 from water_source_research.ui.review import render_simple_review
 
 ACTIVE = {"QUEUED", "RUNNING"}
@@ -38,8 +39,10 @@ with st.sidebar:
     reviewer = " ".join(st.text_input(
         "Your name", key="reviewer",
         help="Recorded with each review decision. Kept for this browser session.").split())
-    mode = st.radio("Mode", ["Research", "Evaluation"], horizontal=True, key="mode",
-                    help="Evaluation compares saved research runs with the reference workbook")
+    mode = st.radio("Mode", ["Research", "Evaluation", "Monitoring"], horizontal=True,
+                    key="mode",
+                    help="Evaluation compares saved research runs with the reference workbook; "
+                         "Monitoring shows run health, workers, model usage and alerts")
 client: Any = st.session_state.get("client") or ResearchApiClient(api_url)
 
 with st.sidebar:
@@ -61,6 +64,9 @@ with st.sidebar:
 
 if mode == "Evaluation":
     render_evaluation(client, reviewer)
+    st.stop()
+if mode == "Monitoring":
+    render_monitoring(client)
     st.stop()
 
 st.title("💧 Water Source Research")
