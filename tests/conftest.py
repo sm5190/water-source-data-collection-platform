@@ -40,3 +40,11 @@ def metric_points(_tracer_provider):
                         out.setdefault(m.name, []).append((dict(p.attributes), value))
         return out
     return collect
+
+@pytest.fixture(autouse=True)
+def _no_live_semantic_judge(monkeypatch):
+    """No test reaches a real LLM through the evaluation's semantic judge (the real .env may
+    hold a VT key): the default judge is unavailable unless a test injects its own."""
+    from water_source_research.evaluation import judge
+    monkeypatch.setattr(judge, "build_judge", lambda engine, settings=None: judge.SemanticJudge(
+        None, judge.JudgmentStore(engine), descriptions={}, unavailable="disabled in tests"))

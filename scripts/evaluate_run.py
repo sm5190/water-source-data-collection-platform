@@ -4,7 +4,10 @@ research data is only read). Each invocation stores a new evaluation run.
     uv run python scripts/evaluate_run.py <research_run_id> [--dataset <version>] [--out dir]
 
 Prints per-field results (RAW / AUTO / FINAL), diagnoses and the main metrics with their
-numerators and denominators. --out writes the full evaluation as JSON.
+numerators and denominators. --out writes the full evaluation as JSON. Cells the deterministic
+comparison can't decide (descriptions, name variants) go to the semantic judge on the configured
+LLM provider (cached in eval_judgments; provisional until a person verifies them); --no-judge
+keeps the evaluation fully deterministic.
 
     uv run python scripts/evaluate_run.py --compare-manual tests/evaluation/toronto_manual_findings.yaml
         [--eval-run <id>] [--out dir]
@@ -19,6 +22,7 @@ import sys
 from pathlib import Path
 from water_source_research.db.session import get_engine
 from water_source_research.evaluation.evaluate import run_evaluation
+from water_source_research.evaluation.judge import build_judge
 from water_source_research.evaluation.manual import compare_manual, load_findings, manual_markdown
 from water_source_research.evaluation.report import effective
 from water_source_research.evaluation.store import EvaluationStore
@@ -33,14 +37,20 @@ def main() -> int:
                         help="YAML manual findings to check the evaluation against")
     parser.add_argument("--eval-run", default=None,
                         help="with --compare-manual: the evaluation to check")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="deterministic comparison only (no semantic LLM judge)")
     args = parser.parse_args()
     engine = get_engine()
     if args.compare_manual:
         return compare(engine, args)
     if not args.run_id:
         parser.error("run_id is required (unless --compare-manual)")
+    judge = None if args.no_judge else build_judge(engine)
+    if judge is not None and judge.llm is None:
+        print(f"semantic judge unavailable ({judge.unavailable}): undecided cells will need "
+              "a person")
     try:
-        eval_id = run_evaluation(engine, args.run_id, args.dataset)
+        eval_id = run_evaluation(engine, args.run_id, args.dataset, judge=judge)
     except LookupError as exc:
         print(f"cannot evaluate: {exc}")
         return 2
@@ -90,7 +100,8 @@ def compare(engine, args) -> int:
         (r["id"] for r in store.runs(run_id) if r["status"] == "COMPLETED"), None)
     if eval_id is None:
         try:
-            eval_id = run_evaluation(engine, run_id, args.dataset)
+            eval_id = run_evaluation(engine, run_id, args.dataset,
+                                     judge=None if args.no_judge else build_judge(engine))
         except LookupError as exc:
             print(f"cannot evaluate: {exc}")
             return 2

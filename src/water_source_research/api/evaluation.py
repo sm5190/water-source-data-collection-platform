@@ -3,6 +3,7 @@ evidence checks, diagnoses, metrics, adjudication and reports. Reads research da
 writes it. Results, diagnoses and metrics are served with adjudications applied
 (`evaluation/report.py::effective`); the as-evaluated values stay alongside."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, get_args
 from fastapi import APIRouter, HTTPException, Response
@@ -11,7 +12,9 @@ from sqlalchemy import Engine
 from water_source_research.core.paths import REPO_ROOT
 from water_source_research.evaluation.compare import Status
 from water_source_research.evaluation.diagnosis import ROOT_CAUSES
+from water_source_research.evaluation import judge as judge_module
 from water_source_research.evaluation.evaluate import run_evaluation
+from water_source_research.evaluation.judge import SemanticJudge
 from water_source_research.evaluation.reference import import_reference
 from water_source_research.evaluation.report import REPORT_KINDS, effective, overview, render
 from water_source_research.evaluation.store import EvaluationStore
@@ -25,6 +28,7 @@ class ImportRequest(BaseModel):
 class EvaluateRequest(BaseModel):
     research_run_id: str
     dataset_id: str | None = None
+    semantic: bool = True  # use the semantic judge for undecided cells
 
 class AdjudicationRequest(BaseModel):
     target: Literal["FIELD_RESULT", "DIAGNOSIS"]
@@ -41,8 +45,14 @@ FIELD_DECISIONS = {"CONFIRM_MATCH", "CONFIRM_MISMATCH", "AMBIGUOUS", "REFERENCE_
 DIAGNOSIS_DECISIONS = {"CORRECT_DIAGNOSIS", "CONFIRM_DIAGNOSIS"}
 STATUSES = set(get_args(Status))
 
-def evaluation_router(engine: Engine, store: EvaluationStore | None = None) -> APIRouter:
+def evaluation_router(engine: Engine, store: EvaluationStore | None = None,
+                      judge_factory: Callable[[], SemanticJudge | None] | None = None
+                      ) -> APIRouter:
+    """``judge_factory``: builds the semantic judge per evaluation (default: the configured
+    LLM provider; ``lambda: None`` = deterministic only)."""
     store = store or EvaluationStore(engine)
+    if judge_factory is None:
+        judge_factory = lambda: judge_module.build_judge(engine)
     router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
     @router.get("/references")
@@ -68,7 +78,9 @@ def evaluation_router(engine: Engine, store: EvaluationStore | None = None) -> A
     @router.post("/runs", status_code=201)
     async def evaluate(body: EvaluateRequest):
         try:
-            eval_id = run_evaluation(engine, body.research_run_id, body.dataset_id)
+            judge = judge_factory() if body.semantic else None
+            eval_id = run_evaluation(engine, body.research_run_id, body.dataset_id,
+                                     judge=judge)
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
         return store.run(eval_id)

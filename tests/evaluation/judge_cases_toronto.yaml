@@ -1,0 +1,168 @@
+# Labelled cases for checking the semantic judge (evaluation/judge.py) before its results are
+# trusted. Used by scripts/judge_calibration.py (live model; opt-in) and, for well-formedness
+# only, by tests/evaluation/test_judge.py.
+#
+# STATUS: DRAFT. The labels were drafted on 2026-10-25 from the manual Toronto comparison
+# (tests/evaluation/toronto_manual_findings.yaml) and the standardization rules. They must be
+# reviewed by a researcher: set `confirmed: true` per case (or correct `expected`) and fill in
+# `labels_confirmed_by`. Until every case is confirmed and the calibration passes, semantic
+# matching is NOT validated and the dashboard says so. Never edit a label to match the judge.
+#
+# kind: toronto = real values from Toronto run 8ad1fa90 vs the workbook's Toronto row;
+#       contrast = constructed pairs that test one rule of the methodology.
+# expected: MATCH | PARTIAL_MATCH | MISMATCH | NEEDS_REVIEW (after the deterministic caps).
+labels_confirmed_by: null
+pass_criteria:
+  min_agreement: 0.9          # share of confirmed cases where the judge gives `expected`
+  max_false_equivalence: 0    # cases expected MISMATCH that the judge calls MATCH
+cases:
+  - id: toronto-utility-same
+    kind: toronto
+    field: utility_name
+    manual: Toronto Water
+    automated: Toronto Water
+    quote: Toronto Water is the City of Toronto division that provides drinking water
+    expected: MATCH
+    confirmed: false
+    why: identical names (sanity check)
+
+  - id: toronto-utility-division-name
+    kind: contrast
+    field: utility_name
+    manual: City of Toronto Water Division
+    automated: Toronto Water
+    quote: Toronto Water is the City of Toronto division that provides drinking water
+    expected: MATCH
+    confirmed: false
+    why: the quote states Toronto Water is the City of Toronto's water division
+
+  - id: toronto-source-word-order
+    kind: contrast
+    field: water_source
+    manual: Lake Ontario
+    automated: Ontario Lake
+    quote: Toronto draws its drinking water from Lake Ontario
+    expected: MATCH
+    confirmed: false
+    why: the same water body written in a different word order; the quote names it
+
+  - id: toronto-source-different-lake
+    kind: contrast
+    field: water_source
+    manual: Lake Ontario
+    automated: Lake Simcoe
+    quote: Several York Region communities draw water from Lake Simcoe
+    expected: MISMATCH
+    confirmed: false
+    why: a different water body
+
+  - id: toronto-jurisdiction-long-form
+    kind: contrast
+    field: jurisdiction
+    manual: Ontario
+    automated: Province of Ontario
+    quote: the Province of Ontario's Safe Drinking Water Act
+    expected: MATCH
+    confirmed: false
+    why: the same province, official long form
+
+  - id: toronto-infrastructure-partial
+    kind: toronto
+    field: infrastructure_notes
+    manual: lake intake, intake pipe, treatment plant, pumping station, storage reservoir, elevated storage tank, trunk watermain, distribution main
+    automated: >-
+      toronto water manages a comprehensive water-supply infrastructure that includes intake
+      pipes located 1-5 km offshore in lake ontario, screens to remove large debris, a
+      multi-barrier treatment system that uses chemically assisted filtration (coagulation,
+      flocculation, granular media filtration) to remove particles including micro-plastics.
+      the system treats, transmits, stores, distributes drinking water to residents
+    quote: intake pipes located 1-5 km offshore in Lake Ontario
+    expected: PARTIAL_MATCH
+    confirmed: false
+    why: intakes and treatment overlap; pumping stations, storage and watermains are missing
+
+  - id: toronto-water-quality-treated-vs-raw
+    kind: toronto
+    field: water_quality_notes
+    manual: freshwater lake source, offshore intakes, seasonal taste and odor risk, turbidity monitoring
+    automated: >-
+      Toronto Water conducts laboratory testing for water quality standards and continuous
+      monitoring, including bacteriological testing up to 6,000 times a year, uses chlorine to
+      control bacteria, algae and viruses, ensures compliance with provincial Drinking Water
+      Regulations, and reports that water leaving the treatment plants does not contain lead
+    quote: water leaving the treatment plants does not contain lead
+    expected: MISMATCH
+    confirmed: false
+    why: treated (finished) drinking-water testing, not raw source-water quality
+
+  - id: toronto-seasonal-taste-not-use
+    kind: toronto
+    field: seasonal_uses
+    manual: Peak Demand Periods
+    automated: >-
+      Earthy or musty smell or taste can occur in late summer or early fall and can be caused
+      by naturally occurring algae and high water temperatures in Lake Ontario
+    quote: Earthy or musty smell or taste can occur in late summer or early fall
+    expected: MISMATCH
+    confirmed: false
+    why: a taste and odour event is not a seasonal pattern of use
+
+  - id: contrast-transfer-sewer-tunnel
+    kind: contrast
+    field: water_transfer_system
+    manual: Colorado River Aqueduct
+    automated: Coxwell Bypass Tunnel
+    quote: The Coxwell Bypass Tunnel will capture combined sewer overflows and stormwater
+    expected: MISMATCH
+    confirmed: false
+    why: a sewer/stormwater tunnel is not an interbasin drinking-water transfer
+
+  - id: contrast-infrastructure-wastewater
+    kind: contrast
+    field: infrastructure_notes
+    manual: lake intake, intake pipe, treatment plant
+    automated: combined sewer overflow tunnel, wastewater treatment plant, outfall
+    quote: the Ashbridges Bay wastewater treatment plant and its outfall
+    expected: MISMATCH
+    confirmed: false
+    why: wastewater infrastructure is not drinking-water conveyance infrastructure
+
+  - id: contrast-raw-quality-paraphrase
+    kind: contrast
+    field: water_quality_notes
+    manual: low turbidity, agricultural runoff influence
+    automated: The lake water entering the intakes is usually clear but is affected by runoff from nearby farmland
+    quote: the raw lake water is usually clear but is affected by runoff from nearby farmland
+    expected: MATCH
+    confirmed: false
+    why: the same two raw-water characteristics in different words
+
+  - id: contrast-infrastructure-subset
+    kind: contrast
+    field: infrastructure_notes
+    manual: lake intake, treatment plant, pumping station
+    automated: intake crib in the lake, water treatment plant
+    quote: water enters an intake crib in the lake and flows to the water treatment plant
+    expected: PARTIAL_MATCH
+    confirmed: false
+    why: intake and treatment plant agree; the pumping station is missing
+
+  - id: contrast-country-different
+    kind: contrast
+    field: country
+    manual: Canada
+    automated: United States of America
+    quote: ""
+    expected: MISMATCH
+    confirmed: false
+    why: different countries (sanity check)
+
+# Cases the judge must never see: the hard rules decide them deterministically. The calibration
+# script checks they are not eligible (evaluation/judge.py::eligible).
+never_judged:
+  - {id: toronto-population-service-area, field: city_population_millions, status: SCOPE_MISMATCH,
+     why: "3.6M is Toronto plus parts of York and Peel (service area), not the city"}
+  - {id: toronto-withdrawal-2010-vs-2024, field: total_city_water_withdrawals_m3_day,
+     status: TEMPORAL_MISMATCH, why: "an estimated 2010 figure vs the 2024 reported value"}
+  - {id: toronto-transfer-na, field: water_transfer_system, status: MISMATCH,
+     tags: [VALUE_WHERE_NOT_APPLICABLE], why: "the workbook says N/A; a value where N/A is a rule decision"}

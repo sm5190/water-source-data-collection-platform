@@ -139,3 +139,23 @@ class EvalMetricRecord(Base):
     denominator: Mapped[float | None] = mapped_column(Float)
     value: Mapped[float | None] = mapped_column(Float)
     detail: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)  # exclusions
+
+class EvalJudgmentRecord(Base):
+    """A semantic (LLM) judgment of whether an automated value means the same as the manual
+    one, with its exact inputs, model and prompt version. Shared cache: the same inputs under
+    the same prompt and model are judged once. Provisional until a person adjudicates the
+    evaluation result that uses it."""
+
+    __tablename__ = "eval_judgments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cache_key: Mapped[str] = mapped_column(String(64), unique=True)
+    field_key: Mapped[str] = mapped_column(String(128), index=True)
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(128))
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    output: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    verdict: Mapped[str] = mapped_column(String(24))
+    status: Mapped[str] = mapped_column(String(24))  # comparison status after the caps
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

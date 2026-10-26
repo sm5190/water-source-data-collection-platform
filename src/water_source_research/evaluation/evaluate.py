@@ -19,6 +19,7 @@ from water_source_research.services.review import OFFICIAL_DEFAULT, proposal_key
 from .compare import Comparison, Prediction, compare, entity_keys
 from .diagnosis import Diagnoser
 from .evidence import check_evidence
+from .judge import JUDGE_PROMPT_VERSION, SemanticJudge, eligible
 from .metrics import compute_metrics
 from .policy import ComparePolicy, load_policy
 from .reference import ReferenceCity, ReferenceRecord, ReferenceValue
@@ -51,7 +52,10 @@ INSTRUMENTATION_GAPS = [
 
 def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
                       fields: Mapping[str, FieldDefinition] | None = None,
-                      policy: ComparePolicy | None = None) -> dict[str, Any]:
+                      policy: ComparePolicy | None = None,
+                      judge: SemanticJudge | None = None) -> dict[str, Any]:
+    """``judge``: the semantic judge for cells the deterministic comparison can't decide
+    (None = deterministic only)."""
     fields = fields or load_field_definitions()
     policy = policy or load_policy()
     stages = ["RAW", "PROPOSED", "AUTO"] + (["FINAL"] if has_final(snap) else [])
@@ -93,6 +97,7 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
                             "field_key": d.key, **r,
                             "reference": _ref_dict(ref)})
 
+    judge_info = apply_judge(results, judge, snap) if judge is not None else None
     diagnoser = Diagnoser(snap, fields, policy)
     diagnoses = []
     by_cell: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
@@ -109,7 +114,63 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
     metrics = compute_metrics(results, diagnoses, evidence, snap, fields)
     return {"stages": stages, "pairing": pairing, "results": results,
             "diagnoses": diagnoses, "evidence": evidence, "metrics": metrics,
-            "gaps": INSTRUMENTATION_GAPS, "evaluated_at": datetime.now(UTC).isoformat()}
+            "gaps": INSTRUMENTATION_GAPS, "evaluated_at": datetime.now(UTC).isoformat(),
+            "judge": judge_info}
+
+# --- semantic judge ---------------------------------------------------------------------------
+
+JUDGED_STAGES = ("PROPOSED", "AUTO", "FINAL")
+
+def apply_judge(results: list[dict[str, Any]], judge: SemanticJudge,
+                snap: dict[str, Any]) -> dict[str, Any]:
+    """Refine undecided cells (``judge.eligible``) with the semantic judge, in place. The
+    deterministic status is kept next to the judged one; a cell the judge couldn't decide
+    (model unavailable or failed) needs a person (NEEDS_REVIEW)."""
+    claims = {c["claim_uid"]: c for c in snap["claims"] if c.get("claim_uid")}
+    judged = unavailable = 0
+    for r in results:
+        if r["stage"] not in JUDGED_STAGES or not eligible(r):
+            continue
+        p, ref = r["predicted"], r["reference"]
+        uids = p.get("selected_claim_uids") or p.get("claim_uids") or []
+        selected = [claims[u] for u in uids if u in claims]
+        year = p.get("reference_year") or next(
+            (claim_prediction(c).reference_year for c in selected), None)
+        x = judge.make_input(
+            r["field_key"], _text(ref.get("raw") if ref.get("raw") not in (None, "")
+                                  else ref.get("normalized")),
+            ref.get("reference_year"), _text(p.get("value")), year,
+            [x["quote"] for c in selected for x in c.get("citations") or [] if x.get("quote")])
+        j = judge.judge(x)
+        cmp = dict(r["comparison"] or {})
+        cmp["deterministic_status"] = r["status"]
+        if j is None:
+            unavailable += 1
+            reason = judge.unavailable or (judge.errors[-1] if judge.errors else "model error")
+            cmp.update(status="NEEDS_REVIEW", tags=[*cmp.get("tags", []), "SEMANTIC_UNAVAILABLE"],
+                       detail=f"semantic check unavailable ({reason}); needs a person")
+        else:
+            judged += 1
+            out = j["output"]
+            cmp.update(status=j["status"], judgment_id=j["judgment_id"],
+                       detail=out["justification"],
+                       judgment={k: out[k] for k in (
+                           "verdict", "overlapping_facts", "missing_facts", "differing_facts",
+                           "same_meaning_of_measure", "same_geographic_scope",
+                           "same_reporting_period", "justification")}
+                       | {"model": j["model"], "provider": j["provider"],
+                          "prompt_version": j["prompt_version"], "cached": j["cached"]})
+        r["comparison"] = cmp
+        r["status"] = cmp["status"]
+    return {"prompt_version": JUDGE_PROMPT_VERSION, "provider": judge.provider,
+            "model": judge.model, "judged": judged, "unavailable_cells": unavailable,
+            "new_calls": judge.calls, "errors": judge.errors[-5:],
+            "unavailable": judge.unavailable}
+
+def _text(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    return "" if value is None else str(value)
 
 # --- cells and pairing -----------------------------------------------------------------------
 
@@ -407,7 +468,8 @@ def _run_level_findings(snap: dict[str, Any], pairing: dict[str, Any]) -> list[d
     return out
 
 def run_evaluation(engine, research_run_id: str, dataset_id: str | None = None,
-                   policy: ComparePolicy | None = None) -> str:
+                   policy: ComparePolicy | None = None,
+                   judge: SemanticJudge | None = None) -> str:
     """Snapshot the research run (read-only), evaluate it against the reference dataset
     (default: the latest one containing its city) and store a new evaluation run."""
     from .store import EvaluationStore
@@ -424,10 +486,11 @@ def run_evaluation(engine, research_run_id: str, dataset_id: str | None = None,
     city = ds.city(run["city_name"], run["country"])
     if city is None:
         raise LookupError(f"reference dataset {dataset_id} has no {run['city_name']}")
-    evaluation = evaluate_snapshot(snap, city, policy=policy)
+    evaluation = evaluate_snapshot(snap, city, policy=policy, judge=judge)
     origin = (snap.get("origin") or snap["run"])["run_id"]
     return store.save_run(research_run_id, origin, dataset_id, city.city_key, snap,
                           snapshot_sha256(snap), evaluation, policy.version,
                           config={"reference_policy": ds.policy_version,
                                   "snapshot_version": snap["version"],
-                                  "pairing": evaluation["pairing"]})
+                                  "pairing": evaluation["pairing"],
+                                  "judge": evaluation["judge"]})

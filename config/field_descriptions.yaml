@@ -1,0 +1,39 @@
+# Plain definitions of the 32 standardized fields, from "Water Source Standardization Rules -
+# Polished.pdf" (kept outside the repo). Used by evaluation only: the semantic judge
+# (evaluation/judge.py) reads them to decide whether two values mean the same thing for the
+# field. Kept apart from field_definitions.yaml so research caches (context bundles) don't change.
+# Changing a description changes judge inputs: bump JUDGE_PROMPT_VERSION in evaluation/judge.py.
+version: 1
+fields:
+  city_name: "Name of the city being served."
+  jurisdiction: "State, province or most relevant sub-national jurisdiction the city is located in (common English name)."
+  country: "Country where the city is located (common English name)."
+  city_latitude: "Latitude of the city's epicenter, decimal degrees."
+  city_longitude: "Longitude of the city's epicenter, decimal degrees."
+  city_population_millions: "Total population of the city itself, in millions. Not a metropolitan, regional or utility service-area population."
+  city_population_reference_year: "Year the city population estimate refers to."
+  utility_reported_city_population_millions: "Population of the city as reported by the city's utility, in millions."
+  utility_reported_city_population_reference_year: "Year of the utility-reported city population."
+  population_served_millions: "Population served by this specific water source, in millions."
+  percentage_total_population: "Share of the city population served by this source (percent)."
+  utility_name: "The utility that operates the water supply system for the city. Different names for the same organization (official name, division name, common short name) are the same utility; a different organization is not."
+  water_source: "Name of the specific natural water source supplying the city: a river, natural lake, aquifer or sea/ocean (not a reservoir). 'Reclaimed' for wastewater recycling. The same water body written differently (word order, 'Lake X' vs 'X Lake') is the same source; a different water body is not."
+  water_system: "Broader river basin, aquifer system or supply system the source comes from: for surface water the HydroBASINS level-02 HYBAS_ID; for groundwater the aquifer name; 'Reclaimed' for recycled water."
+  water_type: "Source category: Surface, Groundwater, Reclaimed or Desalination."
+  water_transfer_system: "Name of an interbasin water transfer (IBT) project or imported drinking-water supply (e.g. an aqueduct bringing water from another basin). Sewer, stormwater or wastewater tunnels are NOT water transfer systems. N/A when the city has no such transfer."
+  seasonal_uses: "Whether the source is relied on more in certain months or seasons (e.g. peak summer use, drought backup source, used mainly in dry season). 'None Reported' if no seasonal pattern is reported. Water-quality or taste/odour events are not seasonal uses."
+  reservoir_names: "Reservoir(s) the city directly receives water from or that control the city's water source. N/A if the source is not reservoir-based."
+  pod_latitude: "Latitude of the point of diversion or intake, decimal degrees (WGS84)."
+  pod_longitude: "Longitude of the point of diversion or intake, decimal degrees (WGS84)."
+  pod_coordinate_method: "How the point-of-diversion coordinates were obtained: Utility Source, Reported Database, Visual Estimation, Pour Point Estimation or City Epicenter."
+  infrastructure_notes: "Major drinking-water conveyance infrastructure that brings the source water to the city, including the point-of-diversion infrastructure: e.g. intake, dam, aqueduct, canal, tunnel, well, infiltration gallery, pipeline, pump station, treatment plant. A list of elements, not sentences. Wastewater or sewer infrastructure is not drinking-water infrastructure."
+  total_city_water_withdrawals_m3_day: "Total daily water withdrawals for the whole city, cubic metres per day, for the most current year reported."
+  total_city_water_withdrawals_year: "Year the total city water withdrawal refers to."
+  past_total_city_water_withdrawals: "Earlier reported total daily withdrawals for the city, as 'year: m3/day' pairs, most recent first. Each pair is a fact: a different year or a different value is a different fact."
+  source_withdrawal_contribution_m3_day: "Daily volume contributed by this specific water source, cubic metres per day."
+  source_withdrawal_contribution_year: "Year of the source's withdrawal contribution."
+  source_withdrawal_contribution_method: "How the source contribution was determined: Reported Daily, Reported Annually, Remainder Allocated or Unknown."
+  source_withdrawal_percentage: "Share of total city water volume contributed by this source (percent)."
+  water_quality_notes: "Key RAW (source) water quality characteristics relevant to treatment or source condition, e.g. low turbidity, high salinity, agricultural runoff influence, industrial contamination risk, pristine upland source. Finished/treated drinking-water quality (test results after treatment, compliance of tap water) is NOT raw-water quality."
+  water_quality_year: "Year the water quality notes refer to."
+  references: "Online sources used to populate the row."
