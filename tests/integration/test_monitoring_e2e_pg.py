@@ -47,6 +47,7 @@ def env(monkeypatch, tmp_path):
     values = {
         "DATABASE_URL": URL, "OBSERVABILITY__LOG_DIR": str(tmp_path / "logs"),
         "OBSERVABILITY__OTEL_ENABLED": "true", "OBSERVABILITY__TRACE_EXPORTER": "otlp",
+        "OBSERVABILITY__USAGE_LEDGER": "true",  # off in the test session (conftest)
         "OBSERVABILITY__OTLP_ENDPOINT": "http://127.0.0.1:1",  # nothing listens here
         "OBSERVABILITY__COLLECTOR_HEALTH_URL": "http://127.0.0.1:1/",
         "OBSERVABILITY__JAEGER_API_URL": "http://127.0.0.1:1",

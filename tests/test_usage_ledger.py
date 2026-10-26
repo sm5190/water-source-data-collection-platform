@@ -118,3 +118,14 @@ def test_database_outage_never_fails_a_call(tmp_path):
 def test_no_recorder_means_no_rows_and_no_error():
     usage.set_recorder(None)
     make_llm(Server(chat_json({"value": "x"}))).structured("s", "u", Answer)
+
+def test_importing_the_api_never_starts_the_ledger():
+    """Regression: building the module-level app at import (as tests do) must not point the
+    process-wide ledger at the configured database; it starts only when the app is served."""
+    import importlib
+    from water_source_research.api import main
+    usage.set_recorder(None)
+    importlib.reload(main)
+    assert usage.recorder() is None
+    assert any(getattr(h, "__name__", "") == "start_usage_ledger"
+               for h in main.app.router.on_startup)

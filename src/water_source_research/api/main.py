@@ -486,14 +486,20 @@ def _transition(ok: bool) -> dict:
 def _instrument(application: FastAPI) -> FastAPI:
     """Tracing for the API process when enabled (OBSERVABILITY__OTEL_ENABLED)."""
     from water_source_research.observability.otel import configure_telemetry
-    try:  # judge calls made by API-triggered evaluations go to the usage ledger
-        from water_source_research.db.session import get_engine
-        from water_source_research.observability.usage import configure_usage
-        configure_usage(get_engine())
-    except Exception as exc:  # noqa: BLE001 - monitoring never stops the API
-        import logging
-        logging.getLogger(__name__).warning("usage ledger not started (%s)",
-                                            type(exc).__name__)
+
+    def start_usage_ledger() -> None:
+        """Only when the app is actually served (not when the module is imported, e.g. by
+        tests): judge calls of API-triggered evaluations go to the usage ledger."""
+        try:
+            from water_source_research.db.session import get_engine
+            from water_source_research.observability.usage import configure_usage
+            configure_usage(get_engine())
+        except Exception as exc:  # noqa: BLE001 - monitoring never stops the API
+            import logging
+            logging.getLogger(__name__).warning("usage ledger not started (%s)",
+                                                type(exc).__name__)
+
+    application.router.on_startup.append(start_usage_ledger)
     if configure_telemetry("api") is not None:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         FastAPIInstrumentor.instrument_app(application, excluded_urls="health")

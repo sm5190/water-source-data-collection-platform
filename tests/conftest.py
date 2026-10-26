@@ -9,6 +9,10 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 # Keyed prompt hashes in tests use a fixed key (no key file is written under logs/).
 os.environ.setdefault("OBSERVABILITY__HASH_KEY", "test-hash-key")
+# No process-wide usage ledger in tests: it would write mocked calls to the configured
+# (real) database. Ledger tests build their own recorder on a test database; the end-to-end
+# test turns it back on for its worker processes, on the test database.
+os.environ["OBSERVABILITY__USAGE_LEDGER"] = "false"
 
 _EXPORTER = InMemorySpanExporter()
 _METRIC_READER = InMemoryMetricReader()
