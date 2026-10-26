@@ -123,9 +123,15 @@ class ModelScript:
                         if " ".join(a["quote"].split()) in " ".join(text.split())), None)
             if sid is None:
                 continue
-            claims.append({"value": a["value"], "value_status": "KNOWN",
-                           "value_origin": "REPORTED", "confidence": a["confidence"],
-                           "citations": [{"source_id": sid, "quote": a["quote"]}]})
+            claim = {"value": a["value"], "value_status": "KNOWN",
+                     "value_origin": "REPORTED", "confidence": a["confidence"],
+                     "citations": [{"source_id": sid, "quote": a["quote"]}]}
+            if field in ("water_source", "reservoir_names"):
+                claim["source_kind"] = a.get("source_kind", "lake" if field == "water_source"
+                                             else "reservoir")
+                claim["relations"] = [{**r, "source_id": sid}
+                                      for r in a.get("relations", [])]
+            claims.append(claim)
         return chat_json({"claims": claims})
 
 def malformed(_prompt: str) -> httpx2.Response:

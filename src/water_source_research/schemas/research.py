@@ -57,6 +57,9 @@ class FieldDefinition(BaseModel):
     # When nothing was found, the city catalog or the methodology's derivations fill the gap,
     # so "nothing found" is not a review item (conflicting/uncertain claims still are).
     gap_filled_by: Literal["catalog", "rules"] | None = None
+    # Plain definition from the standardization methodology (config/field_descriptions.yaml):
+    # shown to the extraction model and the evaluation judge.
+    definition: str | None = None
 
     @model_validator(mode="after")
     def _default_scope(self) -> "FieldDefinition":
@@ -83,6 +86,12 @@ class ClaimValidation(BaseModel):
     def result_of(self, code: str) -> CheckResult | None:
         return next((c.result for c in self.checks if c.code == code), None)
 
+# What a water-source value names (standardization rules: Water Source = a natural source,
+# Reclaimed, or desalinated sea water; reservoirs, systems and regions are other fields).
+SOURCE_KINDS = ("river", "lake", "spring", "aquifer", "wellfield", "sea", "reclaimed",
+                "desalination", "general_groundwater", "reservoir", "supply_system", "region",
+                "category")
+
 class ClaimQualifiers(BaseModel):
     """Context that decides whether two claims describe the same measurement."""
 
@@ -96,6 +105,12 @@ class ClaimQualifiers(BaseModel):
     # Discovery round whose extraction produced the claim (1 = first pass; later rounds are
     # re-extractions on new evidence). Provenance only: never part of the claim's identity.
     extraction_round: int | None = None
+    # water_source / reservoir_names: what kind of thing the value names (SOURCE_KINDS), and
+    # relationships the evidence states, each with its verbatim quote and source URL, e.g.
+    # {"relation": "on_river", "target": "San Jacinto River", "quote": "...", "url": "..."}.
+    # Never inferred from names or geography.
+    source_kind: str | None = None
+    relations: list[dict[str, Any]] = Field(default_factory=list)
 
 class FieldClaim(BaseModel):
     field_key: str
@@ -138,6 +153,9 @@ class EntityResolution(BaseModel):
     # Reviewer decisions are never recomputed by the rules.
     decided_by: Literal["RULES", "REVIEWER"] = "RULES"
     review_decision_id: int | None = None
+    # water_source entities: relationships to other source entities stated in the evidence
+    # ({"relation", "target_entity_key", "quote", "url"}); both entities are kept.
+    relations: list[dict[str, Any]] = Field(default_factory=list)
     note: str | None = None  # reviewer's reason (e.g. why Unknown / N/A)
 
 class FieldResolution(BaseModel):

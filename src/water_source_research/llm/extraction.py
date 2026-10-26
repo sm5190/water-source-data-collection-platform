@@ -18,7 +18,9 @@ from water_source_research.context_manager import ContextBundle, ContextStatus
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.observability.otel import get_tracer
 from water_source_research.schemas.common import ValueOrigin, ValueStatus
-from water_source_research.schemas.research import EvidenceRef, FieldClaim, FieldDefinition
+from water_source_research.schemas.research import (
+    SOURCE_KINDS, ClaimQualifiers, EvidenceRef, FieldClaim, FieldDefinition,
+)
 from water_source_research.services.field_state import load_field_definitions
 from .base import AsyncStructuredLLM, LLMError, LLMErrorKind
 from .gateway import LLMGateway, UnconfiguredGateway
@@ -91,14 +93,34 @@ def value_type(field: FieldDefinition) -> Any:
     return Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
                                             max_length=2000)]
 
+SOURCE_FIELDS = frozenset({"water_source", "reservoir_names"})
+RELATIONS = ("on_river", "on_lake", "fed_by", "part_of_system", "drawn_from")
+MAX_RELATIONS = 4
+
 def response_model(field: FieldDefinition, source_ids: list[str]) -> type[BaseModel]:
-    """Response schema for one call: citations may only name ``source_ids``."""
+    """Response schema for one call: citations may only name ``source_ids``. Source fields
+    also state what kind of thing each value names, and relationships the evidence states
+    (each with its own verbatim quote)."""
+    quote = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                             max_length=600)]
     citation = create_model(
         "Citation", __base__=_Strict,
         source_id=(_choice(source_ids), ...),
-        quote=(Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
-                                                max_length=600)], ...),
+        quote=(quote, ...),
     )
+    extra: dict[str, Any] = {}
+    if field.key in SOURCE_FIELDS:
+        relation = create_model(
+            "Relation", __base__=_Strict,
+            relation=(_choice(list(RELATIONS)), ...),
+            target=(Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                                     max_length=200)], ...),
+            source_id=(_choice(source_ids), ...),
+            quote=(quote, ...),
+        )
+        extra = {"source_kind": (_choice(list(SOURCE_KINDS)), ...),
+                 "relations": (Annotated[_list_of(relation), Field(max_length=MAX_RELATIONS)],
+                               [])}
     claim = create_model(
         "Claim", __base__=_ClaimBase,
         value=(value_type(field) | None, ...),
@@ -107,6 +129,7 @@ def response_model(field: FieldDefinition, source_ids: list[str]) -> type[BaseMo
         confidence=(Annotated[float, Field(ge=0, le=1)], ...),
         citations=(Annotated[_list_of(citation), Field(min_length=1,
                                                         max_length=MAX_CITATIONS)], ...),
+        **extra,
     )
     return create_model("ExtractionResponse", __base__=_Strict,
                         claims=(Annotated[_list_of(claim), Field(max_length=MAX_CLAIMS)], ...))
@@ -165,6 +188,10 @@ def user_prompt(bundle: ContextBundle, field: FieldDefinition,
     kind = f"one of: {' | '.join(field.allowed)}" if field.allowed else field.type
     lines = [bundle.render(), "", "## Instructions",
              f"Target field: {field.key} ({kind})."]
+    if field.definition:
+        lines.append(f"Definition (standardization rules): {field.definition}")
+    if field.key in SOURCE_INSTRUCTIONS:
+        lines.append(SOURCE_INSTRUCTIONS[field.key])
     if field.keywords:
         lines.append("Related terms: " + ", ".join(field.keywords) + ".")
     if field.multi_valued:
@@ -174,6 +201,23 @@ def user_prompt(bundle: ContextBundle, field: FieldDefinition,
     lines.append("Cite only these sources: " + ", ".join(sorted(passages, key=_source_order))
                  + ".")
     return "\n".join(lines)
+
+SOURCE_INSTRUCTIONS = {
+    "water_source": (
+        "For each claim set source_kind: river, lake, spring, aquifer, wellfield, sea, "
+        "reclaimed or desalination for a water source as defined above; general_groundwater "
+        "when the evidence only reports unnamed groundwater or local wells; reservoir, "
+        "supply_system, region or category when the passage names one of those instead of a "
+        "natural source (still report it, with that kind: a person will review it). Name each "
+        "source separately (\"the Bengo and Cuanza Rivers\" is two claims; \"springs of A, B "
+        "and C\" is one claim per named spring area). Add a relation only when the quoted "
+        "text states it (e.g. a reservoir \"on the X River\": relation on_river, target "
+        "\"X River\", with that quote); never infer one from names or geography."),
+    "reservoir_names": (
+        "For each claim set source_kind (reservoir, or lake for a natural lake used as "
+        "storage). Add a relation (on_river, on_lake, fed_by, part_of_system) only when the "
+        "quoted text states it; never infer one from names or geography."),
+}
 
 def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[str, Any]],
                   passages: Mapping[str, str]) -> tuple[list[FieldClaim], int, int]:
@@ -198,11 +242,23 @@ def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[s
         if not evidence:
             rejected_claims += 1
             continue
+        qualifiers = None
+        if field_key in SOURCE_FIELDS:
+            relations = []
+            for r in raw.get("relations") or []:
+                sid = r["source_id"]
+                if _normalize(r["quote"]) not in normalized.get(sid, ""):
+                    rejected_citations += 1  # a relation must be stated in its quote
+                    continue
+                relations.append({"relation": r["relation"], "target": r["target"],
+                                  "quote": r["quote"], "url": bundle.sources[sid].url})
+            qualifiers = ClaimQualifiers(source_kind=raw.get("source_kind"),
+                                         relations=relations)
         claims.append(FieldClaim(
             field_key=field_key, value=raw["value"],
             value_status=ValueStatus(raw["value_status"]),
             value_origin=ValueOrigin(raw["value_origin"]),
-            confidence=raw["confidence"], evidence=evidence,
+            confidence=raw["confidence"], evidence=evidence, qualifiers=qualifiers,
         ))
     return claims, rejected_citations, rejected_claims
 

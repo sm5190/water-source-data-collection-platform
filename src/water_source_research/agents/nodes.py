@@ -312,6 +312,8 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
                     c.qualifiers = q.model_copy(update={"extraction_round": extraction_round})
                 fs = research.fields[field_key]
                 fs.candidate_claims.extend(new_claims)
+                if field_key == "water_source":
+                    _keep_reservoirs(research, new_claims, state, events)
                 if fs.status is FieldResolutionStatus.UNRESOLVED:
                     fs.status = FieldResolutionStatus.CANDIDATE
                     events = append_event(events, kind=EventKind.FIELD_TRANSITION,
@@ -333,6 +335,27 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
         }
 
     return extract_node
+
+def _keep_reservoirs(research: CityResearchState, claims: list[FieldClaim],
+                     state: GraphState, events: list[dict]) -> None:
+    """A reservoir named as a water source stays a water_source candidate (for review, never
+    converted) and is also a reservoir_names candidate with the same evidence and stated
+    relations, when that field is researched."""
+    researched = set(state.get("unresolved_fields") or research.fields)
+    target = research.fields.get("reservoir_names")
+    if target is None or "reservoir_names" not in researched:
+        return
+    for c in claims:
+        if not c.qualifiers or c.qualifiers.source_kind != "reservoir":
+            continue
+        copy = c.model_copy(deep=True, update={"field_key": "reservoir_names",
+                                                "claim_uid": None})
+        if any(str(x.value).casefold() == str(copy.value).casefold()
+               for x in target.candidate_claims):
+            continue
+        target.candidate_claims.append(copy)
+        if target.status is FieldResolutionStatus.UNRESOLVED:
+            target.status = FieldResolutionStatus.CANDIDATE
 
 async def _extract_field(
     context_service: ContextService,

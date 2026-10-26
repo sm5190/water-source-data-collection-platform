@@ -16,6 +16,7 @@ import hashlib
 import json
 import math
 import re
+from urllib.parse import urlsplit
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -290,8 +291,11 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     claim = claim.model_copy(update={"original_value": original, "value": original})
     uid = claim.claim_uid or claim_uid(claim)
     checks = _Checks()
+    previous = claim.qualifiers
     qualifiers = ClaimQualifiers(
-        extraction_round=claim.qualifiers.extraction_round if claim.qualifiers else None)
+        extraction_round=previous.extraction_round if previous else None,
+        source_kind=previous.source_kind if previous else None,
+        relations=list(previous.relations) if previous else [])
     normalized: Any = None
 
     if definition is None:
@@ -319,7 +323,102 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     _check_reference_year(claim, definition, normalized, quotes, located, checks, qualifiers,
                           current_year)
     _check_dependencies(claim, definition, normalized, research, checks, qualifiers)
+    if definition.key in SOURCE_FIELDS and claim.value_status is ValueStatus.KNOWN:
+        _check_source_kind(claim, definition, qualifiers, checks)
+    _check_out_of_area(located, research, checks)
     return _finish(claim, uid, normalized, qualifiers, checks)
+
+# --- water sources: kinds per the standardization rules ---------------------------------------
+
+SOURCE_FIELDS = frozenset({"water_source", "reservoir_names"})
+# Valid Water Source values (methodology): natural water bodies, Reclaimed, desalinated sea.
+NATURAL_SOURCE_KINDS = frozenset({"river", "lake", "spring", "aquifer", "wellfield", "sea",
+                                  "reclaimed", "desalination"})
+_RESERVOIR_WORD = re.compile(r"\b(reservoirs?|dams?|impoundments?)\b", re.IGNORECASE)
+_GENERAL_WORDS = re.compile(r"^\W*(?:local\s+|municipal\s+|private\s+|shallow\s+|deep\s+)*"
+                            r"(?:groundwater|ground\s+water|wells?|boreholes?|surface\s+water)"
+                            r"\b", re.IGNORECASE)
+
+def infer_source_kind(value: Any) -> str | None:
+    """A kind only where the wording is explicit (claims extracted before kinds existed);
+    otherwise None: a value is never rejected for lacking a proper noun."""
+    text = str(value or "").strip()
+    if text.casefold() == "reclaimed":
+        return "reclaimed"
+    if _RESERVOIR_WORD.search(text) and not re.search(r"\b(river|lake|spring|aquifer)\b",
+                                                       text, re.IGNORECASE):
+        return "reservoir"
+    if _GENERAL_WORDS.match(text):
+        return "general_groundwater" if re.search(r"ground|well|bore", text, re.IGNORECASE) \
+            else "category"
+    return None
+
+def _check_source_kind(claim: FieldClaim, d: FieldDefinition, qualifiers: ClaimQualifiers,
+                       checks: _Checks) -> None:
+    kind = qualifiers.source_kind or infer_source_kind(claim.value)
+    qualifiers.source_kind = kind
+    if d.key == "reservoir_names":
+        if kind not in (None, "reservoir", "lake"):
+            checks.add("SOURCE_KIND", CheckResult.WARN, f"named as a {kind}, not a reservoir")
+        else:
+            checks.add("SOURCE_KIND", CheckResult.PASS, kind or "unspecified")
+        return
+    if kind is None or kind in NATURAL_SOURCE_KINDS:
+        checks.add("SOURCE_KIND", CheckResult.PASS, kind or "unspecified")
+    elif kind == "general_groundwater":
+        checks.add("SOURCE_KIND", CheckResult.WARN,
+                   "a general groundwater description (allowed when no named aquifer is "
+                   "reported; confirm)")
+    else:
+        checks.add("SOURCE_KIND", CheckResult.WARN,
+                   f"a {kind.replace('_', ' ')} is not a Water Source under the methodology "
+                   "(reservoirs go to Reservoir Name(s); basins/systems to Water System)")
+
+# --- out-of-area documents ------------------------------------------------------------------
+
+US_STATES = {"alabama": "al", "alaska": "ak", "arizona": "az", "arkansas": "ar",
+             "california": "ca", "colorado": "co", "connecticut": "ct", "delaware": "de",
+             "florida": "fl", "georgia": "ga", "hawaii": "hi", "idaho": "id", "illinois": "il",
+             "indiana": "in", "iowa": "ia", "kansas": "ks", "kentucky": "ky",
+             "louisiana": "la", "maine": "me", "maryland": "md", "massachusetts": "ma",
+             "michigan": "mi", "minnesota": "mn", "mississippi": "ms", "missouri": "mo",
+             "montana": "mt", "nebraska": "ne", "nevada": "nv", "new hampshire": "nh",
+             "new jersey": "nj", "new mexico": "nm", "new york": "ny",
+             "north carolina": "nc", "north dakota": "nd", "ohio": "oh", "oklahoma": "ok",
+             "oregon": "or", "pennsylvania": "pa", "rhode island": "ri",
+             "south carolina": "sc", "south dakota": "sd", "tennessee": "tn", "texas": "tx",
+             "utah": "ut", "vermont": "vt", "virginia": "va", "washington": "wa",
+             "west virginia": "wv", "wisconsin": "wi", "wyoming": "wy"}
+_STATE_HOST = re.compile(r"(?:^|\.)([a-z]{2})\.gov$|(?:^|\.)state\.([a-z]{2})\.us$")
+
+def _check_out_of_area(located: list[tuple[EvidenceRef, Located]], research: CityResearchState,
+                       checks: _Checks) -> None:
+    """Every citation is a US state government document of another state than the city's
+    (e.g. a same-named city elsewhere): the evidence is about another place."""
+    state = _city_state_code(research)
+    if state is None or not located:
+        return
+    hosts = [urlsplit(ref.url).hostname or "" for ref, _ in located]
+    codes = [next((g for g in m.groups() if g), None) if (m := _STATE_HOST.search(h)) else None
+             for h in hosts]
+    if all(codes) and all(c != state for c in codes):
+        checks.add("OUT_OF_AREA", CheckResult.WARN,
+                   f"cited only from another US state's government ({', '.join(sorted(set(codes)))}"
+                   f"; the city is in {state})")
+
+def _city_state_code(research: CityResearchState) -> str | None:
+    fs = research.fields.get("jurisdiction")
+    if fs is None:
+        return None
+    values = [str(c.comparable_value or "") for c in fs.candidate_claims
+              if c.value_status is ValueStatus.KNOWN]
+    if fs.selected_claim is not None:
+        values.insert(0, str(fs.selected_claim.comparable_value or ""))
+    for v in values:
+        code = US_STATES.get(v.strip().casefold())
+        if code:
+            return code
+    return None
 
 def _finish(claim: FieldClaim, uid: str, normalized: Any, qualifiers: ClaimQualifiers,
             checks: _Checks) -> FieldClaim:

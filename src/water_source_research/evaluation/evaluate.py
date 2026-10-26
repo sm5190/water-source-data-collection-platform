@@ -126,7 +126,7 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
     diagnoses += _run_level_findings(snap, pairing)
     evidence = check_evidence(snap, fields)
     metrics = compute_metrics(results, diagnoses, evidence, snap, fields)
-    metrics += source_metrics(pairing)
+    metrics += source_metrics(pairing, source_kinds(claims))
     if final_basis == "REFERENCE_DERIVED":
         for m in metrics:
             if m["scope"] == "stage" and m["scope_key"] == "FINAL":
@@ -338,19 +338,48 @@ def _pair(records: list[ReferenceRecord], predicted: list[tuple[str, str]],
                 for r in records if pairs.get(r.record_key)],
             "extra": [{"key": k, "label": label} for k, label in predicted if k not in used]}
 
-def source_metrics(pairing: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+NON_SOURCE_KINDS = frozenset({"reservoir", "supply_system", "region", "category"})
+
+def source_kinds(claims: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Predicted source key -> {"kind", "out_of_area"} from the water_source claims (the kind
+    the extraction stated, else the conservative inference; never from the reference)."""
+    from water_source_research.services.normalization import infer_source_kind
+    out: dict[str, dict[str, Any]] = {}
+    for c in claims:
+        if c["field_key"] != ENTITY:
+            continue
+        label = str(c.get("normalized_value") or c.get("value") or "")
+        q = c.get("qualifiers") or {}
+        checks = {k["code"]: k["result"] for k in (c.get("validation") or {}).get("checks", [])}
+        entry = out.setdefault(name_key(label), {"kind": None, "out_of_area": False})
+        entry["kind"] = entry["kind"] or q.get("source_kind") or infer_source_kind(label)
+        entry["out_of_area"] = entry["out_of_area"] or checks.get("OUT_OF_AREA") in (
+            "WARN", "FAIL")
+    return out
+
+def source_metrics(pairing: dict[str, dict[str, Any]],
+                   kinds: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Source-level precision and recall per stage: predicted sources vs reference rows,
-    paired one to one. Judge-made pairs are counted and reported as provisional."""
+    paired one to one. Judge-made pairs are counted and reported as provisional. Predicted
+    sources are also counted by kind (reservoirs, systems, regions or categories named
+    instead of a natural source) and out-of-area evidence."""
+    from collections import Counter
     from .metrics import metric
+    kinds = kinds or {}
     out = []
     for stage, p in pairing.items():
+        info = [kinds.get(name_key(e["label"]), {}) for e in p.get("predicted") or []]
+        by_kind = Counter(i.get("kind") or "unspecified" for i in info)
         matched = len(p.get("matched") or [])
         provisional = sum(1 for m in p.get("matched") or [] if m["method"].startswith("JUDGE"))
         predicted = len(p.get("predicted") or [])
         reference = len(p["pairs"])
         detail = {"missing": p.get("missing_labels") or [],
                   "extra": [e["label"] for e in p["extra"]], "provisional": provisional,
-                  "matched": p.get("matched") or []}
+                  "matched": p.get("matched") or [], "kinds": dict(by_kind),
+                  "non_source_kind": sum(by_kind[k] for k in NON_SOURCE_KINDS),
+                  "general_groundwater": by_kind["general_groundwater"],
+                  "out_of_area": sum(bool(i.get("out_of_area")) for i in info)}
         out += [metric("source", stage, "source_precision", matched, predicted, **detail),
                 metric("source", stage, "source_recall", matched, reference, **detail)]
     return out

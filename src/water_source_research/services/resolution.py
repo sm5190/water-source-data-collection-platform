@@ -180,12 +180,33 @@ def _resolve_entities(ws: FieldState, d: FieldDefinition,
         if any(_possibly_same(labels[key], labels[o]) for o in buckets if o != key):
             entity = _to_review(entity, "POSSIBLE_EQUIVALENCE")
         entities.append(entity)
+    _link_relations(entities, buckets)
     unsettled = _decide(UNATTRIBUTED, None, invalid, d, policy) if invalid else None
     if unsettled is not None:  # None: every invalid claim was rejected by a reviewer
         entities.append(unsettled)
     for c in ws.candidate_claims:
         c.entity_key = name_key(str(c.comparable_value)) if _is_valid(c) else None
     return entities
+
+def _link_relations(entities: list[EntityResolution],
+                    buckets: dict[str, list[FieldClaim]]) -> None:
+    """Relationships the evidence states between source entities (e.g. a reservoir on a
+    river), kept with their quotes. Both entities stay; nothing is merged or converted, and
+    no relation is inferred from names. A target that isn't one of the run's source
+    entities is kept by name (target_entity_key None)."""
+    keys = set(buckets)
+    for e in entities:
+        seen: set[tuple[str, str]] = set()
+        for c in buckets.get(e.entity_key, []):
+            for r in (c.qualifiers.relations if c.qualifiers else []):
+                target = name_key(r.get("target") or "")
+                if (r.get("relation"), target) in seen or not target:
+                    continue
+                seen.add((r.get("relation"), target))
+                e.relations.append({"relation": r.get("relation"), "target": r.get("target"),
+                                    "target_entity_key": target if target in keys else None,
+                                    "quote": r.get("quote"), "url": r.get("url"),
+                                    "claim_uid": c.claim_uid})
 
 def _resolve_record_field(fs: FieldState, d: FieldDefinition, sources: list[Source],
                           index: EvidenceIndex | None,
