@@ -36,7 +36,7 @@ fields:
     depends_on: [population_served_millions, city_population_millions]
     keywords: [percent, share, population served]
   - {key: utility_name, field_type: utility, subject: supply_record, type: text, keywords: [utility, water authority, water board, water department, water company, water services, waterworks, drinking water, supplies]}
-  - {key: water_source, field_type: water_source, subject: supply_record, type: text, multi_valued: true, scope: entity, keywords: [source, lake, river, aquifer, reservoir, intake, wellfield, supplied by]}
+  - {key: water_source, field_type: water_source, subject: supply_record, type: text, multi_valued: true, scope: entity, keywords: [source, sources, river, rivers, lake, spring, springs, aquifer, aquifers, groundwater, wellfield, wells, supplied by, drawn from, sourced from, raw water, abstraction]}
   - {key: water_system, field_type: water_source, subject: supply_record, type: text, review_always: true, keywords: [water system, supply system, distribution system, network]}
   - key: water_type
     field_type: source_type

@@ -1,0 +1,2276 @@
+source: Water Source Standardization Rules - Polished.pdf, Appendix (List of Cities and Corresponding
+  Countries)
+note: Methodology city list, independent of the reference workbook's values. Used only to recognise passages
+  about other cities.
+cities:
+- city: New York City
+  country: USA
+  names:
+  - New York City
+- city: Chicago
+  country: USA
+  names:
+  - Chicago
+- city: London
+  country: UK
+  names:
+  - London
+- city: Paris
+  country: France
+  names:
+  - Paris
+- city: Los Angeles-Long Beach-Santa Ana
+  country: USA
+  names:
+  - Los Angeles-Long Beach-Santa Ana
+  - Los Angeles
+  - Long Beach
+  - Santa Ana
+- city: Tokyo
+  country: Japan
+  names:
+  - Tokyo
+- city: Guanguzhou
+  country: China
+  names:
+  - Guanguzhou
+- city: Seoul
+  country: Republic of Korea
+  names:
+  - Seoul
+- city: Chukyo M.M.A. (Nagoya)
+  country: Japan
+  names:
+  - Nagoya
+  - Chukyo
+- city: Hyderabad
+  country: India
+  names:
+  - Hyderabad
+- city: Tehran
+  country: Iran (Islamic Republic of)
+  names:
+  - Tehran
+- city: Chengdu
+  country: China
+  names:
+  - Chengdu
+- city: Nanjing, Jiangsu
+  country: China
+  names:
+  - Nanjing
+- city: Wuhan
+  country: China
+  names:
+  - Wuhan
+- city: Thành Pho Ho Chí Minh (Ho Chi Minh City)
+  country: Viet Nam
+  names:
+  - Ho Chi Minh City
+  - Thành Pho Ho Chí Minh
+- city: Luanda
+  country: Angola
+  names:
+  - Luanda
+- city: Ahmadabad
+  country: India
+  names:
+  - Ahmadabad
+- city: Kuala Lumpur
+  country: Malaysia
+  names:
+  - Kuala Lumpur
+- city: Xi'an, Shaanxi
+  country: China
+  names:
+  - Xi'an
+- city: Hong Kong
+  country: China, Hong Kong SAR
+  names:
+  - Hong Kong
+- city: Dongguan
+  country: China
+  names:
+  - Dongguan
+- city: Hangzhou
+  country: China
+  names:
+  - Hangzhou
+- city: Foshan
+  country: China
+  names:
+  - Foshan
+- city: Shenyang
+  country: China
+  names:
+  - Shenyang
+- city: Ar-Riyadh (Riyadh)
+  country: Saudi Arabia
+  names:
+  - Riyadh
+  - Ar-Riyadh
+- city: Baghdad
+  country: Iraq
+  names:
+  - Baghdad
+- city: Santiago
+  country: Chile
+  names:
+  - Santiago
+- city: Surat
+  country: India
+  names:
+  - Surat
+- city: Madrid
+  country: Spain
+  names:
+  - Madrid
+- city: Suzhou, Jiangsu
+  country: China
+  names:
+  - Suzhou
+- city: Pune (Poona)
+  country: India
+  names:
+  - Poona
+  - Pune
+- city: Haerbin
+  country: China
+  names:
+  - Haerbin
+- city: Houston
+  country: United States of America
+  names:
+  - Houston
+- city: Dallas-Fort Worth
+  country: United States of America
+  names:
+  - Dallas-Fort Worth
+  - Dallas
+  - Fort Worth
+- city: Toronto
+  country: Canada
+  names:
+  - Toronto
+- city: Dar es Salaam
+  country: United Republic of Tanzania
+  names:
+  - Dar es Salaam
+- city: Miami
+  country: United States of America
+  names:
+  - Miami
+- city: Belo Horizonte
+  country: Brazil
+  names:
+  - Belo Horizonte
+- city: Singapore
+  country: Singapore
+  names:
+  - Singapore
+- city: Philadelphia
+  country: United States of America
+  names:
+  - Philadelphia
+- city: Atlanta
+  country: United States of America
+  names:
+  - Atlanta
+- city: Kitakyushu-Fukuoka M.M.A.
+  country: Japan
+  names:
+  - Kitakyushu-Fukuoka
+- city: Al-Khartum (Khartoum)
+  country: Sudan
+  names:
+  - Khartoum
+  - Al-Khartum
+- city: Barcelona
+  country: Spain
+  names:
+  - Barcelona
+- city: Johannesburg
+  country: South Africa
+  names:
+  - Johannesburg
+- city: Sankt Peterburg (Saint Petersburg)
+  country: Russian Federation
+  names:
+  - Saint Petersburg
+  - Sankt Peterburg
+- city: Qingdao
+  country: China
+  names:
+  - Qingdao
+- city: Dalian
+  country: China
+  names:
+  - Dalian
+- city: Washington, D.C.
+  country: United States of America
+  names:
+  - Washington
+- city: Yangon
+  country: Myanmar
+  names:
+  - Yangon
+- city: Al-Iskandariyah (Alexandria)
+  country: Egypt
+  names:
+  - Alexandria
+  - Al-Iskandariyah
+- city: Ji'nan, Shandong
+  country: China
+  names:
+  - Ji'nan
+- city: Guadalajara
+  country: Mexico
+  names:
+  - Guadalajara
+- city: Zhengzhou
+  country: China
+  names:
+  - Zhengzhou
+- city: Abidjan
+  country: Côte d'Ivoire
+  names:
+  - Abidjan
+- city: Ankara
+  country: Turkey
+  names:
+  - Ankara
+- city: Chittagong
+  country: Bangladesh
+  names:
+  - Chittagong
+- city: Sydney
+  country: Australia
+  names:
+  - Sydney
+- city: Melbourne
+  country: Australia
+  names:
+  - Melbourne
+- city: Monterrey
+  country: Mexico
+  names:
+  - Monterrey
+- city: Brasília
+  country: Brazil
+  names:
+  - Brasília
+- city: Jiddah
+  country: Saudi Arabia
+  names:
+  - Jiddah
+- city: Cape Town
+  country: South Africa
+  names:
+  - Cape Town
+- city: Addis Ababa
+  country: Ethiopia
+  names:
+  - Addis Ababa
+- city: Nairobi
+  country: Kenya
+  names:
+  - Nairobi
+- city: Phoenix-Mesa
+  country: United States of America
+  names:
+  - Phoenix-Mesa
+- city: Changsha
+  country: China
+  names:
+  - Changsha
+- city: Xinbei
+  country: China, Taiwan Province of China
+  names:
+  - Xinbei
+- city: Boston
+  country: United States of America
+  names:
+  - Boston
+- city: Hà Noi
+  country: Viet Nam
+  names:
+  - Hà Noi
+- city: Changchun
+  country: China
+  names:
+  - Changchun
+- city: Kunming
+  country: China
+  names:
+  - Kunming
+- city: Roma (Rome)
+  country: Italy
+  names:
+  - Rome
+  - Roma
+- city: Shantou
+  country: China
+  names:
+  - Shantou
+- city: Montréal
+  country: Canada
+  names:
+  - Montréal
+- city: Pôrto Alegre
+  country: Brazil
+  names:
+  - Pôrto Alegre
+- city: Recife
+  country: Brazil
+  names:
+  - Recife
+- city: Kabul
+  country: Afghanistan
+  names:
+  - Kabul
+- city: Ürümqi (Wulumqi)
+  country: China
+  names:
+  - Wulumqi
+  - Ürümqi
+- city: Tel Aviv-Yafo (Tel Aviv-Jaffa)
+  country: Israel
+  names:
+  - Tel Aviv-Jaffa
+  - Tel Aviv
+  - Jaffa
+  - Tel Aviv-Yafo
+  - Yafo
+- city: Hefei
+  country: China
+  names:
+  - Hefei
+- city: Fortaleza
+  country: Brazil
+  names:
+  - Fortaleza
+- city: Shijiazhuang
+  country: China
+  names:
+  - Shijiazhuang
+- city: Medellín
+  country: Colombia
+  names:
+  - Medellín
+- city: Kano
+  country: Nigeria
+  names:
+  - Kano
+- city: Ningbo
+  country: China
+  names:
+  - Ningbo
+- city: Salvador
+  country: Brazil
+  names:
+  - Salvador
+- city: Ekurhuleni
+  country: South Africa
+  names:
+  - Ekurhuleni
+- city: Taiyuan, Shanxi
+  country: China
+  names:
+  - Taiyuan
+- city: Jaipur
+  country: India
+  names:
+  - Jaipur
+- city: Dar-el-Beida (Casablanca)
+  country: Morocco
+  names:
+  - Casablanca
+  - Dar-el-Beida
+- city: Yaoundé
+  country: Cameroon
+  names:
+  - Yaoundé
+- city: Nanning
+  country: China
+  names:
+  - Nanning
+- city: Detroit
+  country: United States of America
+  names:
+  - Detroit
+- city: Xiamen
+  country: China
+  names:
+  - Xiamen
+- city: Curitiba
+  country: Brazil
+  names:
+  - Curitiba
+- city: Berlin
+  country: Germany
+  names:
+  - Berlin
+- city: Fuzhou, Fujian
+  country: China
+  names:
+  - Fuzhou
+- city: Lucknow
+  country: India
+  names:
+  - Lucknow
+- city: Busan
+  country: Republic of Korea
+  names:
+  - Busan
+- city: Wenzhou
+  country: China
+  names:
+  - Wenzhou
+- city: Douala
+  country: Cameroon
+  names:
+  - Douala
+- city: Ibadan
+  country: Nigeria
+  names:
+  - Ibadan
+- city: Seattle
+  country: United States of America
+  names:
+  - Seattle
+- city: Nanchang
+  country: China
+  names:
+  - Nanchang
+- city: Changzhou, Jiangsu
+  country: China
+  names:
+  - Changzhou
+- city: San Francisco-Oakland
+  country: United States of America
+  names:
+  - San Francisco-Oakland
+  - San Francisco
+  - Oakland
+- city: Faisalabad
+  country: Pakistan
+  names:
+  - Faisalabad
+- city: Asunción
+  country: Paraguay
+  names:
+  - Asunción
+- city: San Diego
+  country: United States of America
+  names:
+  - San Diego
+- city: Campinas
+  country: Brazil
+  names:
+  - Campinas
+- city: Kozhikode (Calicut)
+  country: India
+  names:
+  - Calicut
+  - Kozhikode
+- city: Santo Domingo
+  country: Dominican Republic
+  names:
+  - Santo Domingo
+- city: Bekasi
+  country: Indonesia
+  names:
+  - Bekasi
+- city: Athínai (Athens)
+  country: Greece
+  names:
+  - Athens
+  - Athínai
+- city: Tangshan, Hebei
+  country: China
+  names:
+  - Tangshan
+- city: Wuxi, Jiangsu
+  country: China
+  names:
+  - Wuxi
+- city: Guiyang
+  country: China
+  names:
+  - Guiyang
+- city: Durban (Ethekwini)
+  country: South Africa
+  names:
+  - Ethekwini
+  - Durban
+- city: Milano (Milan)
+  country: Italy
+  names:
+  - Milan
+  - Milano
+- city: Mashhad
+  country: Iran (Islamic Republic of)
+  names:
+  - Mashhad
+- city: Puebla
+  country: Mexico
+  names:
+  - Puebla
+- city: Kanpur
+  country: India
+  names:
+  - Kanpur
+- city: Kumasi
+  country: Ghana
+  names:
+  - Kumasi
+- city: Antananarivo
+  country: Madagascar
+  names:
+  - Antananarivo
+- city: P'yongyang
+  country: Dem. People's Republic of Korea
+  names:
+  - P'yongyang
+- city: Delhi
+  country: India
+  names:
+  - Delhi
+- city: Shanghai
+  country: China
+  names:
+  - Shanghai
+- city: São Paulo
+  country: Brazil
+  names:
+  - São Paulo
+- city: Ciudad de México (Mexico City)
+  country: Mexico
+  names:
+  - Mexico City
+  - Ciudad de México
+- city: Al-Qahirah (Cairo)
+  country: Egypt
+  names:
+  - Cairo
+  - Al-Qahirah
+- city: Al Kuwayt (Kuwait City)
+  country: Kuwait
+  names:
+  - Kuwait City
+  - Al Kuwayt
+- city: Kampala
+  country: Uganda
+  names:
+  - Kampala
+- city: Dakar
+  country: Senegal
+  names:
+  - Dakar
+- city: Kyiv (Kiev)
+  country: Ukraine
+  names:
+  - Kiev
+  - Kyiv
+- city: Malappuram
+  country: India
+  names:
+  - Malappuram
+- city: Izmir
+  country: Turkey
+  names:
+  - Izmir
+- city: Lanzhou
+  country: China
+  names:
+  - Lanzhou
+- city: Caracas
+  country: Venezuela (Bolivarian Republic of)
+  names:
+  - Caracas
+- city: Lisboa (Lisbon)
+  country: Portugal
+  names:
+  - Lisbon
+  - Lisboa
+- city: Abuja
+  country: Nigeria
+  names:
+  - Abuja
+- city: Surabaya
+  country: Indonesia
+  names:
+  - Surabaya
+- city: Guayaquil
+  country: Ecuador
+  names:
+  - Guayaquil
+- city: Shizuoka-Hamamatsu M.M.A.
+  country: Japan
+  names:
+  - Shizuoka-Hamamatsu
+- city: Minneapolis-St. Paul
+  country: United States of America
+  names:
+  - Minneapolis-St. Paul
+  - Minneapolis
+  - St. Paul
+- city: Zhongshan
+  country: China
+  names:
+  - Zhongshan
+- city: Kochi (Cochin)
+  country: India
+  names:
+  - Cochin
+  - Kochi
+- city: Ciudad de Guatemala (Guatemala City)
+  country: Guatemala
+  names:
+  - Guatemala City
+  - Ciudad de Guatemala
+- city: Indore
+  country: India
+  names:
+  - Indore
+- city: Nagpur
+  country: India
+  names:
+  - Nagpur
+- city: Tampa-St. Petersburg
+  country: United States of America
+  names:
+  - Tampa-St. Petersburg
+  - Tampa
+  - St. Petersburg
+- city: Dubayy (Dubai)
+  country: United Arab Emirates
+  names:
+  - Dubai
+  - Dubayy
+- city: Sana'a'
+  country: Yemen
+  names:
+  - Sana'a'
+- city: Thrissur
+  country: India
+  names:
+  - Thrissur
+- city: Incheon
+  country: Republic of Korea
+  names:
+  - Incheon
+- city: Denver-Aurora
+  country: United States of America
+  names:
+  - Denver-Aurora
+- city: Port Harcourt
+  country: Nigeria
+  names:
+  - Port Harcourt
+- city: Cali
+  country: Colombia
+  names:
+  - Cali
+- city: Taibei
+  country: China, Taiwan Province of China
+  names:
+  - Taibei
+- city: El Djazaïr (Algiers)
+  country: Algeria
+  names:
+  - Algiers
+  - El Djazaïr
+- city: Manchester
+  country: United Kingdom
+  names:
+  - Manchester
+- city: Sapporo
+  country: Japan
+  names:
+  - Sapporo
+- city: Coimbatore
+  country: India
+  names:
+  - Coimbatore
+- city: Port-au-Prince
+  country: Haiti
+  names:
+  - Port-au-Prince
+- city: Birmingham (West Midlands)
+  country: United Kingdom
+  names:
+  - West Midlands
+  - Birmingham
+- city: Goiânia
+  country: Brazil
+  names:
+  - Goiânia
+- city: Zibo
+  country: China
+  names:
+  - Zibo
+- city: Las Vegas
+  country: United States of America
+  names:
+  - Las Vegas
+- city: Bandung
+  country: Indonesia
+  names:
+  - Bandung
+- city: Ouagadougou
+  country: Burkina Faso
+  names:
+  - Ouagadougou
+- city: Vancouver
+  country: Canada
+  names:
+  - Vancouver
+- city: Handan
+  country: China
+  names:
+  - Handan
+- city: Lusaka
+  country: Zambia
+  names:
+  - Lusaka
+- city: Depok
+  country: Indonesia
+  names:
+  - Depok
+- city: Weifang
+  country: China
+  names:
+  - Weifang
+- city: Tashkent
+  country: Uzbekistan
+  names:
+  - Tashkent
+- city: San Juan
+  country: Puerto Rico
+  names:
+  - San Juan
+- city: Bamako
+  country: Mali
+  names:
+  - Bamako
+- city: Accra
+  country: Ghana
+  names:
+  - Accra
+- city: Huai'an
+  country: China
+  names:
+  - Huai'an
+- city: Bayrut (Beirut)
+  country: Lebanon
+  names:
+  - Beirut
+  - Bayrut
+- city: Pretoria
+  country: South Africa
+  names:
+  - Pretoria
+- city: Riverside-San Bernardino
+  country: United States of America
+  names:
+  - Riverside-San Bernardino
+  - Riverside
+  - San Bernardino
+- city: Thiruvananthapuram
+  country: India
+  names:
+  - Thiruvananthapuram
+- city: Huizhou
+  country: China
+  names:
+  - Huizhou
+- city: Yantai
+  country: China
+  names:
+  - Yantai
+- city: Toluca de Lerdo
+  country: Mexico
+  names:
+  - Toluca de Lerdo
+- city: Patna
+  country: India
+  names:
+  - Patna
+- city: Shaoxing
+  country: China
+  names:
+  - Shaoxing
+- city: Brisbane
+  country: Australia
+  names:
+  - Brisbane
+- city: Dimashq (Damascus)
+  country: Syrian Arab Republic
+  names:
+  - Damascus
+  - Dimashq
+- city: Baltimore
+  country: United States of America
+  names:
+  - Baltimore
+- city: Sendai
+  country: Japan
+  names:
+  - Sendai
+- city: Mbuji-Mayi
+  country: Democratic Republic of the Congo
+  names:
+  - Mbuji-Mayi
+- city: Tunis
+  country: Tunisia
+  names:
+  - Tunis
+- city: Baku
+  country: Azerbaijan
+  names:
+  - Baku
+- city: Medan
+  country: Indonesia
+  names:
+  - Medan
+- city: Lubumbashi
+  country: Democratic Republic of the Congo
+  names:
+  - Lubumbashi
+- city: Belém
+  country: Brazil
+  names:
+  - Belém
+- city: Bhopal
+  country: India
+  names:
+  - Bhopal
+- city: Luoyang
+  country: China
+  names:
+  - Luoyang
+- city: Brazzaville
+  country: Congo
+  names:
+  - Brazzaville
+- city: Tangerang
+  country: Indonesia
+  names:
+  - Tangerang
+- city: Daegu
+  country: Republic of Korea
+  names:
+  - Daegu
+- city: Barranquilla
+  country: Colombia
+  names:
+  - Barranquilla
+- city: San Antonio
+  country: United States of America
+  names:
+  - San Antonio
+- city: St. Louis
+  country: United States of America
+  names:
+  - St. Louis
+- city: Napoli (Naples)
+  country: Italy
+  names:
+  - Naples
+  - Napoli
+- city: Taoyuan
+  country: China, Taiwan Province of China
+  names:
+  - Taoyuan
+- city: Maracaibo
+  country: Venezuela (Bolivarian Republic of)
+  names:
+  - Maracaibo
+- city: Manaus
+  country: Brazil
+  names:
+  - Manaus
+- city: Rawalpindi
+  country: Pakistan
+  names:
+  - Rawalpindi
+- city: La Habana (Havana)
+  country: Cuba
+  names:
+  - Havana
+  - La Habana
+- city: Nantong
+  country: China
+  names:
+  - Nantong
+- city: Agra
+  country: India
+  names:
+  - Agra
+- city: Vadodara
+  country: India
+  names:
+  - Vadodara
+- city: Gujranwala
+  country: Pakistan
+  names:
+  - Gujranwala
+- city: Portland
+  country: United States of America
+  names:
+  - Portland
+- city: Baotou
+  country: China
+  names:
+  - Baotou
+- city: Hiroshima
+  country: Japan
+  names:
+  - Hiroshima
+- city: Muqdisho (Mogadishu)
+  country: Somalia
+  names:
+  - Mogadishu
+  - Muqdisho
+- city: Visakhapatnam
+  country: India
+  names:
+  - Visakhapatnam
+- city: Amman
+  country: Jordan
+  names:
+  - Amman
+- city: Peshawar
+  country: Pakistan
+  names:
+  - Peshawar
+- city: Tijuana
+  country: Mexico
+  names:
+  - Tijuana
+- city: Xuzhou
+  country: China
+  names:
+  - Xuzhou
+- city: Sacramento
+  country: United States of America
+  names:
+  - Sacramento
+- city: Bruxelles-Brussel
+  country: Belgium
+  names:
+  - Bruxelles-Brussel
+- city: Kannur
+  country: India
+  names:
+  - Kannur
+- city: Liuzhou
+  country: China
+  names:
+  - Liuzhou
+- city: Esfahan
+  country: Iran (Islamic Republic of)
+  names:
+  - Esfahan
+- city: Hohhot
+  country: China
+  names:
+  - Hohhot
+- city: Minsk
+  country: Belarus
+  names:
+  - Minsk
+- city: Grande Vitória
+  country: Brazil
+  names:
+  - Grande Vitória
+- city: Mumbai (Bombay)
+  country: India
+  names:
+  - Bombay
+  - Mumbai
+- city: Beijing
+  country: China
+  names:
+  - Beijing
+- city: Dhaka
+  country: Bangladesh
+  names:
+  - Dhaka
+- city: Kinki M.M.A. (Osaka)
+  country: Japan
+  names:
+  - Osaka
+  - Kinki
+- city: Karachi
+  country: Pakistan
+  names:
+  - Karachi
+- city: Buenos Aires
+  country: Argentina
+  names:
+  - Buenos Aires
+- city: Chongqing
+  country: China
+  names:
+  - Chongqing
+- city: Istanbul
+  country: Turkey
+  names:
+  - Istanbul
+- city: Kolkata (Calcutta)
+  country: India
+  names:
+  - Calcutta
+  - Kolkata
+- city: Manila
+  country: Philippines
+  names:
+  - Manila
+- city: Lagos
+  country: Nigeria
+  names:
+  - Lagos
+- city: Rio de Janeiro
+  country: Brazil
+  names:
+  - Rio de Janeiro
+- city: Tianjin
+  country: China
+  names:
+  - Tianjin
+- city: Kinshasa
+  country: Democratic Republic of the Congo
+  names:
+  - Kinshasa
+- city: Guangzhou, Guangdong
+  country: China
+  names:
+  - Guangzhou
+- city: Moskva (Moscow)
+  country: Russian Federation
+  names:
+  - Moscow
+  - Moskva
+- city: Shenzhen
+  country: China
+  names:
+  - Shenzhen
+- city: Lahore
+  country: Pakistan
+  names:
+  - Lahore
+- city: Bangalore
+  country: India
+  names:
+  - Bangalore
+- city: Bogotá
+  country: Colombia
+  names:
+  - Bogotá
+- city: Jakarta
+  country: Indonesia
+  names:
+  - Jakarta
+- city: Chennai (Madras)
+  country: India
+  names:
+  - Madras
+  - Chennai
+- city: Lima
+  country: Peru
+  names:
+  - Lima
+- city: Krung Thep (Bangkok)
+  country: Thailand
+  names:
+  - Bangkok
+  - Krung Thep
+- city: Perth
+  country: Australia
+  names:
+  - Perth
+- city: Makkah (Mecca)
+  country: Saudi Arabia
+  names:
+  - Mecca
+  - Makkah
+- city: Phnum Pénh (Phnom Penh)
+  country: Cambodia
+  names:
+  - Phnom Penh
+  - Phnum Pénh
+- city: Nashik
+  country: India
+  names:
+  - Nashik
+- city: Multan
+  country: Pakistan
+  names:
+  - Multan
+- city: Bursa
+  country: Turkey
+  names:
+  - Bursa
+- city: Austin
+  country: United States of America
+  names:
+  - Austin
+- city: Vijayawada
+  country: India
+  names:
+  - Vijayawada
+- city: Wien (Vienna)
+  country: Austria
+  names:
+  - Vienna
+  - Wien
+- city: Yangzhou
+  country: China
+  names:
+  - Yangzhou
+- city: Baoding
+  country: China
+  names:
+  - Baoding
+- city: Charlotte
+  country: United States of America
+  names:
+  - Charlotte
+- city: Orlando
+  country: United States of America
+  names:
+  - Orlando
+- city: West Yorkshire
+  country: United Kingdom
+  names:
+  - West Yorkshire
+- city: Valencia
+  country: Venezuela (Bolivarian Republic of)
+  names:
+  - Valencia
+- city: Baixada Santista
+  country: Brazil
+  names:
+  - Baixada Santista
+- city: Rabat
+  country: Morocco
+  names:
+  - Rabat
+- city: Linyi, Shandong
+  country: China
+  names:
+  - Linyi
+- city: Conakry
+  country: Guinea
+  names:
+  - Conakry
+- city: Almaty
+  country: Kazakhstan
+  names:
+  - Almaty
+- city: Quito
+  country: Ecuador
+  names:
+  - Quito
+- city: Bucuresti (Bucharest)
+  country: Romania
+  names:
+  - Bucharest
+  - Bucuresti
+- city: Taizhou, Zhejiang
+  country: China
+  names:
+  - Taizhou
+- city: La Paz
+  country: Bolivia (Plurinational State of)
+  names:
+  - La Paz
+- city: Ludhiana
+  country: India
+  names:
+  - Ludhiana
+- city: Haikou
+  country: China
+  names:
+  - Haikou
+- city: Semarang
+  country: Indonesia
+  names:
+  - Semarang
+- city: Hamburg
+  country: Germany
+  names:
+  - Hamburg
+- city: Torino (Turin)
+  country: Italy
+  names:
+  - Turin
+  - Torino
+- city: Ciudad de Panamá (Panama City)
+  country: Panama
+  names:
+  - Panama City
+  - Ciudad de Panamá
+- city: Hyderabad
+  country: Pakistan
+  names:
+  - Hyderabad
+- city: León de los Aldamas
+  country: Mexico
+  names:
+  - León de los Aldamas
+- city: Yancheng, Jiangsu
+  country: China
+  names:
+  - Yancheng
+- city: Cleveland
+  country: United States of America
+  names:
+  - Cleveland
+- city: San Jose
+  country: United States of America
+  names:
+  - San Jose
+- city: Warszawa (Warsaw)
+  country: Poland
+  names:
+  - Warsaw
+  - Warszawa
+- city: Rajkot
+  country: India
+  names:
+  - Rajkot
+- city: Daqing
+  country: China
+  names:
+  - Daqing
+- city: Budapest
+  country: Hungary
+  names:
+  - Budapest
+- city: Halab (Aleppo)
+  country: Syrian Arab Republic
+  names:
+  - Aleppo
+  - Halab
+- city: Indianapolis
+  country: United States of America
+  names:
+  - Indianapolis
+- city: Lomé
+  country: Togo
+  names:
+  - Lomé
+- city: Davao City
+  country: Philippines
+  names:
+  - Davao City
+- city: Montevideo
+  country: Uruguay
+  names:
+  - Montevideo
+- city: Cincinnati
+  country: United States of America
+  names:
+  - Cincinnati
+- city: Adana
+  country: Turkey
+  names:
+  - Adana
+- city: Pittsburgh
+  country: United States of America
+  names:
+  - Pittsburgh
+- city: Putian
+  country: China
+  names:
+  - Putian
+- city: Lianyungang
+  country: China
+  names:
+  - Lianyungang
+- city: Lyon
+  country: France
+  names:
+  - Lyon
+- city: Wuhu, Anhui
+  country: China
+  names:
+  - Wuhu
+- city: Madurai
+  country: India
+  names:
+  - Madurai
+- city: Zhuhai
+  country: China
+  names:
+  - Zhuhai
+- city: Kollam
+  country: India
+  names:
+  - Kollam
+- city: Palembang
+  country: Indonesia
+  names:
+  - Palembang
+- city: Kansas City
+  country: United States of America
+  names:
+  - Kansas City
+- city: Glasgow
+  country: United Kingdom
+  names:
+  - Glasgow
+- city: Datong
+  country: China
+  names:
+  - Datong
+- city: Santa Cruz
+  country: Bolivia (Plurinational State of)
+  names:
+  - Santa Cruz
+- city: Jiangmen
+  country: China
+  names:
+  - Jiangmen
+- city: Meerut
+  country: India
+  names:
+  - Meerut
+- city: Novosibirsk
+  country: Russian Federation
+  names:
+  - Novosibirsk
+- city: Matola
+  country: Mozambique
+  names:
+  - Matola
+- city: Gaziantep
+  country: Turkey
+  names:
+  - Gaziantep
+- city: Benin City
+  country: Nigeria
+  names:
+  - Benin City
+- city: Varanasi (Benares)
+  country: India
+  names:
+  - Benares
+  - Varanasi
+- city: Xiangyang
+  country: China
+  names:
+  - Xiangyang
+- city: Shiraz
+  country: Iran (Islamic Republic of)
+  names:
+  - Shiraz
+- city: Anshan
+  country: China
+  names:
+  - Anshan
+- city: Marseille-Aix-en-Provence
+  country: France
+  names:
+  - Marseille-Aix-en-Provence
+- city: Columbus, Ohio
+  country: United States of America
+  names:
+  - Columbus
+- city: Karaj
+  country: Iran (Islamic Republic of)
+  names:
+  - Karaj
+- city: Stockholm
+  country: Sweden
+  names:
+  - Stockholm
+- city: Tabriz
+  country: Iran (Islamic Republic of)
+  names:
+  - Tabriz
+- city: Ash-Shariqah (Sharjah)
+  country: United Arab Emirates
+  names:
+  - Sharjah
+  - Ash-Shariqah
+- city: Jilin
+  country: China
+  names:
+  - Jilin
+- city: Quanzhou
+  country: China
+  names:
+  - Quanzhou
+- city: Daejon
+  country: Republic of Korea
+  names:
+  - Daejon
+- city: Auckland
+  country: New Zealand
+  names:
+  - Auckland
+- city: Córdoba
+  country: Argentina
+  names:
+  - Córdoba
+- city: Jamshedpur
+  country: India
+  names:
+  - Jamshedpur
+- city: Gaoxiong
+  country: China, Taiwan Province of China
+  names:
+  - Gaoxiong
+- city: Makassar (Ujung Pandang)
+  country: Indonesia
+  names:
+  - Ujung Pandang
+  - Makassar
+- city: Al-Mawsil (Mosul)
+  country: Iraq
+  names:
+  - Mosul
+  - Al-Mawsil
+- city: Raipur
+  country: India
+  names:
+  - Raipur
+- city: Ulaanbaatar
+  country: Mongolia
+  names:
+  - Ulaanbaatar
+- city: Gwangju
+  country: Republic of Korea
+  names:
+  - Gwangju
+- city: Qiqihaer
+  country: China
+  names:
+  - Qiqihaer
+- city: Srinagar
+  country: India
+  names:
+  - Srinagar
+- city: Harare
+  country: Zimbabwe
+  names:
+  - Harare
+- city: München (Munich)
+  country: Germany
+  names:
+  - Munich
+  - München
+- city: La Laguna
+  country: Mexico
+  names:
+  - La Laguna
+- city: Rosario
+  country: Argentina
+  names:
+  - Rosario
+- city: Yinchuan
+  country: China
+  names:
+  - Yinchuan
+- city: Yekaterinburg
+  country: Russian Federation
+  names:
+  - Yekaterinburg
+- city: Cixi
+  country: China
+  names:
+  - Cixi
+- city: Ciudad Juárez
+  country: Mexico
+  names:
+  - Ciudad Juárez
+- city: Virginia Beach
+  country: United States of America
+  names:
+  - Virginia Beach
+- city: Calgary
+  country: Canada
+  names:
+  - Calgary
+- city: Aurangabad
+  country: India
+  names:
+  - Aurangabad
+- city: Grande São Luís
+  country: Brazil
+  names:
+  - Grande São Luís
+- city: Xining
+  country: China
+  names:
+  - Xining
+- city: Jining, Shandong
+  country: China
+  names:
+  - Jining
+- city: Masqat (Muscat)
+  country: Oman
+  names:
+  - Muscat
+  - Masqat
+- city: Can Tho
+  country: Viet Nam
+  names:
+  - Can Tho
+- city: Kharkiv
+  country: Ukraine
+  names:
+  - Kharkiv
+- city: Milwaukee
+  country: United States of America
+  names:
+  - Milwaukee
+- city: Hengyang
+  country: China
+  names:
+  - Hengyang
+- city: Qinhuangdao
+  country: China
+  names:
+  - Qinhuangdao
+- city: Yichang
+  country: China
+  names:
+  - Yichang
+- city: Al-Madinah (Medina)
+  country: Saudi Arabia
+  names:
+  - Medina
+  - Al-Madinah
+- city: Abu Zaby (Abu Dhabi)
+  country: United Arab Emirates
+  names:
+  - Abu Dhabi
+  - Abu Zaby
+- city: Monrovia
+  country: Liberia
+  names:
+  - Monrovia
+- city: Jabalpur
+  country: India
+  names:
+  - Jabalpur
+- city: Batam
+  country: Indonesia
+  names:
+  - Batam
+- city: Edmonton
+  country: Canada
+  names:
+  - Edmonton
+- city: Jodhpur
+  country: India
+  names:
+  - Jodhpur
+- city: Natal
+  country: Brazil
+  names:
+  - Natal
+- city: Huainan
+  country: China
+  names:
+  - Huainan
+- city: Asansol
+  country: India
+  names:
+  - Asansol
+- city: Chaozhou
+  country: China
+  names:
+  - Chaozhou
+- city: Beograd (Belgrade)
+  country: Serbia
+  names:
+  - Belgrade
+  - Beograd
+- city: Mandalay
+  country: Myanmar
+  names:
+  - Mandalay
+- city: Zürich (Zurich)
+  country: Switzerland
+  names:
+  - Zurich
+  - Zürich
+- city: Ranchi
+  country: India
+  names:
+  - Ranchi
+- city: Tiruppur
+  country: India
+  names:
+  - Tiruppur
+- city: Zhangjiakou
+  country: China
+  names:
+  - Zhangjiakou
+- city: Ottawa-Gatineau
+  country: Canada
+  names:
+  - Ottawa-Gatineau
+- city: Tegucigalpa
+  country: Honduras
+  names:
+  - Tegucigalpa
+- city: Chon Buri
+  country: Thailand
+  names:
+  - Chon Buri
+- city: San José
+  country: Costa Rica
+  names:
+  - San José
+- city: Allahabad
+  country: India
+  names:
+  - Allahabad
+- city: João Pessoa
+  country: Brazil
+  names:
+  - João Pessoa
+- city: Kananga
+  country: Democratic Republic of the Congo
+  names:
+  - Kananga
+- city: Amritsar
+  country: India
+  names:
+  - Amritsar
+- city: Kathmandu
+  country: Nepal
+  names:
+  - Kathmandu
+- city: Anyang
+  country: China
+  names:
+  - Anyang
+- city: Raleigh
+  country: United States of America
+  names:
+  - Raleigh
+- city: N'Djaména
+  country: Chad
+  names:
+  - N'Djaména
+- city: København (Copenhagen)
+  country: Denmark
+  names:
+  - Copenhagen
+  - København
+- city: Adelaide
+  country: Australia
+  names:
+  - Adelaide
+- city: Gwalior
+  country: India
+  names:
+  - Gwalior
+- city: Porto
+  country: Portugal
+  names:
+  - Porto
+- city: Dhanbad
+  country: India
+  names:
+  - Dhanbad
+- city: Kota
+  country: India
+  names:
+  - Kota
+- city: Al-Basrah (Basra)
+  country: Iraq
+  names:
+  - Basra
+  - Al-Basrah
+- city: Bucaramanga
+  country: Colombia
+  names:
+  - Bucaramanga
+- city: Hims (Homs)
+  country: Syrian Arab Republic
+  names:
+  - Homs
+  - Hims
+- city: Maceió
+  country: Brazil
+  names:
+  - Maceió
+- city: Praha (Prague)
+  country: Czechia
+  names:
+  - Prague
+  - Praha
+- city: Taian, Shandong
+  country: China
+  names:
+  - Taian
+- city: Fushun, Liaoning
+  country: China
+  names:
+  - Fushun
+- city: Querétaro
+  country: Mexico
+  names:
+  - Querétaro
+- city: Onitsha
+  country: Nigeria
+  names:
+  - Onitsha
+- city: Taizhong
+  country: China, Taiwan Province of China
+  names:
+  - Taizhong
+- city: Taizhou, Jiangsu
+  country: China
+  names:
+  - Taizhou
+- city: Helsinki
+  country: Finland
+  names:
+  - Helsinki
+- city: Suqian
+  country: China
+  names:
+  - Suqian
+- city: Sofia
+  country: Bulgaria
+  names:
+  - Sofia
+- city: Samut Prakan
+  country: Thailand
+  names:
+  - Samut Prakan
+- city: Konya
+  country: Turkey
+  names:
+  - Konya
+- city: Joinville
+  country: Brazil
+  names:
+  - Joinville
+- city: Suweon
+  country: Republic of Korea
+  names:
+  - Suweon
+- city: Nizhniy Novgorod
+  country: Russian Federation
+  names:
+  - Nizhniy Novgorod
+- city: Kazan
+  country: Russian Federation
+  names:
+  - Kazan
+- city: Jacksonville, Florida
+  country: United States of America
+  names:
+  - Jacksonville
+- city: Qom
+  country: Iran (Islamic Republic of)
+  names: []
+- city: Cochabamba
+  country: Bolivia (Plurinational State of)
+  names:
+  - Cochabamba
+- city: Zhanjiang
+  country: China
+  names:
+  - Zhanjiang
+- city: Port Elizabeth (Nelson Mandela Bay)
+  country: South Africa
+  names:
+  - Nelson Mandela Bay
+  - Port Elizabeth
+- city: Mianyang, Sichuan
+  country: China
+  names:
+  - Mianyang
+- city: Yiwu
+  country: China
+  names:
+  - Yiwu
+- city: Hai Phòng
+  country: Viet Nam
+  names:
+  - Hai Phòng
+- city: Weihai
+  country: China
+  names:
+  - Weihai
+- city: Zunyi
+  country: China
+  names:
+  - Zunyi
+- city: Chelyabinsk
+  country: Russian Federation
+  names:
+  - Chelyabinsk
+- city: Mombasa
+  country: Kenya
+  names:
+  - Mombasa
+- city: Niamey
+  country: Niger
+  names:
+  - Niamey
+- city: Ahvaz
+  country: Iran (Islamic Republic of)
+  names:
+  - Ahvaz
+- city: Dongying
+  country: China
+  names:
+  - Dongying
+- city: Nouakchott
+  country: Mauritania
+  names:
+  - Nouakchott
+- city: Providence
+  country: United States of America
+  names:
+  - Providence
+- city: Dublin
+  country: Ireland
+  names:
+  - Dublin
+- city: Nashville-Davidson
+  country: United States of America
+  names:
+  - Nashville-Davidson
+- city: Florianópolis
+  country: Brazil
+  names:
+  - Florianópolis
+- city: Ad-Dammam
+  country: Saudi Arabia
+  names:
+  - Ad-Dammam
+- city: Bareilly
+  country: India
+  names:
+  - Bareilly
+- city: Barquisimeto
+  country: Venezuela (Bolivarian Republic of)
+  names:
+  - Barquisimeto
+- city: Kaifeng
+  country: China
+  names:
+  - Kaifeng
+- city: Rizhao
+  country: China
+  names:
+  - Rizhao
+- city: Fès
+  country: Morocco
+  names: []
+- city: Omsk
+  country: Russian Federation
+  names:
+  - Omsk
+- city: Antalya
+  country: Turkey
+  names:
+  - Antalya
+- city: San Luis Potosí
+  country: Mexico
+  names:
+  - San Luis Potosí
+- city: Maracay
+  country: Venezuela (Bolivarian Republic of)
+  names:
+  - Maracay
+- city: Durg-Bhilainagar
+  country: India
+  names:
+  - Durg-Bhilainagar
+- city: Nanchong
+  country: China
+  names:
+  - Nanchong
+- city: Samara
+  country: Russian Federation
+  names:
+  - Samara
+- city: Kisangani
+  country: Democratic Republic of the Congo
+  names:
+  - Kisangani
+- city: Shiyan
+  country: China
+  names:
+  - Shiyan
+- city: Mysore
+  country: India
+  names:
+  - Mysore
+- city: Ganzhou
+  country: China
+  names:
+  - Ganzhou
+- city: Tarabulus (Tripoli)
+  country: Libya
+  names:
+  - Tripoli
+  - Tarabulus
+- city: Salt Lake City
+  country: United States of America
+  names:
+  - Salt Lake City
+- city: Zhuzhou
+  country: China
+  names:
+  - Zhuzhou
+- city: Aligarh
+  country: India
+  names:
+  - Aligarh
+- city: Jiaxing
+  country: China
+  names:
+  - Jiaxing
+- city: Memphis
+  country: United States of America
+  names:
+  - Memphis
+- city: Yingkou
+  country: China
+  names:
+  - Yingkou
+- city: Pointe-Noire
+  country: Congo
+  names:
+  - Pointe-Noire
+- city: Pekan Baru
+  country: Indonesia
+  names:
+  - Pekan Baru
+- city: Maoming
+  country: China
+  names:
+  - Maoming
+- city: Freetown
+  country: Sierra Leone
+  names:
+  - Freetown
+- city: Hefa (Haifa)
+  country: Israel
+  names:
+  - Haifa
+  - Hefa
+- city: Chiang Mai
+  country: Thailand
+  names:
+  - Chiang Mai
+- city: Tiruchirappalli
+  country: India
+  names:
+  - Tiruchirappalli
+- city: Rostov-na-Donu (Rostov-on-Don)
+  country: Russian Federation
+  names:
+  - Rostov-on-Don
+  - Rostov-na-Donu
+- city: Mendoza
+  country: Argentina
+  names:
+  - Mendoza
+- city: Amsterdam
+  country: Netherlands
+  names:
+  - Amsterdam
+- city: Ufa
+  country: Russian Federation
+  names: []
+- city: Moradabad
+  country: India
+  names:
+  - Moradabad
+- city: Zhenjiang, Jiangsu
+  country: China
+  names:
+  - Zhenjiang
+- city: Benxi
+  country: China
+  names:
+  - Benxi
+- city: Mérida
+  country: Mexico
+  names:
+  - Mérida
+- city: Tanger
+  country: Morocco
+  names:
+  - Tanger
+- city: Bogor
+  country: Indonesia
+  names:
+  - Bogor
+- city: Krasnoyarsk
+  country: Russian Federation
+  names:
+  - Krasnoyarsk
+- city: Chandigarh
+  country: India
+  names:
+  - Chandigarh
+- city: San Salvador
+  country: El Salvador
+  names:
+  - San Salvador
+- city: Chifeng
+  country: China
+  names:
+  - Chifeng
+- city: Maputo
+  country: Mozambique
+  names:
+  - Maputo
+- city: Jinzhou
+  country: China
+  names:
+  - Jinzhou
+- city: Bhubaneswar
+  country: India
+  names:
+  - Bhubaneswar
+- city: Baoji
+  country: China
+  names:
+  - Baoji
+- city: Guilin
+  country: China
+  names:
+  - Guilin
+- city: Köln (Cologne)
+  country: Germany
+  names:
+  - Cologne
+  - Köln
+- city: Puning
+  country: China
+  names:
+  - Puning
+- city: Tengzhou
+  country: China
+  names:
+  - Tengzhou
+- city: Pingdingshan, Henan
+  country: China
+  names:
+  - Pingdingshan
+- city: Ruian
+  country: China
+  names:
+  - Ruian
+- city: Xiangtan, Hunan
+  country: China
+  names:
+  - Xiangtan
+- city: Nanyang, Henan
+  country: China
+  names:
+  - Nanyang
+- city: Guwahati (Gauhati)
+  country: India
+  names:
+  - Gauhati
+  - Guwahati
+- city: Kaduna
+  country: Nigeria
+  names:
+  - Kaduna
+- city: Mexicali
+  country: Mexico
+  names:
+  - Mexicali
+- city: Richmond
+  country: United States of America
+  names:
+  - Richmond
+- city: Yerevan
+  country: Armenia
+  names:
+  - Yerevan
+- city: Hubli-Dharwad
+  country: India
+  names:
+  - Hubli-Dharwad
+- city: Tbilisi
+  country: Georgia
+  names:
+  - Tbilisi
+- city: Huaibei
+  country: China
+  names:
+  - Huaibei
+- city: Louisville
+  country: United States of America
+  names:
+  - Louisville
+- city: Aguascalientes
+  country: Mexico
+  names:
+  - Aguascalientes
+- city: Suzhou, Anhui
+  country: China
+  names:
+  - Suzhou
+- city: Astana
+  country: Kazakhstan
+  names:
+  - Astana
+- city: Da Nang
+  country: Viet Nam
+  names:
+  - Da Nang
+- city: Liuan
+  country: China
+  names:
+  - Liuan
+- city: Zaozhuang
+  country: China
+  names:
+  - Zaozhuang
+- city: Salem
+  country: India
+  names:
+  - Salem
+- city: Perm
+  country: Russian Federation
+  names:
+  - Perm
+- city: Islamabad
+  country: Pakistan
+  names:
+  - Islamabad
+- city: Changwon
+  country: Republic of Korea
+  names:
+  - Changwon
+- city: Kigali
+  country: Rwanda
+  names:
+  - Kigali
+- city: Voronezh
+  country: Russian Federation
+  names:
+  - Voronezh
+- city: Lille
+  country: France
+  names:
+  - Lille
+- city: Jieyang
+  country: China
+  names:
+  - Jieyang
+- city: Managua
+  country: Nicaragua
+  names:
+  - Managua
+- city: Cartagena
+  country: Colombia
+  names:
+  - Cartagena
+- city: Bandar Lampung
+  country: Indonesia
+  names:
+  - Bandar Lampung
+- city: Xinxiang
+  country: China
+  names:
+  - Xinxiang
+- city: Cuernavaca
+  country: Mexico
+  names:
+  - Cuernavaca
+- city: Quetta
+  country: Pakistan
+  names:
+  - Quetta
+- city: Goyang
+  country: Republic of Korea
+  names:
+  - Goyang
+- city: Yongin
+  country: Republic of Korea
+  names:
+  - Yongin
+- city: Antwerpen
+  country: Belgium
+  names:
+  - Antwerpen
+- city: Lilongwe
+  country: Malawi
+  names:
+  - Lilongwe
+- city: Jinhua
+  country: China
+  names:
+  - Jinhua
+- city: Aba
+  country: Nigeria
+  names: []
+- city: Liuyang
+  country: China
+  names:
+  - Liuyang
+- city: Jalandhar
+  country: India
+  names:
+  - Jalandhar
+- city: Solapur
+  country: India
+  names:
+  - Solapur
+- city: Volgograd
+  country: Russian Federation
+  names:
+  - Volgograd
+- city: Chihuahua
+  country: Mexico
+  names:
+  - Chihuahua
+- city: Uyo
+  country: Nigeria
+  names: []
+- city: Oslo
+  country: Norway
+  names:
+  - Oslo
+- city: Odesa
+  country: Ukraine
+  names:
+  - Odesa
+- city: Panjin
+  country: China
+  names:
+  - Panjin
+- city: Jingzhou, Hubei
+  country: China
+  names:
+  - Jingzhou
+- city: Rotterdam
+  country: Netherlands
+  names:
+  - Rotterdam
+- city: Mwanza
+  country: United Republic of Tanzania
+  names:
+  - Mwanza
+- city: Teresina
+  country: Brazil
+  names:
+  - Teresina
+- city: Binzhou
+  country: China
+  names:
+  - Binzhou

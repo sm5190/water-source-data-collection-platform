@@ -16,8 +16,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
+from functools import lru_cache
+import yaml
 
 from water_source_research.observability.otel import get_tracer
+from water_source_research.core.paths import CONFIG_DIR
 from water_source_research.schemas.common import FINAL_STATUSES, FieldResolutionStatus
 from water_source_research.schemas.research import (
     CityResearchState,
@@ -31,7 +34,7 @@ from water_source_research.services.field_state import load_field_definitions
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "3"
+RETRIEVAL_POLICY_VERSION = "4"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -63,6 +66,55 @@ SOURCE_TYPE_WEIGHTS = {
 }
 UNKNOWN_SOURCE_WEIGHT = 0.75
 CITY_NOT_MENTIONED_FACTOR = 0.6
+# Locality, judged on the sentences that matter (each matching sentence +/-1), not the whole
+# chunk: running headers of multi-city reports name every city on every page.
+#   TARGET  the target city/country is named more than any other place
+#   MIXED   named, but other places at least as often
+#   NONE    no place named (CITY_NOT_MENTIONED_FACTOR)
+#   OTHER   only other cities/countries named: evidence about somewhere else
+MIXED_PLACE_FACTOR = 0.6
+OTHER_PLACE_FACTOR = 0.3
+# Named water bodies (rivers, lakes, springs, aquifers, wellfields) in a sentence about the
+# target city are what the source fields need, even without a field keyword.
+SOURCE_ENTITY_FIELDS = frozenset({"water_source", "reservoir_names"})
+HYDRONYM_FACTOR = 1.3
+HYDRONYM_BASE_SCORE = 1.0
+HYDRONYM_SEEDS = 3
+# A long document may give up to RELAXED_CAP_FACTOR x max_chunks_per_source chunks, but the
+# extra ones only if they are about the target city and score at least this share of the best.
+RELAXED_CAP_FACTOR = 2
+RELAXED_CAP_MIN_RATIO = 0.5
+_NAME = r"[A-ZÀ-ÖØ-Þ][\w'’\-]+"
+HYDRONYM = re.compile(
+    rf"\b(?:{_NAME}\s+(?:and\s+|&\s+)?){{1,3}}"
+    r"(?i:rivers?|lakes?|springs?|aquifers?|wellfields?|well\s+fields?|creeks?|reservoirs?|dams?)\b"
+    rf"|\b(?:River|Lake|Rio|Río|Lago|Lac|Rivière|Fleuve|Wadi)\s+(?:of\s+)?{_NAME}"
+    rf"|\b[Ss]prings?\s+of\s+the\s+{_NAME}")
+GAZETTEER_PATH = CONFIG_DIR / "gazetteer_cities.yaml"
+
+@lru_cache
+def _gazetteer() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(city names, country names) from the methodology's city list."""
+    if not GAZETTEER_PATH.exists():
+        return (), ()
+    data = yaml.safe_load(GAZETTEER_PATH.read_text(encoding="utf-8")) or {}
+    cities = tuple(dict.fromkeys(n for c in data.get("cities", []) for n in c.get("names", [])))
+    countries = tuple(dict.fromkeys(c["country"] for c in data.get("cities", [])
+                                    if c.get("country")))
+    return cities, countries
+
+@lru_cache(maxsize=64)
+def _place_patterns(city: str, country: str | None) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    """(target place pattern, other places pattern) for a city."""
+    own = [city] + ([country] if country else [])
+    own_keys = [o.casefold() for o in own]
+    target = re.compile("|".join(rf"(?<!\w){re.escape(o)}(?!\w)" for o in own), re.IGNORECASE)
+    cities, countries = _gazetteer()
+    others = [n for n in (*cities, *countries) if len(n) >= 4 and not any(
+        n.casefold() in k or k in n.casefold() for k in own_keys)]
+    other = re.compile("|".join(rf"(?<!\w){re.escape(n)}(?!\w)"
+                                for n in sorted(others, key=len, reverse=True)) or r"(?!x)x")
+    return target, other
 NO_DIGITS_FACTOR = 0.3
 EXCERPT_THRESHOLD_TOKENS = 250
 MAX_CLAIM_PASSAGE_TOKENS = 150
@@ -80,6 +132,22 @@ _NUMERIC_TYPES = {"number", "integer", "percent", "coordinate"}
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _DIGIT = re.compile(r"\d")
 _BM25_K1 = 1.2
+
+def _locality(sentences: list[str], patterns: list[re.Pattern[str]], target: re.Pattern[str],
+              other: re.Pattern[str], lower: bool = False) -> str:
+    """TARGET / MIXED / NONE / OTHER for the sentences matching ``patterns`` (+/-1)."""
+    hits = {i for i, s in enumerate(sentences)
+            if any(p.search(s.lower() if lower and p is not HYDRONYM else s) for p in patterns)}
+    window = " ".join(sentences[j] for j in sorted({k for i in hits for k in (i - 1, i, i + 1)
+                                                     if 0 <= k < len(sentences)}))
+    if not window:
+        return "NONE"
+    mine, theirs = len(target.findall(window)), len(other.findall(window))
+    if mine and mine > theirs:
+        return "TARGET"
+    if mine:
+        return "MIXED"
+    return "OTHER" if theirs else "NONE"
 
 def estimate_tokens(text: str) -> int:
     return math.ceil(len(text) / 4)
@@ -532,11 +600,12 @@ class ContextManager:
             return used
 
         with tracer.start_as_current_span("context.ranking") as span:
-            scores = self._score(chunks, targets, terms, tf, state, seen)
+            scores, meta = self._score(chunks, targets, terms, tf, state, seen)
             ranked = sorted(
                 ((max(pf.values()), i) for i, pf in enumerate(scores) if pf),
                 key=lambda x: (-x[0], x[1]),
             )
+            top_score = ranked[0][0] if ranked else 0.0
             # Seed pass: each target's best chunk goes first so no field is starved.
             seeds: list[int] = []
             for key in targets:
@@ -547,6 +616,24 @@ class ContextManager:
                 )
                 if best is not None:
                     seeds.append(best)
+            # Source fields: the best few chunks naming a water body in a sentence about the
+            # target city, one per document first, so a long report can't crowd them out.
+            for key in (k for k in targets if k in SOURCE_ENTITY_FIELDS):
+                named = sorted((i for _, i in ranked if key in scores[i] and i not in seeds
+                                and meta[i]["hydronym_local"]),
+                               key=lambda i: -scores[i][key])
+                urls: set[str] = set()
+                picked: list[int] = []
+                for i in named + named:  # distinct documents first, then the rest
+                    if len(picked) >= HYDRONYM_SEEDS:
+                        break
+                    if i in picked or (chunks[i].url in urls and len(urls) < len(
+                            {chunks[j].url for j in named})):
+                        continue
+                    picked.append(i)
+                    urls.add(chunks[i].url)
+                seeds += picked
+                stats["hydronym_seeds"] += len(picked)
             order = seeds + [i for _, i in ranked if i not in seeds]
             stats["chunks_irrelevant"] = len(chunks) - len(ranked)
             span.set_attribute("context.chunks_ranked", len(ranked))
@@ -559,7 +646,8 @@ class ContextManager:
             kept_shingles: list[set[str]] = []
             for i in order:
                 keys = sorted(scores[i], key=lambda k: -scores[i][k])
-                passage = self._passage(chunks[i].text, [t for k in keys for t in terms[k]])
+                passage = self._passage(chunks[i].text, [t for k in keys for t in terms[k]],
+                                        hydronyms=bool(SOURCE_ENTITY_FIELDS & set(keys)))
                 norm = " ".join(re.findall(r"\w+", passage.lower()))
                 digest = hashlib.sha1(norm.encode()).hexdigest()
                 shingles = _shingles(norm)
@@ -578,8 +666,14 @@ class ContextManager:
             for i, keys, passage in candidates:
                 chunk = chunks[i]
                 if per_source[chunk.url] >= self.max_chunks_per_source:
-                    stats["dropped_source_cap"] += 1
-                    continue
+                    relaxed = (per_source[chunk.url]
+                               < RELAXED_CAP_FACTOR * self.max_chunks_per_source
+                               and meta[i]["locality"].get(keys[0]) == "TARGET"
+                               and scores[i][keys[0]] >= RELAXED_CAP_MIN_RATIO * top_score)
+                    if not relaxed:
+                        stats["dropped_source_cap"] += 1
+                        continue
+                    stats["source_cap_relaxed"] += 1
                 cost = self.estimate(passage)
                 if not sources.has(chunk.url, chunk.page_number):
                     page = f" (p. {chunk.page_number})" if chunk.page_number is not None else ""
@@ -620,21 +714,27 @@ class ContextManager:
         tf: list[dict[str, int]],
         state: CityResearchState,
         seen: set[tuple[str, str]],
-    ) -> list[dict[str, float]]:
-        """Per-chunk, per-field relevance: BM25-style term saturation x IDF x priors."""
+    ) -> tuple[list[dict[str, float]], list[dict[str, Any]]]:
+        """Per-chunk, per-field relevance: BM25-style term saturation x IDF x priors, with
+        locality judged on the matching sentences. Also returns per-chunk facts (locality per
+        field, whether a named water body sits in a sentence about the target city)."""
         df = Counter(t for row in tf for t in row)
         n_docs = len(chunks)
         idf = {t: math.log(1 + (n_docs - df[t] + 0.5) / (df[t] + 0.5)) for t in df}
-        city = self._pattern(state.city_name.lower())
+        target, other = _place_patterns(state.city_name, state.country)
+        source_targets = SOURCE_ENTITY_FIELDS & set(targets)
 
-        out = []
+        out: list[dict[str, float]] = []
+        meta: list[dict[str, Any]] = []
         for i, chunk in enumerate(chunks):
-            prior = SOURCE_TYPE_WEIGHTS.get((chunk.source_type or "").upper(),
-                                            UNKNOWN_SOURCE_WEIGHT)
-            if not city.search(chunk.text.lower()):
-                prior *= CITY_NOT_MENTIONED_FACTOR
+            base = SOURCE_TYPE_WEIGHTS.get((chunk.source_type or "").upper(),
+                                           UNKNOWN_SOURCE_WEIGHT)
             has_digits = bool(_DIGIT.search(chunk.text))
+            sentences = [s for s in _SENTENCE_SPLIT.split(chunk.text) if s.strip()]
+            hydronym_local = bool(source_targets) and _locality(
+                sentences, [HYDRONYM], target, other) == "TARGET"
             per_field: dict[str, float] = {}
+            locality: dict[str, str] = {}
             for key in targets:
                 if (chunk.chunk_id, key) in seen:
                     continue
@@ -642,13 +742,26 @@ class ContextManager:
                     idf[t] * n / (n + _BM25_K1)
                     for t in terms[key] if (n := tf[i].get(t))
                 )
+                named = key in SOURCE_ENTITY_FIELDS and hydronym_local
+                if not score and named:
+                    score = HYDRONYM_BASE_SCORE
                 if not score:
                     continue
+                patterns = [self._pattern(t) for t in terms[key] if tf[i].get(t)]
+                place = _locality(sentences, patterns + ([HYDRONYM] if named else []),
+                                  target, other, lower=True)
+                locality[key] = place
+                prior = base * {"TARGET": 1.0, "MIXED": MIXED_PLACE_FACTOR,
+                                "NONE": CITY_NOT_MENTIONED_FACTOR,
+                                "OTHER": OTHER_PLACE_FACTOR}[place]
                 if self.fields[key].type in _NUMERIC_TYPES and not has_digits:
                     score *= NO_DIGITS_FACTOR
+                if named:
+                    score *= HYDRONYM_FACTOR
                 per_field[key] = score * prior
             out.append(per_field)
-        return out
+            meta.append({"locality": locality, "hydronym_local": hydronym_local})
+        return out, meta
 
     def _terms(self, key: str) -> list[str]:
         d = self.fields[key]
@@ -659,8 +772,9 @@ class ContextManager:
             self._patterns[term] = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)")
         return self._patterns[term]
 
-    def _passage(self, text: str, terms: list[str]) -> str:
-        """Long chunks are reduced to verbatim matching sentences (+/-1 neighbour)."""
+    def _passage(self, text: str, terms: list[str], hydronyms: bool = False) -> str:
+        """Long chunks are reduced to verbatim matching sentences (+/-1 neighbour); for the
+        source fields a sentence naming a water body counts as matching."""
         if self.estimate(text) <= EXCERPT_THRESHOLD_TOKENS:
             return text
         sentences = [s.strip() for s in _SENTENCE_SPLIT.split(text) if s.strip()]
@@ -668,6 +782,7 @@ class ContextManager:
         hits = {
             i for i, s in enumerate(sentences)
             if any(p.search(s.lower()) for p in patterns)
+            or (hydronyms and HYDRONYM.search(s))
         }
         if not hits:
             return text

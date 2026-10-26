@@ -1,0 +1,159 @@
+{
+ "note": "Verbatim passages from saved research runs (public documents), used as retrieval regression fixtures. Not tuned to: every rule is generic.",
+ "chunks": [
+  {
+   "city": "Luanda",
+   "country": "Angola",
+   "chunk_id": "6e725b18af8012d6",
+   "url": "https://english.www.gov.cn/news/internationalexchanges/202209/21/content_WS632ad025c6d0a757729e050d.html",
+   "page_number": null,
+   "title": "Chinese-built water projects bolster living standards in Angola",
+   "source_type": "GOVERNMENT",
+   "round": 1,
+   "text": "of water, but the water resources are not used efficiently. Thanks to the Chinese companies, the situation is improving,\" said Angolan Minister of Economy and Planning Mario Augusto Caetano Joao.\n\"Chinese companies have brought technology and experience to improve local livelihoods and revitalize sustainable development,\" said the minister.\nPOSITIVE ECONOMIC EFFECT\nThe uneven temporal-spatial distribution of rainfalls in Angola has long been a daunting obstacle for farming and the economy.\nFor example, the southern Angolan province of Cunene is dry for nine months yearly.\nRecalling an acute drought in 2018, Augusto, a local villager who did not provide his full name, said: \"fields were cracked by the sun, thirsty livestock were everywhere, and countless people were forced to flee to the neighboring country of Namibia.\"\nNonetheless, seasonal drought no longer threatens residents after Lot 1 and Lot 2 of the Infrastructure Project to Combat the Effects of Drought in Cunene Province, implemented by the Power Construction Corporation of China (PowerChina), was commissioned in April.\nWith channels connecting the Cunene River and facilities such as water intake pumping stations and reservoirs, the project can transfer water from the river to dry areas, allowing for irrigation of arable land when rains fail.\nThe project can meet the water needs of 235,000 people and support irrigation for 5,000-hectare agricultural land, said Zhao Yong, general manager of the South and West Africa Branch of STECOL Corporation under PowerChina.\nDuring a visit to the site in May, Abdulla Shahid, president of the 76th session of the UN General Assembly, said the global body would consider extending the project model to other drought-stricken countries and regions.\nSOCIAL BENEFIT\nThe Kwanza River, one of the longest rivers in Angola that has nurtured generations of Angolans, is deemed the \"mother river\" of the African country."
+  },
+  {
+   "city": "Luanda",
+   "country": "Angola",
+   "chunk_id": "87d56b14d04c5bf3",
+   "url": "https://sadc-gmi.org/wp-content/uploads/2026/07/SADC-GMI_Megacities-Dependency-Report_FINAL.pdf",
+   "page_number": 3,
+   "title": "ICZ Template",
+   "source_type": "TECHNICAL",
+   "round": 1,
+   "text": "ii\nDEPENDENCY REPORT: Determining dependency and vulnerability of groundwater in Megacities (Kinshasa,\nJohannesburg and Luanda\nEconomic Activities 23\n3.3 Water Governance and Institutional Framework 23\nKey Institutions in Groundwater Resource Management in Kinshasa 23\nKey Challenges 24\n3.4 Water Supply 25\nSurface Water Sources 25\nGroundwater Sources 25\nBottled Water 26\n3.5 Dependency on Groundwater 26\nGender Equity and Access 27\n3.6 Hydrogeological Characteristics 28\nOverview of Aquifer Systems 28\nSoil Characteristics and Porosity 29\nImplications for Groundwater Management 30\nRecharge and Climate Change Modelling 30\n3.7 Groundwater Quality 31\nMicrobiological Contamination 31\nChemical Contamination 31\nContributing Factors and Structural Vulnerabilities 32\nVariability Between Managed and Unmanaged Sources 33\n3.8 Health Impacts and Water-Related Diseases 33\nCholera and Diarrheal Diseases 33\nCholera Incidence in Kinshasa 34\nPublic Health Infrastructure and Gaps 34\n3.9 Existing Studies and Research Initiatives 34\n3.10 Conclusions 35\nRecommendations 35\n4 Groundwater Dependency in Johannesburg 37\n4.1 Introduction 37\n4.2 Overview of Johannesburg 37\nGeneral Demographics 37\nEconomic Activities 38\n4.3 Water Governance and Institutional Framework 39\nKey Challenges 41\n4.4 Water Sources 42\nSurface Water Sources 42\nGroundwater Sources 42\nBottled Water 43\n4.5 Dependency on Groundwater 43\nZuurbekom Dolomitic Well-Field 45\nPeri-Urban and Agricultural Holdings 45\nInformal Settlements in Alexandria and Thembisa 46\nFormal Urban Areas 47\n4.6 Hydrogeological Characteristics 48\nOverview of Aquifer Systems 48"
+  },
+  {
+   "city": "Luanda",
+   "country": "Angola",
+   "chunk_id": "21afafb3520d3d7a",
+   "url": "https://sadc-gmi.org/wp-content/uploads/2026/07/SADC-GMI_Megacities-Dependency-Report_FINAL.pdf",
+   "page_number": 8,
+   "title": "ICZ Template",
+   "source_type": "TECHNICAL",
+   "round": 1,
+   "text": "i\nDEPENDENCY REPORT: Determining dependency and vulnerability of groundwater in Megacities (Kinshasa,\nJohannesburg and Luanda\nExecutive Summary\nThis report explores the varying levels of groundwater dependency across the megacities of Luanda, Kinshasa\nand Johannesburg. Key findings of this assessment include:\nLuanda is supplied by surface water from its utility, EPAL and directly from rivers. Where the piped network is\neither not present or unreliable, most of the city’s residents (estimated at between 50 – 60% of the population)\nrely on the informal sector that provide water in tankers. There is local use of groundwater, concentrated in the\nhigh-income developments of Talatona, Samba and Mussulo. In poorer communities, shallow wells are\nreportedly used (unconfirmed) for water supply where there is no other option. Use of groundwater has also\nbeen reported for industrial applications and is used for small-scale irrigation to the south. The main barriers\nto groundwater exploitation are the high costs of drilling, the water quality and subsequent cost of treatment.\nThere are other potential aquifers that have not been investigated in detail (i.e. hydrogeological mapping,\ngeophysics and exploration drilling) that are further from the sea and in proximity to the major rivers that could\noffer water of a better quality and supplement water supply, especially for peri-urban communities.\nWhile policy frameworks such as the National Water Resources Strategy exist, implementation is impeded by\ninadequate funding, limited technical capacity, and reported lack of political prioritization. These factors result\nin minimal awareness and interest in groundwater abstraction at the policy level. The primary water supply\nutility has reported that there are no plans to develop groundwater for the city. Instead, the water supply is\nexpected to be sourced exclusively from the Bengo and Cuanza Rivers."
+  },
+  {
+   "city": "Luanda",
+   "country": "Angola",
+   "chunk_id": "ac1ca9f2c651ca04",
+   "url": "https://sadc-gmi.org/wp-content/uploads/2026/07/SADC-GMI_Megacities-Dependency-Report_FINAL.pdf",
+   "page_number": 8,
+   "title": "ICZ Template",
+   "source_type": "TECHNICAL",
+   "round": 1,
+   "text": "water supply\nutility has reported that there are no plans to develop groundwater for the city. Instead, the water supply is\nexpected to be sourced exclusively from the Bengo and Cuanza Rivers.\nIt can be concluded that Luanda currently has minimal reliance on groundwater but demand for groundwater\nis increasing steadily, driven by rapid urban development. Growth in the use of this resource by peri-urban\ncommunities is likely to remain stagnant unless there are reductions in the cost to access this water, or\nresources are allocated to explore deeper aquifers located further from the ocean.\nKinshasa has major groundwater resources due to high rainfall. The extent to which land use changes as well\nas increasing demand are affecting the supply need to be quantified. Various sources, including the World\nBank and academia quote different figures for official water coverage in Kinshasa ranging from 30 – 40%.\nREGIDESO, however, officially reports that the coverage rate in the 24 municipalities of Kinshasa is estimated\nat around 64%. Exact estimates of the dependency thus cannot be made but indications are that over 70% of\nthe resident population (approximately 12 million people) rely on groundwater for their daily needs.\nDependency is likely to continue to grow in the foreseeable future under pressure from urbanisation and rapid\npopulation growth.\nThe major risk to the groundwater resources of Kinshasa is from inadequate sanitation infrastructure, which\nrelies on infiltration. Solid waste management and potential contamination from chemical and hydrocarbon\nsources may potentially affect the long-term dependency.\nJohannesburg sources most of its water from surface water sources, however groundwater does play a part.\nIn Randfontein, groundwater is the main source of water for agriculture and water supply to small holdings,\nindicating local high dependency. Historically groundwater was a major component of water supply for the"
+  },
+  {
+   "city": "Luanda",
+   "country": "Angola",
+   "chunk_id": "53592aa3672130b0",
+   "url": "https://sadc-gmi.org/wp-content/uploads/2026/07/SADC-GMI_Megacities-Dependency-Report_FINAL.pdf",
+   "page_number": 50,
+   "title": "ICZ Template",
+   "source_type": "TECHNICAL",
+   "round": 1,
+   "text": "43\nDEPENDENCY REPORT: Determining dependency and vulnerability of groundwater in Megacities (Kinshasa,\nJohannesburg and Luanda\nWell Fields\nThe Zuurbekom Wellfield, located in Gauteng's West Rand region, holds significant historical importance in\nSouth Africa's water supply development.\nIn 1898, prospector and geologist David Draper discovered substantial underground water reserves at\nZuurbekom. This discovery was pivotal, as it provided a reliable water source for the rapidly growing\nJohannesburg area, especially crucial during the gold rush era when water demand surged due to population\ngrowth and industrial activities.\nTo harness this resource, the Johannesburg Waterworks Estate and Exploration Company Ltd constructed\nthe Zuurbekom Pumping Station in 1899. The facility extracted water from wells on the farm, with the main\npump house built directly over one of these wells. This infrastructure supplied Johannesburg with sufficient\nwater until the early 1900s.\nRecognizing the need for a centralized water management system, the Rand Water Board was established in\n1903. By 1905, it had taken over the Zuurbekom Pumping Station, integrating it into a broader network aimed\nat consolidating water resources for the Witwatersrand region.\nHowever, like many groundwater sources in the region, the sustainability of Zuurbekom wellfield was\nchallenged by issues such as aquifer over-extraction, urban contamination, and limited recharge potential due\nto hard rock geology and impervious surfaces resulting from urban development.\nBy the mid-1900s the city's reliance shifted towards large-scale, inter-basin water transfer schemes (notably\nfrom the Vaal River system) and the role of wellfields like Zuurbekom diminished. Today, it is remembered as\na significant chapter in Johannesburg’s hydrological heritage, representing early engineering efforts to secure\nlocal water resources before the advent of regional supply infrastructure like the Rand Water system."
+  },
+  {
+   "city": "Nairobi",
+   "country": "Kenya",
+   "chunk_id": "1d6232a431bd9ae7",
+   "url": "https://nairobiwater.co.ke/reservoirs-dams/",
+   "page_number": null,
+   "title": "Reservoirs/Dams - Nairobi Water Company",
+   "source_type": "UTILITY",
+   "round": 1,
+   "text": "Reservoir/Dams\nReservoir/Dams\nLocated in Ndakaini in Murang’a County Completed in 1994 under the Third Nairobi Water Supply\nLocated in Njambini, Nyandarua County First phase of construction completed in 1955 and second in\nLocated in Githunguri, Kiambu County on Ruiru River Completed in 1950 Storage Capacity is 2.9\nConstructed in 1913 Total production for Spring No.1 is estimated to be 2,000m3 per day,"
+  },
+  {
+   "city": "Nairobi",
+   "country": "Kenya",
+   "chunk_id": "4de24f6ab32c8096",
+   "url": "https://www.nature.org/content/dam/tnc/nature/en/documents/Nairobi-Water-Fund-Business-Case_FINAL.pdf",
+   "page_number": 12,
+   "title": "Upper Tana-Nairobi Water Fund A Business Case",
+   "source_type": "TECHNICAL",
+   "round": 3,
+   "text": "is the most productive basin for agriculture in Kenya, provides\nwater to key national parks, generates half of the total hydropower\nproduction of the country, and supplies 95% of Nairobi’s water.3\nFigure 2 shows the principal users that rely on the basin’s water\nresources. Rain-fed smallholder agriculture uses 36% of the\nwater budget, mostly through transpiration from crops. Another\nmajor water user at 33% is hydropower; although this use is\nnon-consumptive (meaning the flow is returned to the river after\nbeing used for power generation). Irrigated agriculture utilises\nabout 4% of the water budget, while around 2% is abstracted for\nNairobi’s water supply.\nThe Upper Tana basin supplies Nairobi city water through the\nSasumua and Ndakaini dams drawing water from the Chania\nand Thika rivers respectively (Figure 3). Further downstream in\nthe basin are the main hydropower reservoirs of Masinga and\nKamburu.\nUpstream of the Masinga reservoir, there are multiple small\nhydropower facilities, including the Tana power station (20 MW),\nSagana power station (1.5 MW), Ndula power station (2.0 MW),\nMesco power station (0.5 MW), and Wanji power station (7.4\nMW). While their contribution to energy production along the\nTana River is modest, sedimentation at the dams for these power\nstations may also be an issue.\nThe existing hydropower and water-supply infrastructure as well\nas the approximate location of a proposed new water supply\n3 NCWSC Production Records 2014\nFigure 1 Location of the proposed Upper Tana-Nairobi\nWater Fund\nRainfall 8103\nHydro￾power\n2692\nForests\nand natural\nvegetation\n2025\nSmallholder\nagriculture\n2915\nIrrigation\n326\nSupply\nNairobi\n145\nFigure 2 Typical annual water use (in millions of cubic meters)\nof the principal users relying on the water supply of the Upper\nTana River basin above Masinga dam (data from WRMA, 2011)"
+  },
+  {
+   "city": "Vienna",
+   "country": "Austria",
+   "chunk_id": "efce219c582c23b6",
+   "url": "https://www.wien.gv.at/video/403/Viennas-Water-short",
+   "page_number": null,
+   "title": "Archiv - Viennas Water short - wien.at Video",
+   "source_type": "GOVERNMENT",
+   "round": 1,
+   "text": "Mitschrift\nVienna uses 390 million litres of water - every day. To ensure the sustainability of the water supply to the growing metropolis, the important resource is treated with care.\nVienna's water is supplied by the Limestone Alps of Lower Austria and Styria. The water is monitored constantly, from the springs of the Rax, Schneeberg and Hochschwab all the way to Vienna's supply system.\nChristoph Rigler: \"It begins with the analysis of the water, its arrival on the surface, the extraction at the spring and continues in order to ensure a safe, hygienic delivery route to Vienna.\"\nTo ensure the water remains clean, mountain huts in the catchment area are equipped with small water treatment plants. The forests around the springs are managed carefully, to ensure the correct ratio of native fir, spruce and beech trees.\nGerda Frank: \"The mixture is so important because the different tree varieties have different root structures and reach different levels of the soil. The ground is therefore better able to filter out sediment, and absorb and retain the water.\"\nThe water flows downhill to Vienna without the need for pumps, travelling 150 kilometres along the First Spring Water Main and 180 kilometres along the second main.\nKonrad Prochaska: \"In Vienna, the gravitational water supply makes up about 97 percent of the total, which makes it very environmentally friendly.\"\nThree percent of Vienna's water consists of groundwater, which is extracted from wells alongside the Danube.\nThe water is distributed to Vienna's households through 29 reservoirs located at various levels throughout the city.\nOlder reservoirs like the one on the Wienerberg have been renovated and modernised. The new Dreimarkstein reservoir on the Kahlenberg supplies 500 households.\nMarcella Fenz: \"Today's technical standards require that reservoirs be built with two chambers, so that one chamber can be drained for cleaning, inspection or repairs without interrupting the water supply. \""
+  },
+  {
+   "city": "Vienna",
+   "country": "Austria",
+   "chunk_id": "c2f6ea98f18592c0",
+   "url": "https://www.wien.gv.at/pdf/ma31/drinking-water-vienna.pdf",
+   "page_number": 2,
+   "title": "Drinking Water for Vienna",
+   "source_type": "GOVERNMENT",
+   "round": 2,
+   "text": "Refreshingly\nViennese\nDirectly from\nthe spring\nAll of Vienna is supplied with top-quality\ndrinking water. The spring water originates\nin the Lower Austrian-Styrian Alps and\nreaches Vienna via two spring water\nmains. At the endpoints of these mains,\nit is introduced into reservoirs and then\ndistributed via the city’s underground\npipe network, which supplies Vienna’s\nflats and houses with mountain spring\nwater. In periods of very high water\nconsumption, groundwater resources\nensure additional reliability of supply.\nGood for the\nenvironment\nThe mountain spring water reaches\nVienna by following the natural gradient.\nThis means that there is no need for\npumps. Water distribution across Vienna\nis likewise mostly achieved by means of\ngravity. Hence, drinking water from the\ntap equals a minimal carbon footprint,\ncontrary to the consumption of bottled\nbeverages. Since mountain spring water\nalso allows for the generation of more\nelectricity than is needed for water\nsupply, tap water is climate-neutral.\nStrictly\nprotected\nAll areas where spring water and\ngroundwater are extracted are subject\nto extensive protection. They are left\nin a largely natural state and managed\nwith only a minimum of human inter￾vention. Special regulations protect these\nresources against contamination. For\nexample, all industrial and commercial\nactivities are prohibited in water\nprotection zones. This is why Vienna’s\nwater is of such outstanding quality.\nSpring water protection zone in the Hochschwab massif\nVienna’s spring water mains\nVienna’s water supply can count on fully 70 springs.\nThe springs of the 1st Spring Water Main rise in the\nmountain regions of Rax, Schneeberg and Schneealpe.\nThe water from the Pfannbauern spring – which is\nsituated farthest from Vienna – flows 150 kilometres in\nthe spring water main before reaching the city.\nThe springs feeding the 2nd Spring Water Main originate\nat the foot of the Hochschwab massif. Crystal-clear water"
+  },
+  {
+   "city": "Vienna",
+   "country": "Austria",
+   "chunk_id": "c17ae44d322caa62",
+   "url": "https://www.wien.gv.at/pdf/ma31/drinking-water-vienna.pdf",
+   "page_number": 2,
+   "title": "Drinking Water for Vienna",
+   "source_type": "GOVERNMENT",
+   "round": 2,
+   "text": "Vienna – flows 150 kilometres in\nthe spring water main before reaching the city.\nThe springs feeding the 2nd Spring Water Main originate\nat the foot of the Hochschwab massif. Crystal-clear water\ngushes forth from the springs at a maximum temperature\nof eight degrees Celsius in both summer and winter. It\narrives in Vienna after a journey of 180 kilometres.\nGroundwater wells\nThe Lobau, Moosbrunn, Danube Island and Nussdorf\nwaterworks ensure that Vienna’s water supply is always\nable to act as needed. The advantages of groundwater\nlie above all in its rapid availability for water supply as\nwell as in its high quality.\nGroundwater is mostly abstracted in the Donau-Auen\nNational Park, which is situated in the Lobau wetlands,\nand in the southern Vienna Basin, one of Europe’s\nbiggest aquifers. The excellent filtering and purification\ncapacity of the soil ensures high groundwater quality.\nWhenever required, the City of Vienna can thus draw\nwater from 30 wells.\nMödling aqueduct\nHousehold water use\nThe daily water consumption per person in Vienna is 130 litres, composed as follows:\n44 litres\nfor showering,\nbathing\n15 litres\nfor doing\nlaundry\n40 litres\nfor toilet\nflushing\n9 litres\nfor personal\nhygiene\n8 litres\nfor cleaning\n5 litres\nfor watering\nplants\n6 litres\nfor dishwashing\n3 litres\nfor drinking,\ncooking\n2 3"
+  },
+  {
+   "city": "Houston",
+   "country": "United States of America",
+   "chunk_id": "b326b54d3856eff8",
+   "url": "https://msdh.ms.gov/ccr/2024/271576.pdf",
+   "page_number": 1,
+   "title": "Microsoft Word - houston city of 24",
+   "source_type": "GOVERNMENT",
+   "round": 1,
+   "text": "2024 Annual Drinking Water Quality Report\nCity of Houston\nPWS#: 090005\nJune 2025\nWe're pleased to present to you this year's Annual Quality Water Report. This report is designed to inform you about the quality water\nand services we deliver to you every day. Our constant goal is to provide you with a safe and dependable supply of drinking water. We\nwant you to understand the efforts we make to continually improve the water treatment process and protect our water resources. We\nare committed to ensuring the quality of your water.\nContact & Meeting Information\nIf you have any questions about this report or concerning your water utility, please contact Lisa Easley at 662.456.2328. We want our\nvalued customers to be informed about their water utility. If you want to learn more, please attend any of our regularly scheduled\nmeetings. They are held on the first Tuesday of each month at 5:30 PM at the Houston City Hall.\nSource of Water\nOur water source is from wells drawing from the Eutaw Aquifer. The source water assessment has been completed for our public water\nsystem to determine the overall susceptibility of its drinking water supply to identify potential sources of contamination. A report\ncontaining detailed information on how the susceptibility determinations were made has been furnished to our public water system and\nis available for viewing upon request. The wells for the City of Houston have received a lower susceptibility ranking to contamination.\nPeriod Covered by Report\nWe routinely monitor for contaminants in your drinking water according to federal and state laws. This report is based on results of our\nmonitoring period of January 1st to December 31st, 2024. In cases where monitoring wasn’t required in 2024, the table reflects the most\nrecent testing done in accordance with the laws, rules, and regulations.\nAs water travels over the surface of land or underground, it dissolves naturally occurring minerals and, in some cases, radioactive"
+  },
+  {
+   "city": "Houston",
+   "country": "United States of America",
+   "chunk_id": "657e2177d269e5a7",
+   "url": "https://www.houstontx.gov/cip/21cipadopt/e_water.pdf",
+   "page_number": 2,
+   "title": "Cadenza Document",
+   "source_type": "GOVERNMENT",
+   "round": 1,
+   "text": "Water Utility System\nThe Water Utility System delivers treated surface and ground water to customers\nthrough a series of storage tanks, pump stations, transmission and distribution\nmains. This potable water is sold to domestic, commercial, industrial,\ngovernmental and other customers in the Houston metropolitan area. In\naddition, untreated surface water is delivered for sale to governmental, industrial\nand agricultural customers. The System provides water to the residents of\nHouston as well as municipalities, municipal utility districts, and water authorities\noutside the City limits. The service population is approximately 4 million.\nThe System relies on 86% Surface Water and 14% Groundwater sources.\nSurface water is sourced from Lake Conroe and Lake Houston in the San Jacinto\nRiver System and Lake Livingston in the Trinity River System. In aggregate,\nthese supplies are sufficient to meet the City’s expected water demands beyond\nthe year 2060. However, additional water supply strategies have been\ndeveloped to meet the long-term needs. In addition, the System continues to\nshift its supply source from groundwater to surface water in accordance with\nstate mandates.\nThe Capital Improvement Plan (CIP) provides an estimate of delivery by fiscal\nyear for the next five years. The FY2021-2025 CIP includes approximately $1.8\nbillion of Water Utility System improvements financed by a combination of pay￾as-you-go, revenue bonds and adopted contributed capital.\nHighlights of the FY2021-2025 CIP:\n• Continue funding the Design-Build contract for the 320 MGD expansion of\nthe Northeast Water Purification Plant with regional water authority funding\npartners\n• Continue to construct surface water transmission lines to access and deliver\nexpanded treated surface water supplies for Houston and surrounding water\nauthorities\n• Continue funding for replacement of neighborhood water mains to improve\nfire protection, water quality, system reliability and assure compliance with"
+  },
+  {
+   "city": "Houston",
+   "country": "United States of America",
+   "chunk_id": "6c31275a8f6656a2",
+   "url": "https://houstonpublicworks.org/media/4811/download?inline",
+   "page_number": 6,
+   "title": "Houston Water Quality Report | Jan - Dec 2024",
+   "source_type": "TECHNICAL",
+   "round": 3,
+   "text": "Houston Water Quality Report 2024 HPW | 6\nGroundwater\n13.5%\nSurface Water\n86.5%\nGROUNDWATER SOURCE\n104 Wells (Evangeline & Chicot Aquifers) at\ndepths greater than 750 feet\nAVERAGE DAILY\nWATER PRODUCED\n509 M Gallons\nCUSTOMERS\n2.4 M\nParameter/ Substance (units)\n(sampled in 2024 unless noted)\nHighest Level Allowed\n(EPA’s MCL)\nIdeal Goal\n(EPA’s MCLG)\nDetections\nMinimum Average Maximum\nMONITORED AT WATER PLANTS\nArsenic1 (ppb) 10 0 ND 1.8 9.9\nAtrazine (ppb) 3 3 ND 0.1 2.3\nBarium (ppm) 2 2 0.04 0.12 0.36\nCombined Radium (pCi/L) 5 0 1.63 1.77 1.91\nCyanide (ppb) 200 200 ND 52.5 200\nFluoride (ppm) 4 4 0.11 0.21 0.28\nGross Alpha (pCi/L) 15 0 6.8 7 7.1\nNitrate (ppm) 10 10 ND 0.21 0.95\nSimazine (ppb) 4 4 ND 0.02 0.14\nTurbidity (NTU) (TT) 95% of monthly samples ≤ 0.3 NTU NA Lowest Monthly Percentage ≤ 0.3 NTU: 99%\nHighest Single Measurement: 0.8 NTU\nTurbidity has no health effects; however, turbidity can interfere with disinfection and provide a medium for microbial growth. Turbidity may indicate the presence of disease￾causing organisms. These organisms include bacteria, viruses, and parasites that can cause symptoms such as nausea, cramps, diarrhea, and associated headaches.\nMONITORED IN DISTRIBUTION SYSTEMS\nChloramines (Disinfectant) (ppm) 4.0 (MRDL) <4.0 (MRDLG) 0.03 3.0 5.4\nChlorite (Disinfectant) (ppm) 1 0.8 ND 0.002 0.01\nTotal Coliforms 5% of monthly samples are\npositive 0% Highest % of Positive 1.4%\nNitrate (ppm) 10 10 ND 0.39 1.48\nNitrite (ppm) 1 1 ND 0.03 0.30\nHaloacetic Acids (ppb) Yearly Average (LRAA) <60 NA Highest LRAA: 39 ppb Individual sample results\nrange from not detected to 50.4 ppb.\nTotal Trihalomethanes (ppb) Yearly Average (LRAA) <80 NA Highest LRAA: 45 ppb Individual sample results\nrange from not detected to 48.5 ppb.\nMONITORED AT CUSTOMER TAP\nLead (ppb) AL= 90% below 15 ppb 0 90% below 4.4 ppb\nNine samples above 15 ppb\nCopper (ppm) AL= 90% below 1.3 ppm 1.3 90% below 0.25 ppm\nTwo samples above 1.3 ppm\nMain System | TX1010013\nSURFACE WATER SOURCE"
+  },
+  {
+   "city": "Houston",
+   "country": "United States of America",
+   "chunk_id": "21a1f416737130a8",
+   "url": "https://houstonpublicworks.org/sites/g/files/nwywnm456/files/doc/003_2025_houston_water_quality_report.pdf",
+   "page_number": 7,
+   "title": "PDF Water Quality Report",
+   "source_type": "TECHNICAL",
+   "round": 3,
+   "text": "Houston Water Quality Report 2025 HPW | 7\nMain System | TX1010013\nMONITORED AT WATER PLANTS\nParameter / Substance (units) Highest Level Allowed Ideal Goal Detections\n(Sampled in 2025 unless noted) (EPA’s MCL) (EPA’s MCLG) Minimum Average Maximum\n2,4-D (ppb) 70 70 ND 0.02 0.1\nArsenic¹ (ppb) 10 0 ND 1.7 6.7\nAtrazine (ppb) 3 3 ND 0.08 0.19\nBarium (ppm) 2 2 0.03 0.18 0.40\nCombined Uranium (ppb) 30 0 13²\nCyanide (ppb) 200 200 ND 4 40\nDi(2-Ethylhexyl) Adipate (ppb) 400 400 ND 0.11 2.2\nDi(2-Ethylhexyl) Phthalate (ppb) 6 0 ND 0.03 0.6\nFluoride (ppm) 4 4 ND 0.11 0.71\nGross Alpha (pCi/L) 15 0 2²\nGross Beta (pCi/L) 50 0 8.2²\nNitrate (ppm) 10 10 ND 0.11 0.79\nSelenium (ppb) 50 50 ND 1.2 7.3\nSimazine (ppb) 4 4 ND 0.01 0.09\nThallium, Total (ppb) 2 0.5 ND 0 0.85\nTurbidity (NTU) (TT) 95% of monthly NA Lowest Monthly Percentage\nsamples ≤ 0.3 NTU ≤ 0.3 NTU: 95%\nHighest Single Measurement: 1.95 NTU\nTurbidity has no health effects; however, turbidity can interfere with disinfection and provide a medium for microbial growth. Turbidity may indicate the pres￾ence of disease- causing organisms. These organisms include bacteria, viruses, and parasites that can cause symptoms such as nausea, cramps, diarrhea,\nand associated headaches.\nAVERAGE DAILY\nWATER PRODUCED\n500M Gallons\nCUSTOMERS\n2.97M\nGroundwater\n9.7%\nSurface Water\n90.3%\nSURFACE WATER SOURCE\nSan Jacinto River (Lake Conroe & Lake\nHouston) Trinity River (Lake Livingston)\nGROUNDWATER SOURCE\n104 Wells (Evangeline & Chicot\nAquifers) at depths greater than 750 feet\nContinued next page"
+  }
+ ]
+}

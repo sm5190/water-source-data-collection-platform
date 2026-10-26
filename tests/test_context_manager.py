@@ -103,9 +103,17 @@ def test_per_source_cap(state):
              for i in range(5)]
     chunks = [chunk(f"c{i}", t, url="https://same.org") for i, t in enumerate(texts)]
     bundle = mgr.build(extract(["utility_name"]), state, chunks)
+    # strong chunks about the city may exceed the cap, up to twice it
+    assert bundle.stats["chunks_selected"] == 4
+    assert bundle.stats["source_cap_relaxed"] == 2
+    assert bundle.stats["dropped_source_cap"] == 1
+    assert len(bundle.sources) == 1
+    # chunks that aren't about the city keep the strict cap
+    elsewhere = [chunk(f"e{i}", t.replace("Toronto", "the city"), url="https://same.org")
+                 for i, t in enumerate(texts)]
+    bundle = mgr.build(extract(["utility_name"]), state, elsewhere)
     assert bundle.stats["chunks_selected"] == 2
     assert bundle.stats["dropped_source_cap"] == 3
-    assert len(bundle.sources) == 1
 
 def test_seed_pass_gives_each_target_evidence(state, mgr):
     utility_chunks = [chunk(f"u{i}", f"{UTILITY_TEXT} Detail {i} on utility governance {i}.")
