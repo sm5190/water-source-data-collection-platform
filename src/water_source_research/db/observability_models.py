@@ -11,7 +11,7 @@ heartbeat and resource sample only), so its size is bounded by the number of sta
 
 from datetime import datetime
 from typing import Any
-from sqlalchemy import Boolean, DateTime, Index, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from .models import Base, JSONType, utcnow
 
@@ -67,4 +67,36 @@ class RunTraceRecord(Base):
     span_id: Mapped[str] = mapped_column(String(16))
     sampled: Mapped[bool] = mapped_column(Boolean, default=False)
     instance_id: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class ProviderUsageRecord(Base):
+    """One external API call (an LLM call today; Firecrawl and other paid providers later):
+    the single ledger for usage and cost. Nullable measures are UNKNOWN (never 0): tokens the
+    provider didn't report, cost of a model without a configured price."""
+
+    __tablename__ = "provider_usage"
+    __table_args__ = (Index("ix_provider_usage_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    category: Mapped[str] = mapped_column(String(16))  # research | evaluation | procedure | other
+    kind: Mapped[str] = mapped_column(String(16))  # LLM | CRAWL | SEARCH
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(String(128))  # model, or the API operation
+    task: Mapped[str | None] = mapped_column(String(64))
+    field_key: Mapped[str | None] = mapped_column(String(128))
+    prompt_version: Mapped[str | None] = mapped_column(String(64))
+    requests: Mapped[int] = mapped_column(Integer, default=0)  # HTTP requests (0 = cache hit)
+    retries: Mapped[int] = mapped_column(Integer, default=0)
+    cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
+    attempt_errors: Mapped[dict[str, Any] | None] = mapped_column(JSONType)  # kind -> count
+    error: Mapped[str | None] = mapped_column(String(32))  # final error kind, if it failed
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    cached_tokens: Mapped[int | None] = mapped_column(Integer)
+    credits: Mapped[float | None] = mapped_column(Float)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[float | None] = mapped_column(Float)
+    cost_basis: Mapped[str | None] = mapped_column(String(128))  # price-table key used
+    trace_id: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -152,3 +152,30 @@ class ResearchApiClient:
 
     def queue_stats(self) -> dict[str, Any]:
         return self._get("/research/queue/stats")
+
+    # --- monitoring -----------------------------------------------------------------------
+
+    def mon_overview(self, hours: float = 24) -> dict[str, Any]:
+        return self._get("/monitoring/overview", hours=hours)
+
+    def mon_runs(self, limit: int = 200) -> list[dict[str, Any]]:
+        return self._get("/monitoring/runs", limit=limit)
+
+    def mon_run(self, run_id: str) -> dict[str, Any]:
+        return self._get(f"/monitoring/runs/{run_id}")
+
+    def mon_workers(self) -> list[dict[str, Any]]:
+        return self._get("/monitoring/workers")
+
+    def mon_crashes(self, hours: float = 24 * 7) -> list[dict[str, Any]]:
+        return self._get("/monitoring/crashes", hours=hours)
+
+    def mon_recovery(self, hours: float = 24 * 7) -> list[dict[str, Any]]:
+        return self._get("/monitoring/recovery", hours=hours)
+
+    def mon_usage(self, hours: float | None = 24,
+                  group_by: str = "provider_model") -> dict[str, Any]:
+        return self._get("/monitoring/usage", hours=hours or 0, group_by=group_by)
+
+    def mon_alerts(self) -> dict[str, Any]:
+        return self._get("/monitoring/alerts")

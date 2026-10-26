@@ -54,6 +54,13 @@ class ObservabilitySettings(BaseModel):
     # Langfuse (optional; needs LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST).
     langfuse_enabled: bool = False
     langfuse_flush_interval_seconds: float = Field(default=5.0, gt=0)
+    langfuse_ui_url: str = ""  # e.g. https://cloud.langfuse.com/project/<id> (trace links)
+
+    # --- usage ledger and monitoring (Cycle 2) ------------------------------------------
+    usage_ledger: bool = True  # record every external API call in provider_usage
+    collector_health_url: str = "http://localhost:13133/"
+    jaeger_api_url: str = "http://localhost:16686"
+    health_probe_timeout_seconds: float = Field(default=1.5, gt=0)
 
     @model_validator(mode="after")
     def _validate(self) -> "ObservabilitySettings":

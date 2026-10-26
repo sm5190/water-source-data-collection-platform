@@ -34,6 +34,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
     configure_telemetry("replay")  # optional (OBSERVABILITY__OTEL_ENABLED)
+    from water_source_research.db.session import get_engine
+    from water_source_research.observability.usage import configure_usage
+    configure_usage(get_engine())  # extraction calls -> provider_usage
     try:
         code = run_async(main(args.run_ids, args.max_rounds))
     finally:

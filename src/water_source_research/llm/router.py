@@ -207,7 +207,8 @@ class ReliableStructuredLLM:
             span.set_attribute("llm.model", self.model)
             span.set_attribute("llm.task", self.task)
             span.set_attribute("llm.prompt_version", self.prompt_version)
-            stats = _CallStats(span, self.provider, self.model)
+            stats = _CallStats(span, self.provider, self.model, self.task,
+                               self.prompt_version)
             try:
                 yield stats
             finally:
@@ -335,13 +336,20 @@ def _failed(span, exc: LLMError) -> None:
         span.set_attribute("llm.retry_after_s", exc.retry_after)
     span.set_status(Status(StatusCode.ERROR, exc.kind.value))
 
+# Spend category of a model call by router task (the judge evaluates; it isn't research).
+TASK_CATEGORY = {"extract": "research", "eval_judge": "evaluation", "distill": "procedure"}
+
 class _CallStats:
     """Per-call telemetry, written to the ``llm.call`` span (provider/model/tokens/latency)."""
 
-    def __init__(self, span, provider: str = "", model: str = "") -> None:
+    def __init__(self, span, provider: str = "", model: str = "", task: str = "",
+                 prompt_version: str = "") -> None:
         self.span = span
         self.provider = provider
         self.model = model
+        self.task = task
+        self.prompt_version = prompt_version
+        self.attempt_errors: dict[str, int] = {}
         self.cache_hit = False
         self.attempts = 0
         self.repairs = 0
@@ -374,6 +382,7 @@ class _CallStats:
         self.attempts += 1
         self.error = exc.kind.value
         self.status = exc.status
+        self.attempt_errors[exc.kind.value] = self.attempt_errors.get(exc.kind.value, 0) + 1
         return exc.retryable
 
     def flush(self) -> None:
@@ -418,6 +427,7 @@ class _CallStats:
             span.set_attribute("langfuse.observation.type", "span")
             span.set_attribute("llm.usage_known", False)
             record_content(span, prompt=self.prompt)
+            self._ledger(usage_known=False, cost=None)
             return
         span.set_attribute("langfuse.observation.type", "generation")
         span.set_attribute("langfuse.observation.model.name", self.model)
@@ -425,6 +435,7 @@ class _CallStats:
         span.set_attribute("gen_ai.provider.name", self.provider)
         span.set_attribute("gen_ai.request.model", self.model)
         span.set_attribute("llm.usage_known", usage_known)
+        cost = None
         if usage_known:
             span.set_attribute("gen_ai.usage.input_tokens", self.prompt_tokens)
             span.set_attribute("gen_ai.usage.output_tokens", self.completion_tokens)
@@ -444,6 +455,30 @@ class _CallStats:
             span.set_attribute("langfuse.observation.level", "ERROR")
             span.set_attribute("langfuse.observation.status_message", self.error)
         record_content(span, prompt=self.prompt, response=self.response)
+        self._ledger(usage_known=usage_known, cost=cost)
+
+    def _ledger(self, *, usage_known: bool, cost: float | None) -> None:
+        """One provider_usage row for this logical call (the usage/cost ledger)."""
+        from water_source_research.observability.llm_telemetry import llm_context
+        from water_source_research.observability.usage import record_usage
+        ctx = llm_context.get() or {}
+        ctx_span = self.span.get_span_context()
+        succeeded = self.error is None or self.response is not None
+        record_usage({
+            "run_id": ctx.get("run_id"), "category": ctx.get("category")
+            or TASK_CATEGORY.get(self.task, "other"), "kind": "LLM",
+            "provider": self.provider, "model": self.model, "task": self.task,
+            "field_key": ctx.get("field_key"), "prompt_version": self.prompt_version,
+            "requests": self.attempts, "cache_hit": self.cache_hit,
+            "retries": max(0, self.attempts - 1 - self.repairs),
+            "attempt_errors": dict(self.attempt_errors) or None,
+            "error": None if succeeded else self.error,
+            "input_tokens": self.prompt_tokens if usage_known else None,
+            "output_tokens": self.completion_tokens if usage_known else None,
+            "cached_tokens": self.cached_tokens if usage_known else None,
+            "latency_ms": self.latency_ms, "cost_usd": cost,
+            "cost_basis": f"{self.provider}:{self.model}" if cost is not None else None,
+            "trace_id": f"{ctx_span.trace_id:032x}" if ctx_span.is_valid else None})
 
 # Optional per-task log of model calls: a caller (e.g. a graph node) sets a list here to learn
 # what its calls cost; each structured call appends one record when it finishes.

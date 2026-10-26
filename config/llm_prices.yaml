@@ -8,3 +8,7 @@ prices: {}
 #     input_per_1m: 0.0
 #     cached_input_per_1m: 0.0
 #     output_per_1m: 0.0
+# Credit-priced APIs (Firecrawl and similar), USD per credit; recorded in provider_usage.credits
+# once those adapters exist. Unlisted = cost UNKNOWN.
+credit_prices: {}
+#   "firecrawl:scrape": 0.0

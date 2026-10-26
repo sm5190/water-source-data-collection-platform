@@ -96,6 +96,50 @@ class JsonLinesSpanExporter(SpanExporter):
         self._handler.close()
         self._log.removeHandler(self._handler)
 
+class CountingExporter(SpanExporter):
+    """Counts export outcomes of the wrapped exporter (the backend's health as seen from this
+    process: published in the worker heartbeat and checked by alerts). Never raises."""
+
+    def __init__(self, inner: SpanExporter, name: str) -> None:
+        self.inner = inner
+        self.name = name
+        self.ok = 0
+        self.failed = 0
+        self.last_failure_at: str | None = None
+        self.last_success_at: str | None = None
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        from datetime import UTC, datetime
+        try:
+            result = self.inner.export(spans)
+        except Exception:  # noqa: BLE001
+            result = SpanExportResult.FAILURE
+        now = datetime.now(UTC).isoformat()
+        if result is SpanExportResult.SUCCESS:
+            self.ok += 1
+            self.last_success_at = now
+        else:
+            self.failed += 1
+            self.last_failure_at = now
+        return result
+
+    def shutdown(self) -> None:
+        self.inner.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self.inner.force_flush(timeout_millis)
+
+    def stats(self) -> dict[str, Any]:
+        return {"exporter": self.name, "exports_ok": self.ok, "exports_failed": self.failed,
+                "last_failure_at": self.last_failure_at,
+                "last_success_at": self.last_success_at}
+
+_counting: CountingExporter | None = None
+
+def exporter_stats() -> dict[str, Any] | None:
+    """This process's span export health (None when nothing is exported)."""
+    return _counting.stats() if _counting is not None else None
+
 def span_record(s: ReadableSpan) -> dict[str, Any]:
     ctx = s.get_span_context()
     return {"name": s.name, "trace_id": f"{ctx.trace_id:032x}", "span_id": f"{ctx.span_id:016x}",
@@ -136,6 +180,8 @@ def configure_telemetry(role: str, *, instance_id: str | None = None,
         provider = TracerProvider(resource=resource, sampler=research_sampler(s.sample_ratio))
         exporter = _exporter(full, role) if s.otel_enabled else None
         if exporter is not None:
+            global _counting
+            exporter = _counting = CountingExporter(exporter, s.trace_exporter)
             provider.add_span_processor(BatchSpanProcessor(
                 exporter, max_queue_size=s.span_queue_size,
                 max_export_batch_size=min(s.span_batch_size, s.span_queue_size),

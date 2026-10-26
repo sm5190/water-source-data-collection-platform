@@ -123,6 +123,9 @@ def compare(engine, args) -> int:
 if __name__ == "__main__":
     from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
     configure_telemetry("evaluation")  # optional (OBSERVABILITY__OTEL_ENABLED)
+    from water_source_research.db.session import get_engine
+    from water_source_research.observability.usage import configure_usage
+    configure_usage(get_engine())  # judge calls -> provider_usage
     try:
         code = main()
     finally:

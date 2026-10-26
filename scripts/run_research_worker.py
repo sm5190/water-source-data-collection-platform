@@ -27,7 +27,11 @@ from water_source_research.agents.runtime import build_production_graph
 from water_source_research.core.config import get_settings
 from water_source_research.db.session import get_engine
 from water_source_research.llm.router import llm_requests_in_flight
-from water_source_research.observability.otel import configure_telemetry, shutdown_telemetry
+from water_source_research.observability.otel import (
+    configure_telemetry, exporter_stats, shutdown_telemetry,
+)
+from water_source_research.observability.usage import configure_usage
+from water_source_research.observability.usage import recorder as usage_recorder
 from water_source_research.observability.worker_events import (
     EventKind, atomic_write_json, build_sink,
 )
@@ -51,6 +55,7 @@ async def main(once: bool, concurrency: int | None, log_dir: Path, instance_id: 
     if concurrency:
         queue_settings = queue_settings.model_copy(update={"worker_concurrency": concurrency})
     engine = get_engine()
+    configure_usage(engine, settings)  # provider_usage ledger (soft)
     sink = build_sink(log_dir, instance_id, engine, obs.events_max_mb)
     procedures = (build_procedure_services(settings, engine)
                   if settings.procedure_memory.enabled else None)
@@ -99,8 +104,11 @@ async def main(once: bool, concurrency: int | None, log_dir: Path, instance_id: 
                 signal.signal(sig, lambda s, _: on_signal(s))
 
         def activity() -> dict:
+            ledger = usage_recorder()
             return {**worker.activity(), "llm_requests_in_flight": llm_requests_in_flight(),
-                    "fetches_in_flight": fetches_in_flight(), **checkpoint_stats.snapshot()}
+                    "fetches_in_flight": fetches_in_flight(), **checkpoint_stats.snapshot(),
+                    "telemetry": exporter_stats(),
+                    **(ledger.stats() if ledger is not None else {})}
 
         def on_sample(sample: dict) -> None:
             sink.instance(instance_id, last_heartbeat_at=datetime.now(UTC), last_sample=sample,

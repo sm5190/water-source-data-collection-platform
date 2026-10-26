@@ -649,7 +649,9 @@ def run_evaluation(engine, research_run_id: str, dataset_id: str | None = None,
     from water_source_research.observability.otel import get_tracer
     with get_tracer().start_as_current_span("evaluation.run") as span:
         span.set_attribute("research.run_id", research_run_id)
-        eval_id = _run_evaluation(engine, research_run_id, dataset_id, policy, judge)
+        from water_source_research.observability.llm_telemetry import llm_call_context
+        with llm_call_context(run_id=research_run_id, category="evaluation"):
+            eval_id = _run_evaluation(engine, research_run_id, dataset_id, policy, judge)
         # Found in the tracing backend by research.run_id; nothing is written to research
         # tables (evaluation only reads them).
         span.set_attribute("evaluation.id", eval_id)

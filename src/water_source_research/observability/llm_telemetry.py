@@ -38,7 +38,8 @@ CONTEXT_ATTRIBUTES = {"run_id": "research.run_id", "field_key": "research.field_
                       "discovery_round": "research.discovery_round",
                       "reextraction": "extraction.reextraction",
                       "attempt": "extraction.attempt", "bundle_id": "context.bundle_id",
-                      "sources": "extraction.sources", "task_kind": "llm.task_kind"}
+                      "sources": "extraction.sources", "task_kind": "llm.task_kind",
+                      "category": "llm.category"}
 
 @contextlib.contextmanager
 def llm_call_context(**values: Any) -> Iterator[None]:

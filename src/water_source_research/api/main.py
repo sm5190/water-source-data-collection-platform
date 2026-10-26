@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
 from water_source_research.api.evaluation import evaluation_router
+from water_source_research.api.monitoring import monitoring_router
 from water_source_research.core.config import get_settings
 from water_source_research.procedures.services import ProcedureServices, build_procedure_services
 from water_source_research.reporting.run_views import field_provenance, human_review_log
@@ -468,6 +469,7 @@ def create_app(queue: ResearchQueue | None = None,
 
     # Evaluation of saved research runs (reads research data only).
     app.include_router(evaluation_router(queue.engine))
+    app.include_router(monitoring_router(queue.engine, settings))
     return app
 
 def _latest_by_item(decisions: list[dict]) -> dict[str, dict]:
@@ -484,6 +486,14 @@ def _transition(ok: bool) -> dict:
 def _instrument(application: FastAPI) -> FastAPI:
     """Tracing for the API process when enabled (OBSERVABILITY__OTEL_ENABLED)."""
     from water_source_research.observability.otel import configure_telemetry
+    try:  # judge calls made by API-triggered evaluations go to the usage ledger
+        from water_source_research.db.session import get_engine
+        from water_source_research.observability.usage import configure_usage
+        configure_usage(get_engine())
+    except Exception as exc:  # noqa: BLE001 - monitoring never stops the API
+        import logging
+        logging.getLogger(__name__).warning("usage ledger not started (%s)",
+                                            type(exc).__name__)
     if configure_telemetry("api") is not None:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         FastAPIInstrumentor.instrument_app(application, excluded_urls="health")

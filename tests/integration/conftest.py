@@ -53,6 +53,7 @@ def clean(request):
                           "research_runs, context_bundles, research_jobs, claim_citations, "
                           "field_claims, run_field_states, evidence_chunks, source_documents, "
                           "field_resolutions, review_decisions, review_items, supply_records, "
-                          "record_values, research_exports, worker_events, worker_instances "
+                          "record_values, research_exports, worker_events, worker_instances, "
+                          "run_traces, provider_usage "
                           "CASCADE"))
     yield
