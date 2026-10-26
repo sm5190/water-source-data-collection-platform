@@ -42,6 +42,7 @@ uv run python scripts/import_reference.py "resources/Sarina Water Source.xlsx" -
 uv run python scripts/evaluate_run.py <run_id> [--dataset <version>] [--out reports/eval/<city>] [--no-judge]  # new evaluation run; reads research data only; semantic judge on the configured LLM unless --no-judge
 uv run python scripts/judge_calibration.py tests/evaluation/judge_cases_toronto.yaml [--out reports/eval/judge]  # REAL LLM: judge vs labelled cases; exit 0 only when every label is person-confirmed and the criteria pass
 uv run python scripts/evaluate_run.py --compare-manual tests/evaluation/toronto_manual_findings.yaml [--eval-run <id>]  # evaluator vs independently written manual findings: AGREE/DISAGREE per attribute
+uv run python scripts/replay_run.py <run_id> [...]  # saved-document replay (mode REPLAY): the parent's stored documents re-enter in their original acquisition rounds (acquisition/replay.py), current retrieval/extraction (REAL LLM)/resolution run on them; a new run (own documents, claims, records, events; job row written when done); no discovery, fetching or review; the parent is only read
 uv run python scripts/reprocess_run.py <run_id> [--process]  # re-validate/review/assemble a finished run's stored claims+evidence as a new run (no discovery, fetching or LLM calls)
 docker compose exec postgres psql -U water -d water_source -c "CREATE DATABASE water_source_test"  # once
 TEST_DATABASE_URL=postgresql+psycopg://water:water@localhost:5432/water_source_test uv run pytest tests/integration
