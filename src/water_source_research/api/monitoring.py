@@ -4,7 +4,7 @@ observability backends. Computed on read by ``observability/monitoring.py``."""
 from typing import Any
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Engine
-from water_source_research.observability import health, monitoring
+from water_source_research.observability import alerts, health, monitoring
 
 USAGE_GROUPS = ("provider_model", "city", "run", "category")
 
@@ -44,6 +44,10 @@ def monitoring_router(engine: Engine, settings: Any) -> APIRouter:
         if group_by not in USAGE_GROUPS:
             raise HTTPException(422, f"group_by must be one of {USAGE_GROUPS}")
         return monitoring.usage(engine, hours=hours or None, group_by=group_by)
+
+    @r.get("/alerts")
+    def get_alerts():
+        return alerts.evaluate(engine, settings)
 
     @r.get("/backends")
     def backends():

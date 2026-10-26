@@ -1,0 +1,39 @@
+# Monitoring alerts (observability/alerts.py). Computed on read from stored records each time
+# the dashboard asks; nothing is stored or sent (no email/Slack). Set enabled: false to switch
+# a rule off; severity: critical | warning | info.
+window_hours: 24  # how far back events count
+
+rules:
+  worker_crash:          # a worker process ended unexpectedly (supervisor record)
+    enabled: true
+    severity: critical
+  heartbeat_missing:     # a running worker stopped sending heartbeats (it may still be alive)
+    enabled: true
+    severity: warning
+  repeated_restarts:     # the supervisor keeps restarting workers, or gave up
+    enabled: true
+    severity: critical
+    restarts: 3          # restarts within the window
+  stalled_job:           # a RUNNING job whose lease expired, or with no new step for a while
+    enabled: true
+    severity: warning
+    no_progress_minutes: 30
+  recovery_failed:       # a run could not be recovered after a worker failure
+    enabled: true
+    severity: critical
+  high_memory:           # last sample of a live worker
+    enabled: true
+    severity: warning
+    rss_mb: 4000
+    private_mb: 4000
+    commit_ratio: 0.95   # system commit charge / commit limit (Windows)
+  api_errors:            # model API trouble in the window (from the usage ledger)
+    enabled: true
+    severity: warning
+    timeouts: 3          # attempts that timed out
+    rate_limited: 5      # attempts answered with HTTP 429
+    retries: 20          # retried requests
+    failed_calls: 3      # calls that failed after all retries
+  observability_backend: # tracing/Langfuse unreachable, or span exports failing
+    enabled: true
+    severity: warning
