@@ -42,6 +42,9 @@ async def open_checkpointer(settings: Settings,
     size = pool_size or settings.research_queue.worker_concurrency + 2
     pool = AsyncConnectionPool(
         psycopg_conninfo(settings.database_url), min_size=1, max_size=size, open=False,
+        # Validate a connection before handing it out: after the host sleeps (or the
+        # database restarts) pooled connections are dead.
+        check=AsyncConnectionPool.check_connection,
         kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
     )
     await pool.open()

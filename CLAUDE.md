@@ -25,6 +25,7 @@ uv run pytest tests/test_rules_engine.py::test_percentage   # single test
 uv run ruff check .                            # line-length 100, target py312
 uv run uvicorn water_source_research.api.main:app --reload  # API (enqueues runs; needs migrated DB)
 uv run python scripts/run_research_worker.py [--once] [--concurrency N]  # executes queued runs
+powershell -ExecutionPolicy Bypass -File scripts/worker_supervised.ps1 [-Concurrency 2]  # worker under a supervisor: logs/worker-supervisor.log records the real exit code (NTSTATUS hex) and free memory; restarts with backoff. Worker logs: logs/worker-<start>-<pid>.log (append-only, faulthandler, 30 s resource heartbeat); each step summary carries `resources` (RSS, private MB, state size). Keep concurrency 2 until memory is measured.
 uv run python scripts/run_city.py Toronto --country Canada --fields utility_name,water_source  # dev: inline graph, no queue/DB writes
 uv run python scripts/db_readiness.py [--upgrade]   # live DB: revision, drift vs models, checkpointer setup(), catalog report, rolled-back write test
 uv run python scripts/services_check.py             # live VT/SearXNG/OpenAlex/S2/Crossref/HTTP/PDF checks

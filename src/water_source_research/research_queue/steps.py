@@ -6,6 +6,7 @@ bounded in size; full detail lives in the run result and the trusted event log.
 """
 
 from typing import Any
+from .diagnostics import process_sample, state_size
 
 # Expected order of a run without discovery loops; used for progress display.
 NODE_ORDER = ("plan", "discover", "acquire", "extract", "validate", "resolve", "human_review",
@@ -18,6 +19,10 @@ TOP_CANDIDATE_KEYS = ("title", "url", "providers", "source_type", "doi", "doi_ve
 def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -> dict[str, Any]:
     new_events = state.get("events", [])[len(previous.get("events", [])):]
     summary: dict[str, Any] = {"events": new_events[:MAX_EVENTS_PER_STEP]}
+    try:  # memory per step: evidence for resource questions, never fails a run
+        summary["resources"] = {**process_sample(), "state": state_size(state)}
+    except Exception as exc:  # noqa: BLE001
+        summary["resources"] = {"error": type(exc).__name__}
     if len(new_events) > MAX_EVENTS_PER_STEP:
         summary["events_truncated"] = len(new_events) - MAX_EVENTS_PER_STEP
 

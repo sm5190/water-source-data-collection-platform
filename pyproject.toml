@@ -26,6 +26,7 @@ dependencies = [
   "minio>=7.2",
   "pypdfium2>=4.30",
   "openpyxl>=3.1",
+  "psutil>=6.0",
 ]
 
 [project.optional-dependencies]
