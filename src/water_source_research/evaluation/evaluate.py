@@ -136,8 +136,6 @@ def apply_judge(results: list[dict[str, Any]], judge: SemanticJudge,
         p, ref = r["predicted"], r["reference"]
         uids = p.get("selected_claim_uids") or p.get("claim_uids") or []
         selected = [claims[u] for u in uids if u in claims]
-        year = p.get("reference_year") or next(
-            (claim_prediction(c).reference_year for c in selected), None)
         # Years are compared in their own fields (e.g. water_quality_year): a year attached to
         # only one side must not make the same description look different.
         x = judge.make_input(

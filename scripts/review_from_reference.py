@@ -133,7 +133,7 @@ class Reviewer:
             matching = [c for c in cands
                         if compare(d, ref, prediction(c), self.policy).status == "MATCH"]
             if matching:
-                best = sorted(matching, key=invalid)[0]
+                best = min(matching, key=invalid)
                 body: dict[str, Any] = {"decision": "APPROVE", "claim_uids": [best["claim_uid"]]}
                 if invalid(best):
                     body["override_validation"] = True
