@@ -96,7 +96,7 @@ class ClaimQualifiers(BaseModel):
     """Context that decides whether two claims describe the same measurement."""
 
     reference_year: int | None = None
-    year_basis: Literal["quote", "passage", "document"] | None = None
+    year_basis: Literal["quote", "passage", "document", "reviewer"] | None = None
     reported_value: float | None = None  # the number as the source states it
     reported_unit: str | None = None
     measurement_basis: str | None = None  # average | maximum | capacity | annual
@@ -111,6 +111,14 @@ class ClaimQualifiers(BaseModel):
     # Never inferred from names or geography.
     source_kind: str | None = None
     relations: list[dict[str, Any]] = Field(default_factory=list)
+    # How the claim's evidence is established:
+    #   MACHINE_VERIFIED   the quote was found in an acquired chunk (normal extraction, or a
+    #                      reviewer correction quoting the run's evidence)
+    #   REVIEWER_SUPPLIED  a URL/note the reviewer gave: kept, never machine-verified and never
+    #                      counted as independent verification
+    #   HUMAN_VERIFIED     a reviewer confirmed machine evidence the checks had flagged
+    evidence_class: Literal["MACHINE_VERIFIED", "REVIEWER_SUPPLIED", "HUMAN_VERIFIED"] | None = \
+        None
 
 class FieldClaim(BaseModel):
     field_key: str

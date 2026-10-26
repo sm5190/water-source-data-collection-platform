@@ -429,3 +429,16 @@ def test_records_tab_shows_rows_trace_and_prepares_exports_on_request():
     assert not at.exception, at.exception
     assert client.exports == [("csv", "standardized", None)]
     assert any(b.label == "⬇️ Standardized CSV" for b in at.get("download_button"))
+
+def test_a_correction_can_carry_its_reporting_year():
+    client = ReviewClient()
+    at = reviewing(client)
+    at.radio(key="choice:item-1").set_value("Correct").run()
+    at.text_input(key="value:item-1").set_value("980000").run()
+    at.text_input(key="url:item-1").set_value("https://toronto.ca/report.pdf").run()
+    at.text_input(key="year:item-1").set_value("23").run()
+    assert save(at).disabled and "four digits" in all_text(at)
+    at.text_input(key="year:item-1").set_value("2023").run()
+    save(at).click().run()
+    [(_, [body])] = client.decisions
+    assert body["evidence"] == {"url": "https://toronto.ca/report.pdf", "reference_year": 2023}

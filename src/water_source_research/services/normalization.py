@@ -295,7 +295,8 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     qualifiers = ClaimQualifiers(
         extraction_round=previous.extraction_round if previous else None,
         source_kind=previous.source_kind if previous else None,
-        relations=list(previous.relations) if previous else [])
+        relations=list(previous.relations) if previous else [],
+        evidence_class=previous.evidence_class if previous else None)
     normalized: Any = None
 
     if definition is None:
@@ -326,7 +327,30 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     if definition.key in SOURCE_FIELDS and claim.value_status is ValueStatus.KNOWN:
         _check_source_kind(claim, definition, qualifiers, checks)
     _check_out_of_area(located, research, checks)
+    if previous is not None and previous.year_basis == "reviewer":
+        # the year a reviewer gave with a corrected value is kept as given
+        qualifiers.reference_year, qualifiers.year_basis = previous.reference_year, "reviewer"
+        if previous.source_dates:
+            qualifiers.source_dates = list(dict.fromkeys(
+                [*previous.source_dates, *qualifiers.source_dates]))
+    if qualifiers.evidence_class == "REVIEWER_SUPPLIED":
+        _reviewer_supplied(checks)
+    elif qualifiers.evidence_class is None and claim.review_status is None:
+        qualifiers.evidence_class = "MACHINE_VERIFIED" if any(
+            loc.chunk is not None for _, loc in located) else None
     return _finish(claim, uid, normalized, qualifiers, checks)
+
+# Checks that test the evidence against the run's acquired text: for a reviewer-supplied
+# source they can't pass, which means "not machine-verified", not "invalid".
+_EVIDENCE_CHECKS = frozenset({"CITATION_LINKED", "VALUE_IN_QUOTE", "SOURCE_TIER"})
+
+def _reviewer_supplied(checks: _Checks) -> None:
+    checks.items = [
+        c.model_copy(update={"result": CheckResult.WARN,
+                             "detail": "reviewer-supplied source: not machine-verified"
+                                       + (f" ({c.detail})" if c.detail else "")})
+        if c.code in _EVIDENCE_CHECKS and c.result is CheckResult.FAIL else c
+        for c in checks.items]
 
 # --- water sources: kinds per the standardization rules ---------------------------------------
 

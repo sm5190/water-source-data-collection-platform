@@ -33,7 +33,7 @@ from water_source_research.schemas.common import (
     FINAL_STATUSES, FieldResolutionStatus, ValidationOutcome, ValueStatus,
 )
 from water_source_research.schemas.research import (
-    CityResearchState, EntityResolution, EvidenceRef, FieldClaim, FieldDefinition,
+    CityResearchState, ClaimQualifiers, EntityResolution, EvidenceRef, FieldClaim, FieldDefinition,
     FieldResolution, FieldState,
 )
 from water_source_research.schemas.review import DecisionType, ReviewDecisionIn, reviewer_key
@@ -302,6 +302,12 @@ def _apply_one(research: CityResearchState, d: FieldDefinition, item: Mapping[st
             if c is not None:
                 applied.accepted.append((d.key, c))
         rule = "REVIEW_APPROVE_OVERRIDE" if dec.get("validation_override") else "REVIEW_APPROVE"
+        if dec.get("validation_override"):
+            for uid in uids:  # a person confirmed evidence the machine checks had flagged
+                c = fs.claim(uid)
+                if c is not None:
+                    c.qualifiers = (c.qualifiers or ClaimQualifiers()).model_copy(
+                        update={"evidence_class": "HUMAN_VERIFIED"})
         resolution = EntityResolution(**common, status=S.RESOLVED, rule=rule,
                                       selected_claim_uids=uids)
     elif kind is D.CORRECT:
@@ -385,15 +391,21 @@ def _corrected_claim(d: FieldDefinition, dec: Mapping[str, Any], uids: list[str]
     supplied = not evidence.get("chunk_id")
     if supplied:
         ref = EvidenceRef(url=evidence["url"], title=evidence.get("title"),
+                          page_number=evidence.get("page_number"),
                           passage=evidence.get("note") or dec.get("reason") or "")
     else:
         row = chunk(evidence["chunk_id"]) or {}
         ref = EvidenceRef(url=row.get("url", ""), page_number=row.get("page_number"),
                           title=row.get("title"), passage=evidence.get("quote") or "")
+    year = evidence.get("reference_year")
+    qualifiers = ClaimQualifiers(
+        evidence_class="REVIEWER_SUPPLIED" if supplied else "MACHINE_VERIFIED",
+        reference_year=year, year_basis="reviewer" if year else None,
+        source_dates=[evidence["source_date"]] if evidence.get("source_date") else [])
     claim = FieldClaim(field_key=d.key, value=value, value_status=ValueStatus.KNOWN,
                        value_origin=dec.get("value_origin") or "REPORTED", confidence=1.0,
                        evidence=[ref], review_status="CORRECTED",
-                       corrected_from=uids[0] if uids else None,
+                       corrected_from=uids[0] if uids else None, qualifiers=qualifiers,
                        entity_key=entity if d.scope == "record" else None)
     claim = claim.model_copy(update={"claim_uid": claim_uid(claim)})
     # A reviewer-supplied source can't be found in the run's evidence: the claim is accepted

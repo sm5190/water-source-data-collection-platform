@@ -25,7 +25,7 @@ from .supply_records import DECIMALS, typed_row
 PROVENANCE_COLUMNS = [
     "row", "water_source", "column", "field_key", "scope", "export_value", "value_status",
     "value_origin", "resolution_status", "reference_year", "claim_uid", "claim_value",
-    "claim_validation", "citation_url", "citation_title", "page_number", "quote", "chunk_id",
+    "claim_validation", "evidence_class", "citation_url", "citation_title", "page_number", "quote", "chunk_id",
     "document_id", "source_type", "source_date", "calculation_rule", "calculation_formula",
     "calculation_inputs", "review_decision_ids", "note",
 ]
@@ -115,6 +115,8 @@ def _cell_rows(row: Any, source: str | None, header: str, rv: RecordValue, expor
         for cite in claim.get("citations") or [{}]:
             rows.append({**base, "claim_uid": uid, "claim_value": json.dumps(claim["value"]),
                          "claim_validation": claim.get("validation_outcome") or "",
+                         "evidence_class": (claim.get("qualifiers") or {}).get(
+                             "evidence_class") or "",
                          "citation_url": cite.get("url", ""),
                          "citation_title": cite.get("title") or "",
                          "page_number": cite.get("page_number") or "",

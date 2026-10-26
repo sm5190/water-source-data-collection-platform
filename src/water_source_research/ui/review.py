@@ -247,13 +247,22 @@ def decision_controls(client: Any, run_id: str, item: dict[str, Any], reviewer: 
             url = st.text_input("Source link (required)", key=f"url:{iid}",
                                 placeholder="https://…",
                                 help="A page or document that states this value.")
+            year = st.text_input("Reporting year (optional)", key=f"year:{iid}",
+                                 placeholder="e.g. 2024",
+                                 help="The year the value refers to, if the source says.")
             url_ok = url.strip().startswith(("http://", "https://"))
             if url.strip() and not url_ok:
                 st.caption("The link must start with http:// or https://")
-            ready = bool(value.strip()) and url_ok
+            year_ok = not year.strip() or (year.strip().isdigit() and len(year.strip()) == 4)
+            if not year_ok:
+                st.caption("The year must be four digits, e.g. 2024")
+            ready = bool(value.strip()) and url_ok and year_ok
+            evidence: dict[str, Any] = {"url": url.strip()}
+            if year.strip() and year_ok:
+                evidence["reference_year"] = int(year.strip())
             body = {"decision": "CORRECT", "value": parse_value(value) if value.strip() else None,
                     "claim_uids": [proposed["claim_uid"]] if proposed else [],
-                    "evidence": {"url": url.strip()}}
+                    "evidence": evidence}
     elif choice == UNKNOWN:
         body = {"decision": "MARK_UNKNOWN"}
     elif choice == NA:

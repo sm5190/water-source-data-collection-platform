@@ -32,6 +32,10 @@ class ReviewEvidence(BaseModel):
     url: str | None = None
     title: str | None = None
     note: str | None = None
+    # Metadata the reviewer knows about the value: kept on the corrected claim and exported.
+    reference_year: int | None = Field(default=None, ge=1800, le=2100)
+    source_date: str | None = Field(default=None, max_length=32)
+    page_number: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def _one_kind(self) -> "ReviewEvidence":
