@@ -12,7 +12,7 @@ from typing import Any
 import openai
 from pydantic import BaseModel
 from .base import (
-    Completion, LLMError, LLMErrorKind, PerLoop, classify_openai_error, usage_tokens,
+    Completion, LLMError, LLMErrorKind, PerLoop, classify_openai_error, cached_input_tokens, usage_tokens,
 )
 from .config import VT_MAX_OUTPUT_TOKENS, LLMSettings
 
@@ -88,7 +88,8 @@ def _completion(response: Any) -> Completion:
     choices = getattr(response, "choices", None) or []
     content = choices[0].message.content if choices else None
     return Completion(text=strip_fences(content or ""), prompt_tokens=prompt_tokens,
-                      completion_tokens=completion_tokens)
+                      completion_tokens=completion_tokens,
+                      cached_tokens=cached_input_tokens(getattr(response, "usage", None)))
 
 def strip_fences(text: str) -> str:
     match = _FENCE.match(text)

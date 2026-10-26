@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from water_source_research.core.config import get_settings
 from .base import (
     Completion, LLMError, LLMErrorKind, PerLoop, StructuredLLM, classify_openai_error,
-    usage_tokens,
+    cached_input_tokens, usage_tokens,
 )
 from .config import LLMSettings
 
@@ -106,4 +106,5 @@ def _completion(response: Any) -> Completion:
     parsed = getattr(response, "output_parsed", None)
     # No parsed output (e.g. a refusal) is treated like malformed output by the router.
     return Completion(parsed=parsed, text=None if parsed is not None else "",
-                      prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+                      prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+                      cached_tokens=cached_input_tokens(getattr(response, "usage", None)))

@@ -121,7 +121,7 @@ def configure_telemetry(role: str, *, instance_id: str | None = None,
     with _lock:
         if _provider is not None:
             return _provider
-        if not s.otel_enabled:
+        if not (s.otel_enabled or s.langfuse_enabled):
             return None
         current = trace.get_tracer_provider()
         if isinstance(current, TracerProvider):
@@ -134,7 +134,7 @@ def configure_telemetry(role: str, *, instance_id: str | None = None,
             "deployment.environment": s.environment,
             "service.version": _version()})
         provider = TracerProvider(resource=resource, sampler=research_sampler(s.sample_ratio))
-        exporter = _exporter(full, role)
+        exporter = _exporter(full, role) if s.otel_enabled else None
         if exporter is not None:
             provider.add_span_processor(BatchSpanProcessor(
                 exporter, max_queue_size=s.span_queue_size,
@@ -142,6 +142,11 @@ def configure_telemetry(role: str, *, instance_id: str | None = None,
                 export_timeout_millis=int(s.export_timeout_seconds * 1000)))
         trace.set_tracer_provider(provider)
         _provider = provider
+        from .langfuse import configure_langfuse
+        try:
+            configure_langfuse(provider, full)  # optional; shares this provider
+        except Exception:
+            log.warning("Langfuse could not be configured", exc_info=True)
         atexit.register(shutdown_telemetry)
         log.info("tracing enabled (%s, sample_ratio=%s, exporter=%s)", role, s.sample_ratio,
                  s.trace_exporter)
@@ -167,6 +172,8 @@ def shutdown_telemetry(timeout_seconds: float = 5.0) -> None:
     if provider is None:
         return
     _provider = None
+    from .langfuse import shutdown_langfuse
+    shutdown_langfuse()
     try:
         provider.force_flush(int(timeout_seconds * 1000))
         provider.shutdown()

@@ -87,6 +87,7 @@ class Completion:
     parsed: BaseModel | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cached_tokens: int | None = None  # input tokens served from the provider's prompt cache
 
 def usage_tokens(usage: Any) -> tuple[int | None, int | None]:
     """(input, output) tokens from a Chat Completions or Responses usage object."""
@@ -96,6 +97,18 @@ def usage_tokens(usage: Any) -> tuple[int | None, int | None]:
     completion = getattr(usage, "completion_tokens", None) \
         or getattr(usage, "output_tokens", None)
     return prompt, completion
+
+def cached_input_tokens(usage: Any) -> int | None:
+    """Prompt-cache hits reported by the provider (Chat Completions prompt_tokens_details or
+    Responses input_tokens_details); None when the provider doesn't report them."""
+    if usage is None:
+        return None
+    for name in ("input_tokens_details", "prompt_tokens_details"):
+        details = getattr(usage, name, None)
+        cached = getattr(details, "cached_tokens", None) if details is not None else None
+        if isinstance(cached, int):
+            return cached
+    return None
 
 def classify_openai_error(provider: str, exc: Exception) -> LLMError:
     """Map an ``openai`` SDK exception to a typed ``LLMError`` (never leaks the API key)."""

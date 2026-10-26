@@ -212,9 +212,11 @@ class SemanticJudge:
             span.set_attribute("evaluation.judge_cached", cached is not None)
             if cached is not None:
                 return {**cached, "cached": True}
+            from water_source_research.observability.llm_telemetry import llm_call_context
             try:
                 self.calls += 1
-                j = self.llm.structured(SYSTEM, user_prompt(x), Judgment)
+                with llm_call_context(field_key=x.field_key, task_kind="eval_judge"):
+                    j = self.llm.structured(SYSTEM, user_prompt(x), Judgment)
             except LLMError as exc:
                 self.errors.append(f"{exc.kind.value}: {exc}"[:300])
                 span.set_attribute("evaluation.judge_error", exc.kind.value)

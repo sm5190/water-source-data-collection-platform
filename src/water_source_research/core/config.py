@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     crossref_mailto: str = ""  # contact email for Crossref's "polite" pool (not a key)
     firecrawl_api_key: str = ""
     apify_api_token: str = ""
+    # Langfuse (optional LLM observability; OBSERVABILITY__LANGFUSE_ENABLED=true to use).
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = ""  # e.g. https://cloud.langfuse.com
     otel_service_name: str = "water-source-research"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
     max_openai_input_tokens_per_city: int = 300_000

@@ -13,6 +13,7 @@ from water_source_research.discovery.ranking import dedupe_keys, merge_and_rank
 from water_source_research.discovery.service import DiscoveryService
 from water_source_research.llm.gateway import LLMGateway
 from water_source_research.llm.router import llm_call_log
+from water_source_research.observability.llm_telemetry import llm_call_context
 from water_source_research.observability.otel import get_tracer
 from water_source_research.procedures.retrieval import ProcedureMemory
 from water_source_research.procedures.usage import UsageTracker
@@ -402,7 +403,11 @@ async def _extract_field(
             return field_key, bundle, [], []
         calls: list[dict] = []  # model calls made for this field (set in this task's context)
         llm_call_log.set(calls)
-        claims = await gateway.extract(bundle, run_id=run_id, field_key=field_key)
+        with llm_call_context(run_id=run_id, field_key=field_key,
+                              discovery_round=extraction_round, reextraction=reextraction,
+                              attempt=attempt, bundle_id=bundle.bundle_id,
+                              task_kind="extract"):
+            claims = await gateway.extract(bundle, run_id=run_id, field_key=field_key)
         wrong = sorted({c.field_key for c in claims if c.field_key != field_key})
         if wrong:
             raise ValueError(f"Gateway returned claims for {wrong} when extracting "
@@ -416,12 +421,18 @@ def llm_usage(calls: list[dict]) -> dict[str, object]:
     Recorded on the NODE event (not a TOOL_CALL), so procedure eligibility is unchanged."""
     if not calls:
         return {}
-    return {"llm_requests": sum(c["requests"] for c in calls),
-            "cache_hits": sum(1 for c in calls if c["cache_hit"]),
-            "prompt_tokens": sum(c["prompt_tokens"] for c in calls),
-            "completion_tokens": sum(c["completion_tokens"] for c in calls),
-            "duration_ms": sum(c["latency_ms"] for c in calls),
-            "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
+    unknown = sum(1 for c in calls if c["prompt_tokens"] is None
+                  or c["completion_tokens"] is None)
+    usage: dict[str, object] = {
+        "llm_requests": sum(c["requests"] for c in calls),
+        "cache_hits": sum(1 for c in calls if c["cache_hit"]),
+        "prompt_tokens": sum(c["prompt_tokens"] or 0 for c in calls),
+        "completion_tokens": sum(c["completion_tokens"] or 0 for c in calls),
+        "duration_ms": sum(c["latency_ms"] for c in calls),
+        "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
+    if unknown:  # token sums cover only the calls whose usage the provider reported
+        usage["usage_unknown_calls"] = unknown
+    return usage
 
 def make_validate_node(fields: Mapping[str, FieldDefinition]):
     """Normalize and validate every candidate claim (deterministic; no model calls).

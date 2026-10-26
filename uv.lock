@@ -181,6 +181,15 @@ wheels = [
 ]
 
 [[package]]
+name = "backoff"
+version = "2.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba", size = 17001, upload-time = "2022-10-05T19:19:32.061Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8", size = 15148, upload-time = "2022-10-05T19:19:30.546Z" },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1282,6 +1291,26 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a9/75/f9edc5d72945019312f359e69ded9f82392a81d49c5051ed3209b100c0d2/langcodes-3.5.1.tar.gz", hash = "sha256:40bff315e01b01d11c2ae3928dd4f5cbd74dd38f9bd912c12b9a3606c143f731", size = 191084, upload-time = "2025-12-02T16:22:01.627Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dd/c1/d10b371bcba7abce05e2b33910e39c33cfa496a53f13640b7b8e10bb4d2b/langcodes-3.5.1-py3-none-any.whl", hash = "sha256:b6a9c25c603804e2d169165091d0cdb23934610524a21d226e4f463e8e958a72", size = 183050, upload-time = "2025-12-02T16:21:59.954Z" },
+]
+
+[[package]]
+name = "langfuse"
+version = "5.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backoff" },
+    { name = "httpx" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "packaging" },
+    { name = "pydantic" },
+    { name = "typing-extensions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/b3/6694c5edf351a01f85aae48a867fd34979865062cda808630aae86a99768/langfuse-5.0.4.tar.gz", hash = "sha256:f9f13a7a0bf0aad4d75287411cece3172c717d9440e73b4b84255ffffb549c31", size = 367328, upload-time = "2026-10-21T07:36:07.896Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/f4/de90215c074ddde1849a60a939f75f9ceaf656c019501b5cac7cdb63b2fc/langfuse-5.0.4-py3-none-any.whl", hash = "sha256:6ab4ddcbc4b33efbd9c7f5feb405bfb0060949e7a170f7410f8fcc52984887a7", size = 637544, upload-time = "2026-10-21T07:36:06.457Z" },
 ]
 
 [[package]]
@@ -4303,6 +4332,9 @@ dev = [
 docs = [
     { name = "docling" },
 ]
+observability = [
+    { name = "langfuse" },
+]
 ui = [
     { name = "streamlit" },
 ]
@@ -4314,6 +4346,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'docs'", specifier = ">=2.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "langfuse", marker = "extra == 'observability'", specifier = ">=5,<6" },
     { name = "langgraph", specifier = ">=0.2" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.1.2" },
     { name = "minio", specifier = ">=7.2" },
@@ -4338,7 +4371,7 @@ requires-dist = [
     { name = "trafilatura", specifier = ">=1.12" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
-provides-extras = ["docs", "dev", "ui"]
+provides-extras = ["docs", "dev", "ui", "observability"]
 
 [[package]]
 name = "websockets"

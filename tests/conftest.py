@@ -1,3 +1,4 @@
+import os
 import pytest
 from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
@@ -5,6 +6,9 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+# Keyed prompt hashes in tests use a fixed key (no key file is written under logs/).
+os.environ.setdefault("OBSERVABILITY__HASH_KEY", "test-hash-key")
 
 _EXPORTER = InMemorySpanExporter()
 _METRIC_READER = InMemoryMetricReader()

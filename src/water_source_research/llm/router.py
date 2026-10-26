@@ -170,6 +170,7 @@ class ReliableStructuredLLM:
 
     def structured(self, system: str, user: str, schema: type[T]) -> T:
         with self._span() as stats:
+            stats.prompt = f"{system}\n\n{user}"
             key = self.cache_key(system, user, schema)
             if (hit := self._cached(key, schema, stats)) is not None:
                 return hit
@@ -184,6 +185,7 @@ class ReliableStructuredLLM:
 
     async def astructured(self, system: str, user: str, schema: type[T]) -> T:
         with self._span() as stats:
+            stats.prompt = f"{system}\n\n{user}"
             key = self.cache_key(system, user, schema)
             if (hit := self._cached(key, schema, stats)) is not None:
                 return hit
@@ -213,8 +215,10 @@ class ReliableStructuredLLM:
 
     def _request_span(self, attempt: int, stats: "_CallStats"):
         """One HTTP request to the provider (child of ``llm.call``; retries are siblings)."""
-        span = get_tracer().start_as_current_span("llm.request", record_exception=False,
-                                                  set_status_on_exception=False)
+        span = get_tracer().start_as_current_span(
+            "llm.request", record_exception=False, set_status_on_exception=False,
+            # one HTTP attempt: never a Langfuse generation (the llm.call parent is)
+            attributes={"langfuse.observation.type": "span"})
         return _RequestSpan(span, attempt, stats.repairs)
 
     def _cached(self, key: str, schema: type[T], stats: "_CallStats") -> T | None:
@@ -270,18 +274,23 @@ class ReliableStructuredLLM:
         """(result, messages): a validated result, or the conversation for a repair turn."""
         try:
             if completion.parsed is not None:
-                return schema.model_validate(completion.parsed.model_dump()), messages
-            if not completion.text:
-                raise ValueError("the reply was empty")
-            return schema.model_validate_json(completion.text), messages
+                result = schema.model_validate(completion.parsed.model_dump())
+            else:
+                if not completion.text:
+                    raise ValueError("the reply was empty")
+                result = schema.model_validate_json(completion.text)
+            stats.response = completion.text if completion.text else result.model_dump_json()
+            return result, messages
         except (ValidationError, ValueError) as exc:
             problem = _describe(exc)
             if repair >= self.settings.structured_max_attempts:
+                stats.validation_failures += 1
                 stats.error = LLMErrorKind.SCHEMA.value
                 raise LLMError(self.provider, LLMErrorKind.SCHEMA,
                                f"invalid {schema.__name__} after {repair} repair(s): "
                                f"{problem[:300]}") from None
             stats.repairs = repair + 1
+            stats.validation_failures += 1
             return None, [*messages,
                           {"role": "assistant", "content": completion.text or ""},
                           {"role": "user", "content":
@@ -308,10 +317,12 @@ class _RequestSpan:
         return self.cm.__exit__(*exc)
 
 def _ok(span, completion: Completion) -> Completion:
+    # Per-attempt usage under llm.request.* (the call's totals are on llm.call only, so no
+    # backend counts them twice).
     if completion.prompt_tokens is not None:
-        span.set_attribute("llm.prompt_tokens", completion.prompt_tokens)
+        span.set_attribute("llm.request.input_tokens", completion.prompt_tokens)
     if completion.completion_tokens is not None:
-        span.set_attribute("llm.completion_tokens", completion.completion_tokens)
+        span.set_attribute("llm.request.output_tokens", completion.completion_tokens)
     return completion
 
 def _failed(span, exc: LLMError) -> None:
@@ -337,8 +348,13 @@ class _CallStats:
         self.latency_ms = 0
         self.prompt_tokens: int | None = None
         self.completion_tokens: int | None = None
+        self.cached_tokens: int | None = None
+        self.usage_unknown = False  # a request whose usage the provider didn't report
+        self.validation_failures = 0  # replies that didn't match the schema
         self.error: str | None = None
         self.status: int | None = None
+        self.prompt: str | None = None
+        self.response: str | None = None
 
     def record(self, completion: Completion, seconds: float) -> Completion:
         self.attempts += 1
@@ -347,6 +363,10 @@ class _CallStats:
             self.prompt_tokens = (self.prompt_tokens or 0) + completion.prompt_tokens
         if completion.completion_tokens is not None:
             self.completion_tokens = (self.completion_tokens or 0) + completion.completion_tokens
+        if completion.prompt_tokens is None or completion.completion_tokens is None:
+            self.usage_unknown = True
+        if completion.cached_tokens is not None:
+            self.cached_tokens = (self.cached_tokens or 0) + completion.cached_tokens
         return completion
 
     def failed(self, exc: LLMError) -> bool:
@@ -357,21 +377,73 @@ class _CallStats:
         return exc.retryable
 
     def flush(self) -> None:
+        usage_known = (self.attempts > 0 and not self.usage_unknown
+                       and self.prompt_tokens is not None
+                       and self.completion_tokens is not None)
         values = {"llm.attempts": self.attempts, "llm.repairs": self.repairs,
+                  "llm.retries": max(0, self.attempts - 1 - self.repairs),
+                  "llm.validation_failures": self.validation_failures,
                   "llm.latency_ms": self.latency_ms, "llm.prompt_tokens": self.prompt_tokens,
-                  "llm.completion_tokens": self.completion_tokens, "llm.error": self.error,
+                  "llm.completion_tokens": self.completion_tokens,
+                  "llm.cached_tokens": self.cached_tokens, "llm.error": self.error,
                   "http.status_code": self.status}
         for name, value in values.items():
             if value is not None:
                 self.span.set_attribute(name, value)
+        self._observation(usage_known)
         log = llm_call_log.get()
         if log is not None:
+            # None = the provider didn't report usage (UNKNOWN, never counted as 0).
             log.append({"provider": self.provider, "model": self.model,
                         "cache_hit": self.cache_hit, "requests": self.attempts,
                         "repairs": self.repairs, "latency_ms": self.latency_ms,
-                        "prompt_tokens": self.prompt_tokens or 0,
-                        "completion_tokens": self.completion_tokens or 0,
+                        "prompt_tokens": self.prompt_tokens if usage_known or self.cache_hit
+                        else None,
+                        "completion_tokens": self.completion_tokens
+                        if usage_known or self.cache_hit else None,
+                        "cached_tokens": self.cached_tokens,
                         "error": self.error})
+
+    def _observation(self, usage_known: bool) -> None:
+        """How LLM backends (Langfuse) see this call: one generation per fresh invocation
+        with its usage; a cache hit is a plain span with no usage."""
+        from water_source_research.observability.llm_telemetry import (
+            context_attributes, estimate_cost, record_content,
+        )
+        span = self.span
+        for name, value in context_attributes().items():
+            span.set_attribute(name, value)
+        span.set_attribute("llm.invocation", not self.cache_hit and self.attempts > 0)
+        if self.cache_hit or self.attempts == 0:
+            span.set_attribute("langfuse.observation.type", "span")
+            span.set_attribute("llm.usage_known", False)
+            record_content(span, prompt=self.prompt)
+            return
+        span.set_attribute("langfuse.observation.type", "generation")
+        span.set_attribute("langfuse.observation.model.name", self.model)
+        span.set_attribute("gen_ai.operation.name", "chat")
+        span.set_attribute("gen_ai.provider.name", self.provider)
+        span.set_attribute("gen_ai.request.model", self.model)
+        span.set_attribute("llm.usage_known", usage_known)
+        if usage_known:
+            span.set_attribute("gen_ai.usage.input_tokens", self.prompt_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", self.completion_tokens)
+            details = {"input": self.prompt_tokens, "output": self.completion_tokens}
+            if self.cached_tokens is not None:
+                details["input_cached_tokens"] = self.cached_tokens
+            import json
+            span.set_attribute("langfuse.observation.usage_details", json.dumps(details))
+            cost = estimate_cost(self.provider, self.model, self.prompt_tokens,
+                                 self.completion_tokens, self.cached_tokens)
+            span.set_attribute("llm.cost_known", cost is not None)
+            if cost is not None:
+                span.set_attribute("llm.cost_usd", cost)
+                span.set_attribute("langfuse.observation.cost_details",
+                                   json.dumps({"total": cost}))
+        if self.error:
+            span.set_attribute("langfuse.observation.level", "ERROR")
+            span.set_attribute("langfuse.observation.status_message", self.error)
+        record_content(span, prompt=self.prompt, response=self.response)
 
 # Optional per-task log of model calls: a caller (e.g. a graph node) sets a list here to learn
 # what its calls cost; each structured call appends one record when it finishes.

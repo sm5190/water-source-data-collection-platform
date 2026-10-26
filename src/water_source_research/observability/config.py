@@ -46,6 +46,15 @@ class ObservabilitySettings(BaseModel):
     trace_file_backups: int = Field(default=3, ge=0)
     trace_ui_url: str = "http://localhost:16686"  # Jaeger UI (links in /research/runs/…/traces)
 
+    # --- LLM observability (Phase 3) -----------------------------------------------------
+    # "off": spans carry ids, usage, versions, status and keyed hashes only. "truncated"
+    # (opt-in, debugging): also redacted prompt/response text up to 2000 chars; it may
+    # contain evidence passages from acquired documents.
+    capture_llm_content: Literal["off", "truncated"] = "off"
+    # Langfuse (optional; needs LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST).
+    langfuse_enabled: bool = False
+    langfuse_flush_interval_seconds: float = Field(default=5.0, gt=0)
+
     @model_validator(mode="after")
     def _validate(self) -> "ObservabilitySettings":
         if self.restart_max_seconds < self.restart_base_seconds:

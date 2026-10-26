@@ -46,6 +46,7 @@ ALLOWED_ATTRS = frozenset({
     "llm_requests", "cache_hits", "prompt_tokens", "completion_tokens", "model",
     "claim_uid", "entity_key", "rule", "reason_code", "outcome", "decision_id", "records",
     "validation_override", "reextraction", "new_chunks", "discovery_round",
+    "usage_unknown_calls",
 })
 MAX_ATTR_CHARS = 300
 

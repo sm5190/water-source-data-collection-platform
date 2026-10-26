@@ -1,0 +1,10 @@
+# Prices for estimated LLM cost on llm.call spans (observability/llm_telemetry.py).
+# Key: "<provider>:<model>", USD per 1M tokens. A model that is not listed has cost UNKNOWN
+# (no estimate is invented). The VT ARC models have no per-token price. Fill in paid models
+# from the provider's published price list when their credentials are added (Phase 4 does
+# the cost accounting).
+prices: {}
+#   "openai:<model>":
+#     input_per_1m: 0.0
+#     cached_input_per_1m: 0.0
+#     output_per_1m: 0.0
