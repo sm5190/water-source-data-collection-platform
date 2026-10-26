@@ -60,3 +60,54 @@ def test_monitor_tracks_peak_memory(caplog):
     assert m.peak_rss_mb > 0
     assert any("heartbeat" in r.message and "'in_flight': 2" in r.message
                for r in caplog.records)
+
+def test_monitor_publishes_heartbeat_file_resources_and_callback(tmp_path):
+    import json
+    from water_source_research.research_queue.diagnostics import heartbeat_path
+    received = []
+
+    async def run():
+        m = Monitor(interval=0.05, activity=lambda: {"active_runs": {"r1": {"stage": "extract"}},
+                                                     "active_jobs": 1},
+                    log_dir=tmp_path, instance_id="host-1", on_sample=received.append)
+        m.start()
+        await asyncio.sleep(0.2)
+        await m.stop()
+
+    asyncio.run(run())
+    hb = json.loads(heartbeat_path(tmp_path, "host-1").read_text())
+    assert hb["active_runs"] == {"r1": {"stage": "extract"}} and hb["pid"] > 0
+    assert {"rss_mb", "cpu_percent", "uptime_s", "threads", "at"} <= set(hb)
+    lines = (tmp_path / "resources" / "host-1.jsonl").read_text().splitlines()
+    assert len(lines) >= 2 and json.loads(lines[0])["active_jobs"] == 1
+    assert received and received[-1]["active_jobs"] == 1
+
+def test_monitor_sets_stop_when_the_stop_file_appears(tmp_path):
+    from water_source_research.research_queue.diagnostics import stop_path
+
+    async def run():
+        stop = asyncio.Event()
+        m = Monitor(interval=10, log_dir=tmp_path, instance_id="w1", stop=stop, stop_poll=0.02)
+        m.start()
+        await asyncio.sleep(0.05)
+        assert not stop.is_set()
+        stop_path(tmp_path, "w1").parent.mkdir(parents=True, exist_ok=True)
+        stop_path(tmp_path, "w1").write_text("now")
+        await asyncio.wait_for(stop.wait(), 2)
+        await m.stop()
+
+    asyncio.run(run())
+
+def test_checkpoint_writes_are_measured_without_changing_them():
+    from langgraph.checkpoint.memory import InMemorySaver
+    from queue_helpers import make_graph
+    from water_source_research.research_queue.checkpointing import measure_checkpoint_writes
+    saver = InMemorySaver()
+    stats = measure_checkpoint_writes(saver)
+    graph = make_graph(saver)
+    config = {"configurable": {"thread_id": "t1"}}
+    final = asyncio.run(graph.ainvoke({"run_id": "t1", "city_name": "Oslo", "country": "Norway",
+                                       "unresolved_fields": []}, config))
+    assert final["finalized"] is True
+    assert stats.writes > 0 and stats.peak_bytes > 0 and stats.errors == 0
+    assert asyncio.run(graph.aget_state(config)).values["run_id"] == "t1"

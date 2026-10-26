@@ -116,6 +116,19 @@ def create_app(queue: ResearchQueue | None = None,
         return {"run_id": run_id, "partial": job.status is JobStatus.AWAITING_REVIEW,
                 **(queue.result(run_id) or {})}
 
+    @app.get("/research/runs/{run_id}/lifecycle")
+    async def get_lifecycle(run_id: str):
+        """Worker events that touched this run: interrupted by a worker exit, lease reclaimed,
+        checkpoint recovery and its outcome (observed facts and inferred cause kept apart)."""
+        from water_source_research.observability.worker_events import EventStore
+        job = queue.get(run_id)
+        if job is None:
+            raise HTTPException(404, "run not found")
+        events = EventStore(queue.engine).events(run_id=run_id)
+        return {"run": job.public(), "events": [
+            {**e, "occurred_at": e["occurred_at"].isoformat(),
+             "recorded_at": e["recorded_at"].isoformat()} for e in events]}
+
     @app.get("/research/runs/{run_id}/steps")
     async def get_steps(run_id: str):
         job = require_run(run_id)

@@ -86,8 +86,9 @@ def make_queue(engine, clock=None, **overrides) -> ResearchQueue:
     kwargs = {"clock": clock} if clock else {}
     return ResearchQueue(engine, queue_settings(**overrides), **kwargs)
 
-def make_worker(queue, graph, worker_id=None, on_success=None) -> ResearchWorker:
-    return ResearchWorker(queue, graph, queue.s, worker_id=worker_id, on_success=on_success)
+def make_worker(queue, graph, worker_id=None, on_success=None, events=None) -> ResearchWorker:
+    return ResearchWorker(queue, graph, queue.s, worker_id=worker_id, on_success=on_success,
+                          events=events)
 
 EVIDENCE = EvidenceChunk(chunk_id="u", url="https://toronto.ca/water", source_type="UTILITY",
                          text="Toronto Water is the municipal utility for drinking water.")

@@ -34,6 +34,12 @@ SKIP_EXTENSIONS = (".xls", ".xlsx", ".csv", ".doc", ".docx", ".ppt", ".pptx", ".
                    ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4", ".kmz", ".kml",
                    ".shp", ".exe", ".dwg")
 
+# Document fetches in flight in this process (one event loop per worker; diagnostics only).
+_FETCHES_IN_FLIGHT = 0
+
+def fetches_in_flight() -> int:
+    return _FETCHES_IN_FLIGHT
+
 class DocStatus:
     OK = "OK"
     EMPTY = "EMPTY"
@@ -146,6 +152,16 @@ class AcquisitionService:
     async def _fetch_one(self, c: Mapping[str, Any]
                          ) -> tuple[dict[str, Any], AcquiredDocument | None,
                                     FetchedResponse | None]:
+        global _FETCHES_IN_FLIGHT
+        _FETCHES_IN_FLIGHT += 1
+        try:
+            return await self._fetch_one_counted(c)
+        finally:
+            _FETCHES_IN_FLIGHT -= 1
+
+    async def _fetch_one_counted(self, c: Mapping[str, Any]
+                                 ) -> tuple[dict[str, Any], AcquiredDocument | None,
+                                            FetchedResponse | None]:
         url = c.get("url") or ""
         record: dict[str, Any] = {
             "requested_url": url, "canonical_url": doc_key(url), "final_url": None,

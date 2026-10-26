@@ -115,6 +115,11 @@ def shared_limiter(provider: str, base_url: str, settings: LLMSettings) -> RateL
             _limiters[key] = RateLimiter(settings.requests_per_minute, settings.max_concurrency)
         return _limiters[key]
 
+def llm_requests_in_flight() -> int:
+    """Model requests currently in flight in this process (all providers; diagnostics)."""
+    with _shared_lock:
+        return sum(limiter.in_flight for limiter in _limiters.values())
+
 def shared_cache(settings: LLMSettings) -> _LockedCache:
     with _shared_lock:
         if "llm" not in _caches:

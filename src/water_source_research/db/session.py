@@ -2,8 +2,8 @@ from functools import lru_cache
 from sqlalchemy import Engine, create_engine
 from water_source_research.core.config import get_settings
 from . import (  # noqa: F401 - registers tables on Base.metadata
-    evaluation_models, evidence_models, procedure_models, record_models, research_models,
-    review_models,
+    evaluation_models, evidence_models, observability_models, procedure_models, record_models,
+    research_models, review_models,
 )
 from .models import Base
 

@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from water_source_research.acquisition.config import AcquisitionSettings, ArtifactSettings
 from water_source_research.discovery.config import DiscoverySettings
 from water_source_research.llm.config import LLMSettings
+from water_source_research.observability.config import ObservabilitySettings
 from water_source_research.procedures.config import ProcedureMemorySettings
 from water_source_research.research_queue.config import ResearchQueueSettings
 
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     procedure_memory: ProcedureMemorySettings = Field(default_factory=ProcedureMemorySettings)
     research_queue: ResearchQueueSettings = Field(default_factory=ResearchQueueSettings)
+    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
 
 @lru_cache
 def get_settings() -> Settings:

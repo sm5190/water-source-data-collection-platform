@@ -22,6 +22,7 @@ from uuid import uuid4
 from langgraph.types import Command
 from opentelemetry.trace import Status, StatusCode
 from water_source_research.observability.otel import get_tracer
+from water_source_research.observability.worker_events import EventKind, EventSink
 from water_source_research.services.field_state import initialize_city_state, unresolved_fields
 from water_source_research.services.reprocess import reprocess_input
 from . import telemetry
@@ -52,14 +53,44 @@ class ResearchWorker:
         settings: ResearchQueueSettings,
         worker_id: str | None = None,
         on_success: Callable[[str], None] | None = None,
+        events: EventSink | None = None,
     ) -> None:
         self.queue = queue
         self.graph = graph
         self.s = settings
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid4().hex[:6]}"
         self.on_success = on_success  # soft post-run hook (e.g. procedure distillation)
+        self.events = events  # lifecycle/recovery events (observability/worker_events.py)
         self.in_flight: set[asyncio.Task] = set()
         self.max_in_flight_seen = 0
+        # run_id -> live diagnostics (stage, attempt, recovery, last trace/span), published
+        # in the heartbeat file that the supervisor reads when this process dies.
+        self.active: dict[str, dict[str, Any]] = {}
+
+    def activity(self) -> dict[str, Any]:
+        return {"active_runs": {k: dict(v) for k, v in self.active.items()},
+                "active_jobs": len(self.active)}
+
+    async def _emit(self, kind: str, job: Job | None = None, **values: Any) -> None:
+        if self.events is None:
+            return
+        if job is not None:
+            values.setdefault("run_id", job.run_id)
+            values.setdefault("attempt", job.attempts)
+            live = self.active.get(job.run_id) or {}
+            values.setdefault("trace_id", live.get("trace_id"))
+            values.setdefault("span_id", live.get("span_id"))
+        try:
+            await asyncio.to_thread(self.events.emit, kind, "worker",
+                                    instance_id=self.worker_id, pid=os.getpid(), **values)
+        except Exception:
+            log.warning("could not record %s", kind, exc_info=True)
+
+    async def _reap(self) -> None:
+        for run_id, owner, attempts in await asyncio.to_thread(self.queue.reap_expired_runs):
+            await self._emit(EventKind.JOB_RECOVERY_FAILED, run_id=run_id, attempt=attempts,
+                             facts={"reason": "lease expired on the final attempt",
+                                    "previous_owner": owner, "will_retry": False})
 
     # --- loops --------------------------------------------------------------------------
 
@@ -68,7 +99,7 @@ class ResearchWorker:
         stop_wait = asyncio.create_task(stop.wait())
         try:
             while not stop.is_set():
-                await asyncio.to_thread(self.queue.reap_expired)
+                await self._reap()
                 await self._fill_slots()
                 waiters = {stop_wait, *self.in_flight}
                 await asyncio.wait(waiters, timeout=self.s.poll_interval_seconds,
@@ -81,7 +112,7 @@ class ResearchWorker:
         """Process jobs until none are claimable (CLI ``--once`` and tests). Returns count."""
         processed = 0
         while True:
-            await asyncio.to_thread(self.queue.reap_expired)
+            await self._reap()
             started = await self._fill_slots()
             if not started and not self.in_flight:
                 return processed
@@ -115,6 +146,20 @@ class ResearchWorker:
     # --- one run ------------------------------------------------------------------------
 
     async def _execute(self, job: Job) -> None:
+        self.active[job.run_id] = {"attempt": job.attempts, "stage": "claimed"}
+        try:
+            if job.reclaimed_from:
+                facts = {"previous_owner": job.reclaimed_from,
+                         "lease_until": job.reclaimed_lease_until.isoformat()
+                         if job.reclaimed_lease_until else None}
+                await self._emit(EventKind.JOB_LEASE_EXPIRED, job, facts=facts)
+                await self._emit(EventKind.JOB_RECLAIMED, job,
+                                 facts={**facts, "new_owner": self.worker_id})
+            await self._execute_traced(job)
+        finally:
+            self.active.pop(job.run_id, None)
+
+    async def _execute_traced(self, job: Job) -> None:
         tracer = get_tracer()
         with tracer.start_as_current_span("research.run") as span:
             span.set_attribute("research.run_id", job.run_id)
@@ -158,6 +203,13 @@ class ResearchWorker:
                 # Paused earlier but never recorded as waiting (crash): park it again.
                 return dict(snapshot.values), True, paused
             telemetry.runs_resumed.add(1)
+            if paused is None:  # a crashed or failed attempt, not a review resume
+                self.active.setdefault(job.run_id, {})["recovery"] = True
+                await self._emit(EventKind.CHECKPOINT_RECOVERY_ATTEMPTED, job, facts={
+                    "next_nodes": list(snapshot.next),
+                    "checkpoint_id": (snapshot.config or {}).get("configurable", {})
+                    .get("checkpoint_id"),
+                    "reclaimed_from": job.reclaimed_from})
             # Resumed review round (the node reads the decisions from the database), or a
             # run that crashed/failed mid-graph: continue from the checkpoint.
             graph_input = Command(resume={"round": paused}) if paused is not None else None
@@ -179,6 +231,8 @@ class ResearchWorker:
                 if not isinstance(state, dict):
                     continue
                 seq += 1
+                if job.run_id in self.active:
+                    self.active[job.run_id]["stage"] = node
                 now = time.perf_counter()
                 summary = summarize_step(node, state, previous)
                 try:
@@ -219,6 +273,7 @@ class ResearchWorker:
         span.set_attribute("research_queue.resumed", resumed)
         if not recorded:
             return
+        await self._recovered(job, "SUCCEEDED")
         if not self.s.keep_checkpoints:
             await self._delete_checkpoints(job.run_id)
         if self.on_success:
@@ -235,12 +290,22 @@ class ResearchWorker:
         span.set_attribute("research_queue.outcome",
                            "awaiting_review" if recorded else "lease_lost")
         span.set_attribute("review.round", round_no)
+        if recorded:
+            await self._recovered(job, "AWAITING_REVIEW")
 
     async def _failed(self, job: Job, error: str, span) -> None:
         status = await asyncio.to_thread(self.queue.fail, job.run_id, self.worker_id, error)
         span.set_status(Status(StatusCode.ERROR, error[:200]))
+        if (self.active.get(job.run_id) or {}).get("recovery"):
+            await self._emit(EventKind.JOB_RECOVERY_FAILED, job, facts={
+                "error": error[:500], "will_retry": status is JobStatus.QUEUED})
         span.set_attribute("research_queue.outcome",
                            "retry" if status is JobStatus.QUEUED else "failed")
+
+    async def _recovered(self, job: Job, outcome: str) -> None:
+        if (self.active.get(job.run_id) or {}).get("recovery"):
+            await self._emit(EventKind.JOB_RESUMED, job, facts={
+                "outcome": outcome, "reclaimed_from": job.reclaimed_from})
 
     async def _stopped(self, job: Job, reason: str, span) -> None:
         if reason == "cancelled":

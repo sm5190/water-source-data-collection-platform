@@ -3,8 +3,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from water_source_research.core.config import get_settings
 from water_source_research.db import (  # noqa: F401 - registers tables on Base.metadata
-    evaluation_models, evidence_models, procedure_models, record_models, research_models,
-    review_models,
+    evaluation_models, evidence_models, observability_models, procedure_models, record_models,
+    research_models, review_models,
 )
 from water_source_research.db.models import Base, include_object_for
 from sqlalchemy.engine import make_url

@@ -17,7 +17,7 @@ Lease timing uses the application clock, so worker hosts need synchronized clock
 from __future__ import annotations  # the class defines a `list` method
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
@@ -67,6 +67,10 @@ class Job:
     completion: str | None = None  # SUCCEEDED runs: FINALIZED | FINALIZED_WITH_GAPS | INCOMPLETE
     mode: str = "RESEARCH"  # or REPROCESS (of parent_run_id)
     parent_run_id: str | None = None
+    # Set by claim when it took over a RUNNING job whose lease had expired (the previous
+    # worker crashed or stalled): who held it and until when. Diagnostics only.
+    reclaimed_from: str | None = None
+    reclaimed_lease_until: datetime | None = None
 
     def public(self) -> dict[str, Any]:
         return {"run_id": self.run_id, "city_name": self.city_name, "country": self.country,
@@ -190,7 +194,11 @@ class ResearchQueue:
                 .order_by(J.priority.desc(), J.created_at, J.run_id)
                 .limit(_CLAIM_CANDIDATES).with_for_update(skip_locked=True)).all()
             run_id = None
+            previous = None
             for candidate in candidates:
+                # Who held it before (only meaningful when reclaiming an expired lease).
+                previous = session.execute(select(J.status, J.lease_owner, J.lease_until)
+                                           .where(J.run_id == candidate)).one_or_none()
                 n = session.execute(
                     update(J).where(J.run_id == candidate, claimable).values(
                         status=JobStatus.RUNNING.value, lease_owner=worker_id,
@@ -205,6 +213,9 @@ class ResearchQueue:
                 return None
             row = session.execute(select(J).where(J.run_id == run_id)).scalar_one()
             job = _job(row)
+            if previous is not None and previous.status == JobStatus.RUNNING.value:
+                job = replace(job, reclaimed_from=previous.lease_owner,
+                              reclaimed_lease_until=previous.lease_until)
         telemetry.jobs_claimed.add(1)
         telemetry.queue_wait_seconds.record(
             max(0.0, (_aware(now) - _aware(job.created_at)).total_seconds()))
@@ -307,18 +318,28 @@ class ResearchQueue:
 
     def reap_expired(self) -> int:
         """Fail jobs whose lease expired after their last allowed attempt."""
+        return len(self.reap_expired_runs())
+
+    def reap_expired_runs(self) -> list[tuple[str, str | None, int]]:
+        """Like ``reap_expired``; returns (run_id, previous lease owner, attempts) per job."""
         now = self.clock()
+        expired = and_(J.status == JobStatus.RUNNING.value, J.lease_until < now,
+                       J.attempts >= J.max_attempts)
         with Session(self.engine) as session, session.begin():
-            n = session.execute(update(J).where(
-                J.status == JobStatus.RUNNING.value, J.lease_until < now,
-                J.attempts >= J.max_attempts,
-            ).values(status=JobStatus.FAILED.value, lease_owner=None, lease_until=None,
-                     finished_at=now, updated_at=now,
-                     last_error="lease expired on final attempt (worker crashed or stalled)")
-            ).rowcount or 0
-        if n:
-            telemetry.jobs_finished.add(n, {"status": JobStatus.FAILED.value})
-        return n
+            rows = session.execute(select(J.run_id, J.lease_owner, J.attempts).where(expired)
+                                   .with_for_update(skip_locked=True)).all()
+            reaped = []
+            for r in rows:
+                n = session.execute(update(J).where(J.run_id == r.run_id, expired).values(
+                    status=JobStatus.FAILED.value, lease_owner=None, lease_until=None,
+                    finished_at=now, updated_at=now,
+                    last_error="lease expired on final attempt (worker crashed or stalled)")
+                ).rowcount
+                if n:
+                    reaped.append((r.run_id, r.lease_owner, r.attempts))
+        if reaped:
+            telemetry.jobs_finished.add(len(reaped), {"status": JobStatus.FAILED.value})
+        return reaped
 
     def backoff(self, attempts: int) -> float:
         return min(self.s.backoff_max_seconds,
