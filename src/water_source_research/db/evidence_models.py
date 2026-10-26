@@ -138,3 +138,30 @@ class FieldResolutionRecord(Base):
     policy_version: Mapped[str] = mapped_column(String(32))
     review_decision_id: Mapped[int | None] = mapped_column(Integer)  # REVIEWER rows
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class DiscoveryResultRecord(Base):
+    """One search hit as a provider returned it (before merging and ranking), so a later
+    diagnosis can tell which URLs the recorded searches returned. Proves only what the
+    recorded searches returned, never that a source was unavailable."""
+
+    __tablename__ = "discovery_results"
+    __table_args__ = (UniqueConstraint("run_id", "round", "call_index", "result_index",
+                                       name="uq_discovery_results_hit"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    round: Mapped[int] = mapped_column(Integer)
+    call_index: Mapped[int] = mapped_column(Integer)  # provider call within the round
+    result_index: Mapped[int] = mapped_column(Integer)  # position in the provider's answer
+    provider: Mapped[str] = mapped_column(String(64))
+    strategy: Mapped[str] = mapped_column(String(64))  # web_search | scholarly_search | ...
+    query: Mapped[str | None] = mapped_column(String(1000))
+    field_key: Mapped[str | None] = mapped_column(String(128))
+    rank: Mapped[int | None] = mapped_column(Integer)  # the provider's own rank, if given
+    url: Mapped[str] = mapped_column(String(2048))
+    canonical_url: Mapped[str | None] = mapped_column(String(2048), index=True)
+    title: Mapped[str | None] = mapped_column(String(1000))
+    source_type: Mapped[str | None] = mapped_column(String(32))
+    doi: Mapped[str | None] = mapped_column(String(255))
+    retained: Mapped[bool] = mapped_column(Boolean, default=False)  # among the round's candidates
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

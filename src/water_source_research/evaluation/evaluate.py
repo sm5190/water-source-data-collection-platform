@@ -36,8 +36,8 @@ RANK = {"MATCH": 0, "PARTIAL_MATCH": 1, "SCOPE_MISMATCH": 2, "TEMPORAL_MISMATCH"
 ENTITY = "water_source"
 # Telemetry the evaluator needs but the research pipeline doesn't record (reported per run).
 INSTRUMENTATION_GAPS = [
-    {"code": "RAW_SEARCH_RESULTS", "detail": "only retained, ranked discovery candidates are "
-     "stored; 'not found by search' vs 'ranked out' can't be told apart"},
+    {"code": "RAW_SEARCH_RESULTS", "detail": "this run's raw search results weren't recorded "
+     "(runs before migration 0013): 'not returned' vs 'ranked out' can't be told apart"},
     {"code": "BUNDLE_PER_ATTEMPT", "detail": "only the last context bundle per field is linked "
      "to the run; earlier attempts are matched by city and time window"},
     {"code": "LLM_RAW_OUTPUT", "detail": "raw model responses and rejected citations/claims "
@@ -112,9 +112,11 @@ def evaluate_snapshot(snap: dict[str, Any], ref_city: ReferenceCity,
     diagnoses += _run_level_findings(snap, pairing)
     evidence = check_evidence(snap, fields)
     metrics = compute_metrics(results, diagnoses, evidence, snap, fields)
+    gaps = [g for g in INSTRUMENTATION_GAPS if not (
+        g["code"] == "RAW_SEARCH_RESULTS" and snap.get("discovery_results"))]
     return {"stages": stages, "pairing": pairing, "results": results,
             "diagnoses": diagnoses, "evidence": evidence, "metrics": metrics,
-            "gaps": INSTRUMENTATION_GAPS, "evaluated_at": datetime.now(UTC).isoformat(),
+            "gaps": gaps, "evaluated_at": datetime.now(UTC).isoformat(),
             "judge": judge_info}
 
 # --- semantic judge ---------------------------------------------------------------------------

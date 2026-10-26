@@ -25,7 +25,7 @@ from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.record_store import RecordRepository
 from water_source_research.services.review import ReviewRepository
 
-SNAPSHOT_VERSION = "snapshot-1"
+SNAPSHOT_VERSION = "snapshot-2"  # + raw discovery results
 
 def build_snapshot(engine: Engine, run_id: str) -> dict[str, Any]:
     """Read (never write) everything the evaluation needs about ``run_id``."""
@@ -70,6 +70,8 @@ def build_snapshot(engine: Engine, run_id: str) -> dict[str, Any]:
         "documents": evidence.documents(run_id),
         "chunks": evidence.chunks(run_id, limit=100_000),
         "discovery_candidates": origin_result.get("discovery_candidates") or [],
+        # every hit the recorded searches returned (runs before migration 0013: none)
+        "discovery_results": evidence.discovery_results(origin_id),
         "discovery_rounds": origin_result.get("discovery_rounds"),
         "events": events,
         "steps": steps,

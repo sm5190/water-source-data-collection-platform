@@ -208,3 +208,18 @@ def test_failed_run_is_retried_by_worker_without_duplicates(engine):
     assert counts["claims"] == 4 and counts["field_states"] == 3
     urls = [d["requested_url"] for d in repo.documents(run_id)]
     assert len(urls) == len(set(urls))
+
+def test_raw_discovery_results_are_stored_once_per_hit(engine):
+    from water_source_research.services.evidence_store import EvidenceRepository
+    repo = EvidenceRepository(engine)
+    hits = [{"call_index": 0, "result_index": n, "provider": "searxng",
+             "strategy": "web_search", "query": "toronto drinking water source",
+             "field_key": "water_source", "rank": n + 1, "url": f"https://x.example/{n}",
+             "canonical_url": f"x.example/{n}", "title": f"Hit {n}", "source_type": "OTHER",
+             "doi": None, "retained": n == 0} for n in range(3)]
+    assert repo.save_discovery_results("run-1", 1, hits) == 3
+    assert repo.save_discovery_results("run-1", 1, hits) == 0  # a resumed round
+    stored = repo.discovery_results("run-1")
+    assert [(h["position"], h["retained"]) for h in stored] == [(1, True), (2, False),
+                                                                (3, False)]
+    assert stored[0]["query"] == "toronto drinking water source" and stored[0]["retrieved_at"]

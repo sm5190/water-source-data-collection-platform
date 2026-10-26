@@ -6,8 +6,9 @@ from langgraph.types import interrupt
 from water_source_research.acquisition.service import AcquisitionService, DocStatus
 from water_source_research.core.capabilities import Capability
 from water_source_research.discovery.base import SearchResult
+from water_source_research.discovery.normalize import canonical_url
 from water_source_research.discovery.queries import build_queries, previous_queries
-from water_source_research.discovery.ranking import merge_and_rank
+from water_source_research.discovery.ranking import dedupe_keys, merge_and_rank
 from water_source_research.discovery.service import DiscoveryService
 from water_source_research.llm.gateway import LLMGateway
 from water_source_research.llm.router import llm_call_log
@@ -75,6 +76,7 @@ def make_discover_node(
     usage_tracker: UsageTracker | None = None,
     discovery: DiscoveryService | None = None,
     fields: Mapping[str, FieldDefinition] | None = None,
+    evidence_store: EvidenceRepository | None = None,
 ):
     async def discover_node(state: GraphState) -> GraphState:
         state = {**state, **apply_selected_procedures(state, usage_tracker)}
@@ -88,6 +90,13 @@ def make_discover_node(
             updates = await _discover(discovery, fields or {}, state)
             span.set_attribute("graph.discovery_candidates",
                                len(updates.get("discovery_candidates", [])))
+            hits = updates.pop("_raw_hits", [])
+            if evidence_store is not None and hits and state.get("run_id"):
+                try:  # provenance for later diagnosis; never fails the run
+                    await asyncio.to_thread(evidence_store.save_discovery_results,
+                                            state["run_id"], rounds, hits)
+                except Exception:
+                    log.warning("could not store raw discovery results", exc_info=True)
         return {**state, **updates, "discovery_rounds": rounds}
     return discover_node
 
@@ -138,7 +147,16 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
                                 max_per_host=settings.max_results_per_host,
                                 limit=settings.max_candidates_total)
     status.update(outcome.provider_status)
+    kept = {k for c in outcome.candidates for k in dedupe_keys(c)}
+    hits = [{"call_index": i, "result_index": n, "provider": call.provider,
+             "strategy": call.strategy, "query": call.query, "field_key": call.field_key,
+             "rank": r.rank, "url": r.url, "canonical_url": canonical_url(r.url),
+             "title": r.title, "source_type": r.source_type, "doi": r.doi,
+             "retained": bool(dedupe_keys(r) & kept)}
+            for i, call in enumerate(outcome.calls) for n, r in enumerate(call.results)
+            if r.url]
     return {
+        "_raw_hits": hits,
         "events": events,
         "discovery_candidates": [c.to_dict() for c in candidates],
         "candidate_urls": [c.url for c in candidates],

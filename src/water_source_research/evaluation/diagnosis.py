@@ -4,8 +4,11 @@ the earliest stage where the failure can be demonstrated, and record what was ob
 Probes, in pipeline order (each records facts and links; none guesses):
   evidence    does any acquired chunk contain the reference value? are the reference's own
               source URLs among the discovery candidates / acquired documents?
-  discovery   reference source absent from the retained candidates (raw search results are
-              not persisted: PROBABLE, never CONFIRMED)
+  discovery   reference source absent from the retained candidates. With recorded search
+              results (migration 0013) it says whether the recorded searches returned it
+              (ranked out) or not (not returned in the recorded searches); either way PROBABLE:
+              recorded searches can't show a source was unavailable or that discovery as a
+              whole failed
   acquisition candidate not fetched, fetch failed, or fetched without the value (PROBABLE)
   retrieval   a chunk with the value never entered the field's context bundles
   extraction  it did, and no claim carries the value
@@ -74,6 +77,12 @@ class Diagnoser:
         self.chunks = snap["chunks"]
         self.candidates = {canonical_url(c["url"]): c for c in snap["discovery_candidates"]
                            if c.get("url")}
+        hits = snap.get("discovery_results") or []
+        self.searches_recorded = bool(hits)
+        self.returned: dict[str, list[dict[str, Any]]] = {}
+        for h in hits:
+            self.returned.setdefault(canonical_url(h["url"]), []).append(h)
+        self.recorded_queries = sorted({h["query"] for h in hits if h.get("query")})
         self.documents: dict[str, dict[str, Any]] = {}
         for d in snap["documents"]:
             for u in (d.get("requested_url"), d.get("final_url"), d.get("canonical_url")):
@@ -150,7 +159,13 @@ class Diagnoser:
         for url in urls:
             key = canonical_url(url)
             doc = self.documents.get(key)
+            hits = self.returned.get(key, [])
             trail.append({"url": url, "in_discovery_candidates": key in self.candidates,
+                          # None: searches weren't recorded for this run
+                          "returned_by_recorded_search": bool(hits)
+                          if self.searches_recorded else None,
+                          "search_hits": [{k: h.get(k) for k in (
+                              "provider", "query", "position", "retained")} for h in hits[:3]],
                           "document_id": doc["document_id"] if doc else None,
                           "document_status": doc["status"] if doc else None,
                           "chunks": doc.get("chunks") if doc else None})
@@ -308,11 +323,34 @@ class Diagnoser:
                          symptoms, probes,
                          "the reference's source was a discovery candidate but was never "
                          "fetched (acquisition budget or ranking)")
-        return _diag("RAW", record_key, field_key, "DISCOVERY_FAILURE", "PROBABLE", symptoms,
-                     probes,
-                     "none of the reference's sources is among the retained discovery "
-                     "candidates (raw search results are not stored, so 'never found' and "
-                     "'found but ranked out' can't be told apart)")
+        return self._discovery(record_key, field_key, trail, symptoms, probes)
+
+    def _discovery(self, record_key: str, field_key: str, trail: list[dict[str, Any]],
+                   symptoms: list[str], probes: list[dict[str, Any]]) -> dict[str, Any]:
+        """The reference's sources never became candidates. Recorded searches tell 'returned
+        but ranked out' from 'not returned', but only for the searches that were run: neither
+        shows that a source was unavailable or that discovery as a whole failed."""
+        if not self.searches_recorded:
+            return _diag("RAW", record_key, field_key, "DISCOVERY_FAILURE", "PROBABLE",
+                         symptoms, probes,
+                         "none of the reference's sources is among the retained discovery "
+                         "candidates (this run's search results weren't recorded, so 'not "
+                         "returned' and 'returned but ranked out' can't be told apart)")
+        returned = [t for t in trail if t["returned_by_recorded_search"]]
+        if returned:
+            hit = returned[0]["search_hits"][0]
+            return _diag("RAW", record_key, field_key, "DISCOVERY_FAILURE", "PROBABLE",
+                         [*symptoms, "RANKED_OUT"], probes,
+                         f"the reference's source {returned[0]['url']} was returned by a "
+                         f"recorded search ({hit['provider']}, position {hit['position']}"
+                         + (f", query {hit['query']!r}" if hit.get("query") else "")
+                         + ") but not kept among the candidates (ranking or limits)")
+        n = len(self.recorded_queries)
+        return _diag("RAW", record_key, field_key, "DISCOVERY_FAILURE", "PROBABLE",
+                     [*symptoms, "URL_NOT_RETURNED_IN_RECORDED_SEARCHES"], probes,
+                     f"none of the reference's sources was returned by the {n} recorded "
+                     f"search quer{'y' if n == 1 else 'ies'}; this shows what those searches "
+                     "returned, not that the source was unavailable")
 
     def _final(self, field_key: str, record_key: str, final: dict[str, Any],
                symptoms: list[str]) -> dict[str, Any]:

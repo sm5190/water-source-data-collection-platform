@@ -124,12 +124,38 @@ def test_discovery_and_acquisition_failures_use_the_references_sources(engine, t
     assert (quality["root_cause"], quality["confidence"]) == ("DISCOVERY_FAILURE", "PROBABLE")
     [trail] = quality["probes"][0]["observed"]["reference_sources"]
     assert trail["in_discovery_candidates"] is False
+    # The run's searches were recorded: the source wasn't returned by any of them. That is
+    # all it shows (not that the source was unavailable), so it stays PROBABLE.
+    assert trail["returned_by_recorded_search"] is False
+    assert "URL_NOT_RETURNED_IN_RECORDED_SEARCHES" in quality["symptoms"]
+    assert "not that the source was unavailable" in quality["explanation"]
     # The infrastructure reference cites the down host: discovered, fetched, failed.
     infra = diagnoses["infrastructure_notes"]
     assert (infra["root_cause"], infra["confidence"]) == ("ACQUISITION_FAILURE", "CONFIRMED")
     assert infra["probes"][0]["observed"]["reference_sources"][0]["document_status"] == "FAILED"
     run = store.run(eval_id)
-    assert any(g["code"] == "RAW_SEARCH_RESULTS" for g in run["gaps"])
+    assert not any(g["code"] == "RAW_SEARCH_RESULTS" for g in run["gaps"])
+    hits = w.evidence.discovery_results(w.run_id)
+    assert hits and {h["provider"] for h in hits} and all(h["url"] for h in hits)
+    assert any(h["retained"] for h in hits) and all(h["position"] >= 1 for h in hits)
+
+def test_ranked_out_and_unrecorded_searches_are_told_apart(engine, tmp_path):
+    from water_source_research.evaluation.diagnosis import Diagnoser
+    from water_source_research.evaluation.policy import load_policy
+    from water_source_research.services.field_state import load_field_definitions
+    url = "https://www.toronto.ca/quality-2024/"
+    base = {"chunks": [], "discovery_candidates": [], "documents": [], "context_bundles": []}
+    fields, policy = load_field_definitions(), load_policy()
+    unrecorded = Diagnoser({**base, "discovery_results": []}, fields, policy)
+    d = unrecorded._discovery("", "water_quality_notes",
+                              unrecorded.source_trail([url]), [], [])
+    assert d["confidence"] == "PROBABLE" and "weren't recorded" in d["explanation"]
+    hit = {"url": url, "provider": "searxng", "query": "toronto water quality", "position": 14,
+           "retained": False}
+    ranked = Diagnoser({**base, "discovery_results": [hit]}, fields, policy)
+    d = ranked._discovery("", "water_quality_notes", ranked.source_trail([url]), [], [])
+    assert d["confidence"] == "PROBABLE" and "RANKED_OUT" in d["symptoms"]
+    assert "position 14" in d["explanation"]
 
 def test_fields_outside_the_researched_subset_are_not_scored(engine, tmp_path):
     w, dataset = paused_run(engine, tmp_path)

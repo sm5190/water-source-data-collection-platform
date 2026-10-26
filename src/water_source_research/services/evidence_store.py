@@ -13,8 +13,8 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.db.evidence_models import (
-    ClaimCitationRecord, EvidenceChunkRecord, FieldClaimRecord, FieldResolutionRecord,
-    RunFieldStateRecord, SourceDocumentRecord,
+    ClaimCitationRecord, DiscoveryResultRecord, EvidenceChunkRecord, FieldClaimRecord,
+    FieldResolutionRecord, RunFieldStateRecord, SourceDocumentRecord,
 )
 from water_source_research.llm.extraction import normalize_quote
 from water_source_research.schemas.common import FINAL_STATUSES
@@ -78,6 +78,44 @@ class EvidenceRepository:
                         char_count=len(c.text)))
                     inserted += 1
         return inserted
+
+    def save_discovery_results(self, run_id: str, round_no: int,
+                               rows: list[Mapping[str, Any]]) -> int:
+        """Raw search hits of one discovery round (insert-or-skip, so a resumed round doesn't
+        duplicate them). Returns the number of new rows."""
+        if not rows:
+            return 0
+        with Session(self.engine) as session, session.begin():
+            existing = {tuple(row) for row in session.execute(select(
+                DiscoveryResultRecord.call_index, DiscoveryResultRecord.result_index).where(
+                DiscoveryResultRecord.run_id == run_id,
+                DiscoveryResultRecord.round == round_no))}
+            new = [r for r in rows
+                   if (r["call_index"], r["result_index"]) not in existing]
+            session.add_all(DiscoveryResultRecord(
+                run_id=run_id, round=round_no, call_index=r["call_index"],
+                result_index=r["result_index"], provider=r["provider"][:64],
+                strategy=r["strategy"][:64], query=_cut(r.get("query"), 1000),
+                field_key=r.get("field_key"), rank=r.get("rank"), url=r["url"][:2048],
+                canonical_url=_cut(r.get("canonical_url"), 2048),
+                title=_cut(r.get("title"), 1000), source_type=r.get("source_type"),
+                doi=_cut(r.get("doi"), 255), retained=bool(r.get("retained")))
+                for r in new)
+        return len(new)
+
+    def discovery_results(self, run_id: str) -> list[dict[str, Any]]:
+        with Session(self.engine) as session:
+            rows = session.scalars(select(DiscoveryResultRecord).where(
+                DiscoveryResultRecord.run_id == run_id).order_by(
+                DiscoveryResultRecord.round, DiscoveryResultRecord.call_index,
+                DiscoveryResultRecord.result_index)).all()
+            return [{"round": r.round, "provider": r.provider, "strategy": r.strategy,
+                     "query": r.query, "field_key": r.field_key, "rank": r.rank,
+                     "position": r.result_index + 1, "url": r.url,
+                     "canonical_url": r.canonical_url, "title": r.title,
+                     "source_type": r.source_type, "doi": r.doi, "retained": r.retained,
+                     "retrieved_at": r.retrieved_at.isoformat() if r.retrieved_at else None}
+                    for r in rows]
 
     def save_results(self, run_id: str, research_state: Mapping[str, Any],
                      needs_evidence: list[str] | None = None,
@@ -363,3 +401,6 @@ def _citation_dict(c: ClaimCitationRecord, doc: SourceDocumentRecord | None) -> 
             "acquisition_method": doc.acquisition_method if doc else None,
             "source_date": doc.source_date if doc else None,
             "raw_object_key": doc.raw_object_key if doc else None}
+
+def _cut(value: str | None, n: int) -> str | None:
+    return value[:n] if isinstance(value, str) else value

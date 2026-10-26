@@ -76,7 +76,7 @@ def test_reports_render_in_each_format(evaluated):
     content, name, media = render(view, "summary", "md")
     text = content.decode("utf-8")
     assert name.endswith(".md") and media == "text/markdown"
-    assert "## Metrics (numerator/denominator)" in text and "RAW_SEARCH_RESULTS" in text
+    assert "## Metrics (numerator/denominator)" in text and "## Instrumentation gaps" in text
     assert "at coverage" in text  # auto precision always carries its coverage
     content, name, _ = render(view, "city", "csv")
     rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
