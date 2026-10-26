@@ -218,7 +218,9 @@ def _concept_words(text: str) -> list[str]:
 
 def _description(d: FieldDefinition, expected: str, got: str) -> Comparison:
     """Concept coverage only; free-text agreement is a person's call (never an automatic
-    MATCH)."""
+    MATCH) — except the same text, which needs no judgment."""
+    if " ".join(expected.split()).casefold() == " ".join(got.split()).casefold():
+        return Comparison(status="MATCH", detail="identical text", tags=["IDENTICAL_TEXT"])
     concepts = [c.strip() for c in re.split(r"[;,]", expected) if c.strip()]
     got_words = set(_concept_words(got))
     covered = [c for c in concepts if (w := _concept_words(c)) and set(w) <= got_words]

@@ -138,10 +138,12 @@ def apply_judge(results: list[dict[str, Any]], judge: SemanticJudge,
         selected = [claims[u] for u in uids if u in claims]
         year = p.get("reference_year") or next(
             (claim_prediction(c).reference_year for c in selected), None)
+        # Years are compared in their own fields (e.g. water_quality_year): a year attached to
+        # only one side must not make the same description look different.
         x = judge.make_input(
             r["field_key"], _text(ref.get("raw") if ref.get("raw") not in (None, "")
                                   else ref.get("normalized")),
-            ref.get("reference_year"), _text(p.get("value")), year,
+            None, _text(p.get("value")), None,
             [x["quote"] for c in selected for x in c.get("citations") or [] if x.get("quote")])
         j = judge.judge(x)
         cmp = dict(r["comparison"] or {})

@@ -148,3 +148,12 @@ def test_a_listed_description_is_compared_by_concepts_not_as_a_set():
     assert "intake pipe" in c.matched and "pumping station" in c.matched
     assert "lake intake" in c.missing
     assert cmp(f, reference, "Chlorine residual is tested daily.").status == "NEEDS_REVIEW"
+
+def test_identical_description_matches_without_judgment():
+    from water_source_research.evaluation.compare import _description
+    from water_source_research.services.field_state import load_field_definitions
+    d = load_field_definitions()["water_quality_notes"]
+    c = _description(d, "freshwater lake source,  offshore intakes",
+                     "Freshwater lake source, offshore intakes")
+    assert c.status == "MATCH" and "IDENTICAL_TEXT" in c.tags
+    assert _description(d, "freshwater lake source", "treated water testing").status != "MATCH"
