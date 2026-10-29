@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 from water_source_research.discovery.normalize import host_names_org, is_city_domain
 from water_source_research.schemas.research import CityResearchState, EvidenceChunk, FieldDefinition
-from water_source_research.services.places import HYDRONYM, names_city
+from water_source_research.services.places import HYDRONYM, city_pattern, without_water_bodies
 
 CITY_NEARBY = "CITY_NEARBY"
 DOC_CONTEXT = "DOC_CONTEXT"
@@ -65,6 +65,12 @@ def name_key(name: str) -> str:
     # imported here: services.resolution imports the context manager (via normalization)
     from water_source_research.services.resolution import name_key as key
     return key(name)
+
+def _names_city(text: str, city: str) -> bool:
+    """The city is named outside water-body names ("Lake Houston" isn't Houston): the TARGET
+    case of services/places.py::names_city, without building the other-places pattern."""
+    pattern = city_pattern(city)
+    return bool(pattern.search(text)) and bool(pattern.search(without_water_bodies(text)))
 
 def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").removeprefix("www.")
@@ -142,11 +148,11 @@ def build_relevance_context(state: CityResearchState,
     pages: dict[str, set[int | None]] = {}
     hydronyms: set[str] = set()
     for c in chunks:
-        if names_city(c.text, city, country) != "TARGET":
+        if not _names_city(c.text, city):
             continue
         pages.setdefault(c.url, set()).add(c.page_number)
         for s in _SENTENCE.split(c.text):
-            if s.strip() and names_city(s, city, country) == "TARGET":
+            if s.strip() and _names_city(s, city):
                 hydronyms.update(m.group(0) for m in HYDRONYM.finditer(s))
     excluded = {name_key(x) for x in (city, country) if x}
     features = {k for v in (*hydronyms, *(v for f in _SOURCE_FIELDS

@@ -45,7 +45,8 @@ def slot(field, rnd, status="READY", called=True, tokens=(1000, 100), reason=Non
 
 def test_compare_separates_lost_from_replaced_and_estimates_tokens():
     parent = {"slots": [slot("city_name", 1), slot("water_source", 2),
-                        slot("water_quality_notes", 3), slot("jurisdiction", 2)]}
+                        slot("water_quality_notes", 3), slot("jurisdiction", 2),
+                        slot("city_name", 2)]}
     cf = [slot("city_name", 1, "NOT_NEEDED", reason="from the approved city catalog"),
           slot("water_source", 2, "NO_RELEVANT_EVIDENCE"),
           slot("water_quality_notes", 3, "NO_RELEVANT_EVIDENCE"),
@@ -56,10 +57,11 @@ def test_compare_separates_lost_from_replaced_and_estimates_tokens():
                "validation_outcome": "VALID", "is_selected": False,
                "qualifiers": {"extraction_round": 2}}]
     r = compare(parent, cf, claims, [])
-    assert (r["parent_calls"], r["counterfactual_calls"]) == (4, 2)
-    replaced = {s["field"]: s["replaced"] for s in r["skipped_slots"]}
-    assert replaced == {"city_name": True, "water_source": False, "water_quality_notes": False}
+    assert (r["parent_calls"], r["counterfactual_calls"]) == (5, 2)
+    replaced = {(s["field"], s["round"]): s["replaced"] for s in r["skipped_slots"]}
+    assert replaced == {("city_name", 1): True, ("city_name", 2): True,  # never rescheduled
+                        ("water_source", 2): False, ("water_quality_notes", 3): False}
     assert [x["field"] for x in r["skipped_with_usable_claims"]] == ["water_source"]
     assert r["added_slots"] == [{"field": "jurisdiction", "round": 3,
                                  "tokens_estimate": 1100}]
-    assert (r["parent_tokens"], r["counterfactual_tokens_estimate"]) == (4400, 2200)
+    assert (r["parent_tokens"], r["counterfactual_tokens_estimate"]) == (5500, 2200)

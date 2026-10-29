@@ -117,9 +117,12 @@ def compare(parent: Mapping[str, Any], cf_slots: list[dict[str, Any]],
         added.append({"field": slot[0], "round": slot[1], "tokens_estimate": cost(slot)})
     parent_tokens = sum(cost(sl) for sl in p_called)
     cf_tokens = sum(cost(sl) for sl in c_called)
-    # A field pruned because the catalog or assemble fills it is replaced, not lost.
+    # A field pruned because the catalog or assemble fills it is replaced, not lost (in any
+    # round: once pruned it is never scheduled again).
+    pruned = {s["field"] for s in cf_slots
+              if s["bundle_status"] == "NOT_NEEDED" and s.get("skip_reason")}
     for x in skipped:
-        x["replaced"] = x["status_now"] == "NOT_NEEDED" and bool(x["skip_reason"])
+        x["replaced"] = x["field"] in pruned
     lost = [x for x in skipped if not x["replaced"] and any(
         c["selected"] or c["validation"] in ("VALID", "VALID_WITH_WARNINGS")
         for c in x["claims"])]
