@@ -16,7 +16,7 @@ from water_source_research.services.field_state import initialize_city_state, un
 
 TARGETS = ["utility_name", "water_source", "total_city_water_withdrawals_m3_day"]
 UTIL_URL = "https://www.toronto.ca/services-payments/water-environment/tap-water-in-toronto/"
-PDF_URL = "https://www.toronto.ca/wp-content/uploads/2024/water-annual-report-2023.pdf"
+PDF_URL = "https://www.toronto.ca/wp-content/uploads/2026/water-annual-report-2025.pdf"
 BLOG_URL = "https://blog.example.com/toronto-hikes"
 DOWN_URL = "https://down.example.org/toronto-water"
 
@@ -24,17 +24,17 @@ UTIL_SENTENCE = ("Toronto Water is the City of Toronto division that provides dr
                  "to residents and businesses in Toronto.")
 SOURCE_SENTENCE = ("Toronto draws its drinking water from Lake Ontario, and the Toronto Island "
                    "community is also served by groundwater wells.")
-WITHDRAWAL_SENTENCE = ("In 2023 the Toronto Water treatment plants produced an average of "
-                       "980,000 cubic metres of drinking water per day.")
+WITHDRAWAL_SENTENCE = ("In 2025 the Toronto Water intakes withdrew an average of "
+                       "980,000 cubic metres of raw water per day from Lake Ontario.")
 
 def utility_page() -> bytes:
     return html_page("Tap water in Toronto - City of Toronto", UTIL_SENTENCE, SOURCE_SENTENCE,
                      "Water is treated at four treatment plants before distribution.")
 
 def report_pdf() -> bytes:
-    return make_pdf([["Toronto Water Annual Report 2023", "Prepared by Toronto Water."],
-                     ["Section 2: Production", WITHDRAWAL_SENTENCE]],
-                    title="Toronto Water 2023 Annual Report", mod_date="D:20240315000000Z")
+    return make_pdf([["Toronto Water Annual Report 2025", "Prepared by Toronto Water."],
+                     ["Section 2: Water withdrawals", WITHDRAWAL_SENTENCE]],
+                    title="Toronto Water 2025 Annual Report", mod_date="D:20260315000000Z")
 
 def blog_page() -> bytes:
     return html_page("Best hikes near Toronto", "Our favourite hiking trails near Toronto "
@@ -46,7 +46,7 @@ def make_site() -> Site:
 
 def search_results() -> list:
     return [web("Tap water in Toronto - City of Toronto", UTIL_URL, rank=1),
-            web("Toronto Water Annual Report 2023", PDF_URL, rank=2),
+            web("Toronto Water Annual Report 2025", PDF_URL, rank=2),
             web("Best hikes near Toronto", BLOG_URL, rank=3),
             web("Toronto water information", DOWN_URL, rank=4),
             web("Tap water in Toronto (tracking link)", UTIL_URL + "?utm_source=news", rank=5)]
@@ -81,8 +81,8 @@ ANSWERS: dict[str, list[dict[str, Any]]] = {
          "quote": "the Toronto Island community is also served by groundwater wells",
          "confidence": 0.7}],
     "total_city_water_withdrawals_m3_day": [
-        {"value": 980000, "quote": "produced an average of 980,000 cubic metres of drinking "
-                                   "water per day", "confidence": 0.85}],
+        {"value": 980000, "quote": "withdrew an average of 980,000 cubic metres of raw water "
+                                   "per day", "confidence": 0.85}],
 }
 
 _TARGET = re.compile(r"Target field: (\w+)")

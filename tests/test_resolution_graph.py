@@ -36,8 +36,8 @@ DISAGREEING = {
     "water_source": [{"value": "Lake Ontario", "quote": "Toronto draws its drinking water from "
                       "Lake Ontario", "confidence": 0.9}],
     "total_city_water_withdrawals_m3_day": [
-        {"value": 450000, "quote": "produced an average of 980,000 cubic metres of drinking "
-                                   "water per day", "confidence": 0.99}],
+        {"value": 450000, "quote": "withdrew an average of 980,000 cubic metres of raw water "
+                                   "per day", "confidence": 0.99}],
 }
 
 def test_graph_emits_validation_and_resolution_events():

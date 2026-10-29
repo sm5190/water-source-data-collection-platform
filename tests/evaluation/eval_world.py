@@ -27,16 +27,16 @@ class EvalWorld(World):
                            context_service=ContextService(store=ContextBundleStore(self.engine)))
 
 def reference_row(**changes):
-    """What a researcher recorded for the mocked Toronto (980,000 m3/d in 2023, Lake Ontario,
+    """What a researcher recorded for the mocked Toronto (980,000 m3/d in 2025, Lake Ontario,
     Toronto Water, Surface), with sources per information label."""
     refs = (f"Water Sources: City of Toronto. (n.d.). Tap water. {UTIL_URL}; "
             f"Water Withdrawal: Toronto Water. (2024). Annual report. {PDF_URL}; "
             f"Water Quality: Toronto Water. (2024). Quality. https://www.toronto.ca/quality-2024/; "
             f"Infrastructure: Other. (2020). Intakes. {DOWN_URL}")
     return row(total_city_water_withdrawals_m3_day=980000.0,
-               total_city_water_withdrawals_year=2023.0,
+               total_city_water_withdrawals_year=2025.0,
                source_withdrawal_contribution_m3_day=980000.0,
-               source_withdrawal_contribution_year=2023.0,
+               source_withdrawal_contribution_year=2025.0,
                city_population_millions=2.794, utility_reported_city_population_millions=3.6,
                population_served_millions=2.794, percentage_total_population=100.0,
                references=refs, **changes)

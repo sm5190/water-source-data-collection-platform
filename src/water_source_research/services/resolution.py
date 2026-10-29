@@ -15,6 +15,16 @@ Entities:
 Status transitions written here (reviewer decisions are applied elsewhere and preserved):
   UNRESOLVED/CANDIDATE -> RESOLVED (AUTO_STRICT) | HITL_REQUIRED | CONFLICT
   a field without valid claims never becomes RESOLVED.
+
+High-risk fields (FieldDefinition.risk, e.g. jurisdiction, population, utility, withdrawals)
+are accepted only when every required semantic check PASSes explicitly (a check that didn't
+run counts as not passed), so a lone candidate isn't trusted just because nothing contradicts
+it. After every field is
+decided, two cross-field rules run before anything is written:
+  a measurement's year stays RESOLVED only if the measurement itself is RESOLVED with the same
+  reference year (PARENT_NOT_ACCEPTED / YEAR_DIFFERS_FROM_PARENT);
+  a shared field (utility_name) accepted for one source goes to review when another of its
+  entities is unsettled with a different value (SIBLING_UNSETTLED).
 """
 
 import re
@@ -107,6 +117,7 @@ def resolve_research(research: CityResearchState, fields: Mapping[str, FieldDefi
             _apply(ws, ws_def, entities, policy, log)
         sources = _accepted_sources(ws)
 
+    decided: dict[str, list[EntityResolution]] = {}
     for key, d in fields.items():
         if key == ENTITY_FIELD or d.scope == "derived" or d.generated:
             continue
@@ -117,8 +128,69 @@ def resolve_research(research: CityResearchState, fields: Mapping[str, FieldDefi
             entities = [e for e in [_decide(CITY, None, fs.candidate_claims, d, policy)] if e]
         else:
             entities = _resolve_record_field(fs, d, sources, index, policy)
-        _apply(fs, d, entities, policy, log)
+        if key in SHARED_RECORD_FIELDS:
+            entities = _siblings_settled(fs, entities)
+        decided[key] = entities
+    for key, entities in decided.items():
+        d = fields[key]
+        if d.type == "integer" and key.endswith("_year") and d.depends_on:
+            entities = _years_follow_measurement(out, d, entities, decided)
+        _apply(out.fields[key], d, entities, policy, log)
     return out, log
+
+def _entity_of(fs: FieldState | None, computed: list[EntityResolution] | None,
+               key: str) -> EntityResolution | None:
+    for e in computed or []:
+        if e.entity_key == key:
+            return e
+    reviewer = _reviewer_entities(fs) if fs is not None else {}
+    return reviewer.get(key)
+
+def _years_follow_measurement(research: CityResearchState, d: FieldDefinition,
+                              entities: list[EntityResolution],
+                              decided: dict[str, list[EntityResolution]]
+                              ) -> list[EntityResolution]:
+    """A year is the year of its measurement: it stays accepted only if the measurement is
+    accepted for the same entity with the same reference year."""
+    parent_key = d.depends_on[0]
+    parent_fs = research.fields.get(parent_key)
+    fs = research.fields.get(d.key)
+    out = []
+    for e in entities:
+        if e.status is not S.RESOLVED:
+            out.append(e)
+            continue
+        parent = _entity_of(parent_fs, decided.get(parent_key), e.entity_key)
+        if parent is None and e.entity_key != CITY:  # a city-wide parent covers every record
+            parent = _entity_of(parent_fs, decided.get(parent_key), CITY) or \
+                _entity_of(parent_fs, decided.get(parent_key), ALL_RECORDS)
+        if parent is None or parent.status is not S.RESOLVED or not parent.selected_claim_uids:
+            out.append(_to_review(e, "PARENT_NOT_ACCEPTED"))
+            continue
+        chosen = parent_fs.claim(parent.selected_claim_uids[0]) if parent_fs else None
+        parent_year = chosen.qualifiers.reference_year if chosen and chosen.qualifiers else None
+        mine = fs.claim(e.selected_claim_uids[0]) if fs and e.selected_claim_uids else None
+        year = mine.comparable_value if mine is not None else None
+        if parent_year is None or year is None or int(year) != int(parent_year):
+            out.append(_to_review(e, "YEAR_DIFFERS_FROM_PARENT"))
+            continue
+        out.append(e)
+    return out
+
+def _siblings_settled(fs: FieldState, entities: list[EntityResolution]
+                      ) -> list[EntityResolution]:
+    """One utility usually serves every source: a value accepted for one source while another
+    entity of the field is unsettled with a different value is not settled either."""
+    def values(e: EntityResolution) -> set[str]:
+        uids = e.selected_claim_uids or e.candidate_claim_uids
+        return {name_key(str(c.comparable_value)) for uid in uids
+                if (c := fs.claim(uid)) is not None and c.comparable_value is not None}
+    unsettled = [e for e in entities if e.status in (S.CONFLICT, S.HITL_REQUIRED)]
+    if not unsettled:
+        return entities
+    others = set().union(*(values(e) for e in unsettled))
+    return [_to_review(e, "SIBLING_UNSETTLED")
+            if e.status is S.RESOLVED and others - values(e) else e for e in entities]
 
 def _reviewer_entities(fs: FieldState) -> dict[str, EntityResolution]:
     if fs.resolution is None:
@@ -368,6 +440,12 @@ def _claim_failures(c: FieldClaim, d: FieldDefinition, policy: ResolutionPolicy)
         reasons.append("INVALID")
     reasons += [f"WARN_{code}" for code in v.codes(CheckResult.WARN)
                 if code not in policy.allowed_warnings]
+    # High risk: every required check must have run and passed (absent is not passed). The
+    # year a measurement refers to is one of them (MEASUREMENT_YEAR, FRESHNESS, YEAR_LINKED),
+    # so the general REFERENCE_YEAR note stays allowed (a name has no measurement year).
+    if d.risk == "high":
+        reasons += [f"NOT_ESTABLISHED_{code}" for code in d.required_checks
+                    if v.result_of(code) is not CheckResult.PASS]
     if c.value_status is ValueStatus.KNOWN \
             and v.result_of("VALUE_IN_QUOTE") is not CheckResult.PASS:
         reasons.append("VALUE_NOT_VERIFIED")

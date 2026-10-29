@@ -82,7 +82,7 @@ def test_reports_render_in_each_format(evaluated):
     rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
     withdrawal = next(r for r in rows if r["field"] == W)
     assert withdrawal["RAW status"] == "MISMATCH" and "450000" in withdrawal["RAW prediction"]
-    assert withdrawal["reference"] == "980000 (2023)"
+    assert withdrawal["reference"] == "980000 (2025)"
     failures = json.loads(render(view, "failures", "json")[0])["rows"]
     assert any(f["root_cause"] == "EXTRACTION_FAILURE" for f in failures)
     for kind in ("fields", "evidence", "metrics"):

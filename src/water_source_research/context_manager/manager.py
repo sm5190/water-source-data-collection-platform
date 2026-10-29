@@ -16,11 +16,8 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
-from functools import lru_cache
-import yaml
 
 from water_source_research.observability.otel import get_tracer
-from water_source_research.core.paths import CONFIG_DIR
 from water_source_research.schemas.common import FINAL_STATUSES, FieldResolutionStatus
 from water_source_research.schemas.research import (
     CityResearchState,
@@ -30,6 +27,8 @@ from water_source_research.schemas.research import (
     FieldDefinition,
 )
 from water_source_research.services.field_state import load_field_definitions
+from water_source_research.services.places import HYDRONYM
+from water_source_research.services.places import place_patterns as _place_patterns
 
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
@@ -84,37 +83,7 @@ HYDRONYM_SEEDS = 3
 # extra ones only if they are about the target city and score at least this share of the best.
 RELAXED_CAP_FACTOR = 2
 RELAXED_CAP_MIN_RATIO = 0.5
-_NAME = r"[A-ZÀ-ÖØ-Þ][\w'’\-]+"
-HYDRONYM = re.compile(
-    rf"\b(?:{_NAME}\s+(?:and\s+|&\s+)?){{1,3}}"
-    r"(?i:rivers?|lakes?|springs?|aquifers?|wellfields?|well\s+fields?|creeks?|reservoirs?|dams?)\b"
-    rf"|\b(?:River|Lake|Rio|Río|Lago|Lac|Rivière|Fleuve|Wadi)\s+(?:of\s+)?{_NAME}"
-    rf"|\b[Ss]prings?\s+of\s+the\s+{_NAME}")
-GAZETTEER_PATH = CONFIG_DIR / "gazetteer_cities.yaml"
-
-@lru_cache
-def _gazetteer() -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """(city names, country names) from the methodology's city list."""
-    if not GAZETTEER_PATH.exists():
-        return (), ()
-    data = yaml.safe_load(GAZETTEER_PATH.read_text(encoding="utf-8")) or {}
-    cities = tuple(dict.fromkeys(n for c in data.get("cities", []) for n in c.get("names", [])))
-    countries = tuple(dict.fromkeys(c["country"] for c in data.get("cities", [])
-                                    if c.get("country")))
-    return cities, countries
-
-@lru_cache(maxsize=64)
-def _place_patterns(city: str, country: str | None) -> tuple[re.Pattern[str], re.Pattern[str]]:
-    """(target place pattern, other places pattern) for a city."""
-    own = [city] + ([country] if country else [])
-    own_keys = [o.casefold() for o in own]
-    target = re.compile("|".join(rf"(?<!\w){re.escape(o)}(?!\w)" for o in own), re.IGNORECASE)
-    cities, countries = _gazetteer()
-    others = [n for n in (*cities, *countries) if len(n) >= 4 and not any(
-        n.casefold() in k or k in n.casefold() for k in own_keys)]
-    other = re.compile("|".join(rf"(?<!\w){re.escape(n)}(?!\w)"
-                                for n in sorted(others, key=len, reverse=True)) or r"(?!x)x")
-    return target, other
+# Place patterns and named water bodies live in services/places.py (shared with validation).
 NO_DIGITS_FACTOR = 0.3
 EXCERPT_THRESHOLD_TOKENS = 250
 MAX_CLAIM_PASSAGE_TOKENS = 150

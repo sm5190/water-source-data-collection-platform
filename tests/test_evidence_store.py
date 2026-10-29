@@ -100,11 +100,11 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
     cite = withdrawal["citations"][0]
     assert withdrawal["value"] == 980000 and withdrawal["is_selected"]
     assert withdrawal["claim_uid"] and withdrawal["validation_outcome"] == "VALID"
-    assert withdrawal["qualifiers"]["reference_year"] == 2023
+    assert withdrawal["qualifiers"]["reference_year"] == 2025
     assert withdrawal["validation"]["version"]
     assert cite["url"] == PDF_URL and cite["page_number"] == 2
     assert cite["chunk_id"] in {c["chunk_id"] for c in chunks}  # linked to the exact chunk
-    assert cite["source_date"] == "2024-03-15"
+    assert cite["source_date"] == "2026-03-15"
     assert cite["raw_object_key"] == docs[PDF_URL]["raw_object_key"]
     assert {s["field_key"]: s["review_required"] for s in stored["field_states"]} == {
         k: False for k in TARGETS}

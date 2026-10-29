@@ -127,7 +127,8 @@ def automatic_decisions(resolutions: list[dict[str, Any]]) -> dict[tuple[str, st
         out[(r["field_key"], r["entity_key"])] = {
             "status": r["to_status"], "rule": r["rule"],
             "selected": sorted(r.get("selected_claim_uids") or []),
-            "policy_version": r.get("policy_version")}
+            "policy_version": r.get("policy_version"),
+            "reasons": list(r.get("reason_codes") or [])}
     return out
 
 def compare_decisions(engine: Engine, parent_run_id: str, run_id: str) -> list[dict[str, Any]]:

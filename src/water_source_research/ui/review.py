@@ -47,6 +47,25 @@ CHECK_HINT = {
     "REFERENCE_YEAR": "the year of this value may be old or unclear",
     "TYPE": "the value has an unexpected format", "ENUM": "the value is not an allowed option",
     "RANGE": "the value is outside the expected range",
+    # semantic checks (services/semantics.py): the value appears, but does it answer the field?
+    "CITY_NOT_NAMED": "the source doesn't say this is about the city",
+    "WRONG_PLACE": "the source seems to be about a different place",
+    "JURISDICTION_LEVEL": "this looks like a county/district, not the state or province",
+    "JURISDICTION_LEVEL_UNKNOWN": "check this is the state or province (first level)",
+    "MEASUREMENT_TERM": "the source doesn't say this number is a population",
+    "SERVICE_AREA_POPULATION": "this may be the utility's service-area population, "
+                               "not the city's",
+    "MEASUREMENT_TYPE_MISMATCH": "this may be water produced, treated or delivered (or a "
+                                 "capacity), not water withdrawn",
+    "MEASUREMENT_TYPE_UNKNOWN": "the source doesn't say this is water withdrawn",
+    "MEASUREMENT_YEAR": "the source doesn't give the year of this number",
+    "FRESHNESS_UNKNOWN": "it's unclear how recent this number is",
+    "POSSIBLY_SUPERSEDED": "this number is old; a more recent one may exist",
+    "YEAR_NOT_LINKED": "the year isn't clearly the year of the measurement "
+                       "(it may be a page or publication date)",
+    "DESIGNATED_SOURCE_MISSING": "city population needs the designated population list; "
+                                 "check the value and its year",
+    "UTILITY_SERVICE_NOT_STATED": "the source doesn't show this utility serves the city",
 }
 
 def field_label(field_key: str) -> str:
@@ -178,11 +197,15 @@ def render_card(client: Any, run_id: str, item: dict[str, Any], reviewer: str,
         decision_controls(client, run_id, item, reviewer, proposed, others)
 
 def render_candidate(c: dict[str, Any], unit: str | None, big: bool = False) -> None:
-    year = (c.get("qualifiers") or {}).get("reference_year")
+    q = c.get("qualifiers") or {}
+    year = q.get("reference_year")
     value = show_value(candidate_value(c), unit)
     # A short value reads as a headline; a long description stays normal text.
     line = (f"### {value}" if len(value) <= 80 else f"**{value}**") if big else f"- **{value}**"
-    st.markdown(line + (f"  \n*Reporting year: {year}*" if year else ""))
+    year_text = (f"  \n*Publication year: {year} (the source doesn't give the year of the "
+                 "number)*" if q.get("year_basis") == "document"
+                 else f"  \n*Reporting year: {year}*") if year else ""
+    st.markdown(line + year_text)
     hints = [CHECK_HINT[k["code"]] for k in (c.get("validation") or {}).get("checks", [])
              if k["result"] != "PASS" and k["code"] in CHECK_HINT]
     if is_invalid(c):

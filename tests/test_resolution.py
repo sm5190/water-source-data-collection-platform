@@ -33,11 +33,11 @@ def test_single_official_verified_claim_is_resolved_automatically():
 
 def test_equivalent_claims_from_two_documents_form_one_group():
     world = World()
-    world.doc(UTIL, "In 2023 Toronto produced 980,000 m3/d of drinking water.")
-    world.doc(REPORT, "Average production in 2023: 980 ML/d.", source_type="GOVERNMENT")
+    world.doc(UTIL, "In 2025 Toronto withdrew 980,000 m3/d of raw water.")
+    world.doc(REPORT, "Average withdrawal in 2025: 980 ML/d.", source_type="GOVERNMENT")
     state, _ = resolve(world,
-                       claim(W, 980000, (UTIL, "In 2023 Toronto produced 980,000 m3/d")),
-                       claim(W, 980000, (REPORT, "Average production in 2023: 980 ML/d")))
+                       claim(W, 980000, (UTIL, "In 2025 Toronto withdrew 980,000 m3/d")),
+                       claim(W, 980000, (REPORT, "Average withdrawal in 2025: 980 ML/d")))
     fs = state.fields[W]
     assert fs.status is S.RESOLVED
     [e] = fs.resolution.entities
@@ -70,10 +70,10 @@ def test_unverified_value_needs_review():
 
 def test_contradictory_values_for_the_same_year_conflict():
     world = World()
-    world.doc(UTIL, "In 2023 Toronto produced 980,000 m3/d.")
-    world.doc(REPORT, "In 2023 Toronto produced 1,200,000 m3/d.", source_type="GOVERNMENT")
-    state, log = resolve(world, claim(W, 980000, (UTIL, "In 2023 Toronto produced 980,000 m3/d")),
-                         claim(W, 1200000, (REPORT, "In 2023 Toronto produced 1,200,000 m3/d")))
+    world.doc(UTIL, "In 2025 Toronto withdrew 980,000 m3/d.")
+    world.doc(REPORT, "In 2025 Toronto withdrew 1,200,000 m3/d.", source_type="GOVERNMENT")
+    state, log = resolve(world, claim(W, 980000, (UTIL, "In 2025 Toronto withdrew 980,000 m3/d")),
+                         claim(W, 1200000, (REPORT, "In 2025 Toronto withdrew 1,200,000 m3/d")))
     fs = state.fields[W]
     assert fs.status is S.CONFLICT and fs.selected_claim is None
     assert fs.resolution.entities[0].rule == "VALUES_DISAGREE"
@@ -81,18 +81,18 @@ def test_contradictory_values_for_the_same_year_conflict():
 
 def test_undated_disagreement_is_a_conflict():
     world = World()
-    world.doc(UTIL, "Toronto produces 980,000 m3/d.")
-    world.doc(REPORT, "Toronto produces 1,200,000 m3/d.", source_type="GOVERNMENT")
-    state, _ = resolve(world, claim(W, 980000, (UTIL, "Toronto produces 980,000 m3/d")),
-                       claim(W, 1200000, (REPORT, "Toronto produces 1,200,000 m3/d")))
+    world.doc(UTIL, "Toronto withdraws 980,000 m3/d.")
+    world.doc(REPORT, "Toronto withdraws 1,200,000 m3/d.", source_type="GOVERNMENT")
+    state, _ = resolve(world, claim(W, 980000, (UTIL, "Toronto withdraws 980,000 m3/d")),
+                       claim(W, 1200000, (REPORT, "Toronto withdraws 1,200,000 m3/d")))
     assert state.fields[W].resolution.entities[0].rule == "VALUES_DISAGREE_UNDATED"
 
 def test_different_years_are_history_not_conflict():
     world = World()
-    world.doc(UTIL, "In 2023 Toronto produced 980,000 m3/d.")
-    world.doc(REPORT, "In 2019 Toronto produced 1,050,000 m3/d.", source_type="GOVERNMENT")
-    old = claim(W, 1050000, (REPORT, "In 2019 Toronto produced 1,050,000 m3/d"))
-    new = claim(W, 980000, (UTIL, "In 2023 Toronto produced 980,000 m3/d"))
+    world.doc(UTIL, "In 2025 Toronto withdrew 980,000 m3/d.")
+    world.doc(REPORT, "In 2019 Toronto withdrew 1,050,000 m3/d.", source_type="GOVERNMENT")
+    old = claim(W, 1050000, (REPORT, "In 2019 Toronto withdrew 1,050,000 m3/d"))
+    new = claim(W, 980000, (UTIL, "In 2025 Toronto withdrew 980,000 m3/d"))
     state, _ = resolve(world, old, new)
     fs = state.fields[W]
     assert fs.status is S.RESOLVED and fs.selected_claim.value == 980000
@@ -133,8 +133,8 @@ def two_source_world() -> tuple[World, list]:
     world = World()
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario, and the Toronto "
                     "Island community is also served by the Oak Ridges Aquifer.")
-    world.doc(REPORT, "The Lake Ontario intakes supplied 950,000 m3/d in 2023. The Oak Ridges "
-                      "Aquifer wells supplied 30,000 m3/d in 2023.", source_type="GOVERNMENT")
+    world.doc(REPORT, "The Lake Ontario intakes withdrew 950,000 m3/d in 2025. The Oak Ridges "
+                      "Aquifer wells withdrew 30,000 m3/d in 2025.", source_type="GOVERNMENT")
     claims = [
         claim("water_source", "Lake Ontario", (UTIL, "drinking water from Lake Ontario")),
         claim("water_source", "Oak Ridges Aquifer",
@@ -155,9 +155,9 @@ def test_source_level_values_are_attributed_by_name():
     world, claims = two_source_world()
     state, _ = resolve(world, *claims,
                        claim("source_withdrawal_contribution_m3_day", 950000,
-                             (REPORT, "The Lake Ontario intakes supplied 950,000 m3/d in 2023")),
+                             (REPORT, "The Lake Ontario intakes withdrew 950,000 m3/d in 2025")),
                        claim("source_withdrawal_contribution_m3_day", 30000,
-                             (REPORT, "Aquifer wells supplied 30,000 m3/d in 2023")))
+                             (REPORT, "Aquifer wells withdrew 30,000 m3/d in 2025")))
     by_entity = entities(state, "source_withdrawal_contribution_m3_day")
     assert set(by_entity) == {"lake ontario", "oak ridges aquifer"}
     assert all(e.status is S.RESOLVED for e in by_entity.values())
@@ -273,9 +273,29 @@ def test_field_specific_authoritative_sources():
         UTIL, "The 2021 census counted 2,794,356 residents")))
     assert "NO_OFFICIAL_SOURCE" in from_utility.fields["city_population_millions"] \
         .resolution.entities[0].reason_codes  # city population: statistics, not the utility
+    # Standardization Rules 6-7: city population comes from the designated dataset. None is
+    # configured, so even a government census figure goes to a person.
     from_census, _ = resolve(world, claim("city_population_millions", 2.794356, (
         REPORT, "The 2021 census counted 2,794,356 residents")))
-    assert from_census.fields["city_population_millions"].status is S.RESOLVED
+    fs = from_census.fields["city_population_millions"]
+    assert fs.status is S.HITL_REQUIRED
+    reasons = fs.resolution.entities[0].reason_codes
+    assert "WARN_DESIGNATED_SOURCE_MISSING" in reasons and "NO_OFFICIAL_SOURCE" not in reasons
+
+def test_a_designated_population_dataset_is_accepted():
+    fields = dict(FIELDS)
+    fields["city_population_millions"] = FIELDS["city_population_millions"].model_copy(
+        update={"designated_dataset": {"name": "City statistics", "hosts": ["toronto.ca"]}})
+    world = World()
+    world.doc(REPORT, "The 2021 census counted 2,794,356 residents in Toronto.",
+              source_type="GOVERNMENT")
+    from water_source_research.services.normalization import normalize_research
+    from resolution_helpers import YEAR, state_with
+    research = normalize_research(state_with(claim("city_population_millions", 2.794356, (
+        REPORT, "The 2021 census counted 2,794,356 residents"))), fields, world.index,
+        current_year=YEAR)
+    state, _ = resolve_research(research, fields, world.index)
+    assert state.fields["city_population_millions"].status is S.RESOLVED
 
 def test_judgement_fields_are_never_accepted_automatically():
     world = World()

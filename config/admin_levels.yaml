@@ -1,0 +1,141 @@
+# Administrative hierarchy per country, for the State/Province/Most Relevant Sub-National
+# Jurisdiction column (Standardization Rules, column 2: "the state the city is located in").
+#
+# first_level: words that name the country's first-level subdivision (ISO 3166-2 subdivision
+#   categories; where a city is itself first-level, e.g. Vienna, Hamburg, Mexico City, the
+#   bare name carries no term and passes).
+# lower_level: words that name a level below it (county in the US, provincia in Chile, ...).
+#
+# A jurisdiction value naming a lower level (and no first level) goes to review
+# (JURISDICTION_LEVEL); a country not listed here goes to review too
+# (JURISDICTION_LEVEL_UNKNOWN), because the level can't be established. Terms match whole
+# words, case-insensitively, longest first ("sub-county" is not "county").
+version: 1
+source: ISO 3166-2 subdivision categories (first level); national usage for lower levels
+countries:
+  United States of America:
+    aliases: [United States, USA, US, U.S.]
+    first_level: [state, commonwealth, district of columbia]
+    lower_level: [county, parish, borough, census area, township, municipality, city, town, village]
+  Canada:
+    first_level: [province, territory]
+    lower_level: [county, regional municipality, region, district, municipality, city, township, town]
+  India:
+    first_level: [state, union territory]
+    lower_level: [district, division, mandal, tehsil, taluk, taluka, municipal corporation, ward, city]
+  Viet Nam:
+    aliases: [Vietnam]
+    first_level: [province, municipality, city]
+    lower_level: [district, ward, commune, town]
+  Spain:
+    first_level: [autonomous community, comunidad autónoma, community of, comunidad de, autonomous city]
+    lower_level: [province, provincia, municipality, municipio, comarca, district, distrito]
+  Netherlands:
+    first_level: [province, provincie]
+    lower_level: [municipality, gemeente, district]
+  Mexico:
+    first_level: [state, estado, mexico city, ciudad de méxico]
+    lower_level: [municipality, municipio, alcaldía, borough]
+  Japan:
+    first_level: [prefecture, metropolis]
+    lower_level: [city, ward, town, village, district]
+  Italy:
+    first_level: [region, regione]
+    lower_level: [province, provincia, metropolitan city, città metropolitana, municipality, comune]
+  Colombia:
+    first_level: [department, departamento, capital district, distrito capital]
+    lower_level: [municipality, municipio, locality, localidad, comuna]
+  Brazil:
+    first_level: [state, estado, federal district, distrito federal]
+    lower_level: [municipality, município, mesoregion, microregion]
+  United Kingdom:
+    aliases: [UK, Great Britain]
+    first_level: [country, england, scotland, wales, northern ireland]
+    lower_level: [county, district, borough, unitary authority, council area, city]
+  Ukraine:
+    first_level: [oblast, region, city with special status]
+    lower_level: [raion, district, hromada, municipality]
+  Turkey:
+    aliases: [Türkiye]
+    first_level: [province, il]
+    lower_level: [district, ilçe, municipality]
+  Sweden:
+    first_level: [county, län]
+    lower_level: [municipality, kommun]
+  South Korea:
+    aliases: [Republic of Korea, Korea]
+    first_level: [province, special city, metropolitan city, special self-governing city, special self-governing province]
+    lower_level: [county, gun, district, gu, city, si]
+  Senegal:
+    first_level: [region, région]
+    lower_level: [department, département, arrondissement, commune]
+  Rwanda:
+    first_level: [province, city of kigali]
+    lower_level: [district, sector, cell]
+  Romania:
+    first_level: [county, județ, municipality of bucharest]
+    lower_level: [municipality, municipiu, town, oraș, commune, comună, sector]
+  Portugal:
+    first_level: [district, distrito, autonomous region, região autónoma]
+    lower_level: [municipality, município, concelho, parish, freguesia]
+  Nigeria:
+    first_level: [state, federal capital territory]
+    lower_level: [local government area, lga, ward, emirate]
+  Malaysia:
+    first_level: [state, federal territory]
+    lower_level: [district, daerah, municipality]
+  Madagascar:
+    first_level: [province, region, région]
+    lower_level: [district, commune, fokontany]
+  Kenya:
+    first_level: [county]
+    lower_level: [sub-county, constituency, ward, division, location]
+  Ireland:
+    first_level: [province, county]
+    lower_level: [municipal district, electoral division, town, city]
+  Iraq:
+    first_level: [governorate, province, muhafazah]
+    lower_level: [district, qadha, sub-district, nahiya]
+  Indonesia:
+    first_level: [province, provinsi, special capital region, special region]
+    lower_level: [regency, kabupaten, city, kota, district, kecamatan]
+  Greece:
+    first_level: [region, periphery, decentralized administration]
+    lower_level: [regional unit, municipality, prefecture]
+  Ghana:
+    first_level: [region]
+    lower_level: [district, municipal assembly, metropolitan assembly]
+  Germany:
+    first_level: [state, land, bundesland, free state, freistaat, city-state]
+    lower_level: [district, kreis, landkreis, regierungsbezirk, municipality, gemeinde]
+  France:
+    first_level: [region, région]
+    lower_level: [department, département, arrondissement, commune, canton, métropole, metropole]
+  Finland:
+    first_level: [region, maakunta]
+    lower_level: [municipality, kunta, sub-region]
+  Ethiopia:
+    first_level: [region, regional state, chartered city, city administration]
+    lower_level: [zone, woreda, kebele, sub-city]
+  El Salvador:
+    first_level: [department, departamento]
+    lower_level: [municipality, municipio, district, distrito]
+  Ecuador:
+    first_level: [province, provincia]
+    lower_level: [canton, cantón, parish, parroquia]
+  Czech Republic:
+    aliases: [Czechia]
+    first_level: [region, kraj, capital city]
+    lower_level: [district, okres, municipality, obec]
+  Chile:
+    first_level: [region, región]
+    lower_level: [province, provincia, commune, comuna]
+  Cameroon:
+    first_level: [region, région]
+    lower_level: [department, département, arrondissement, commune]
+  Austria:
+    first_level: [state, land, bundesland]
+    lower_level: [district, bezirk, municipality, gemeinde, statutory city]
+  Angola:
+    first_level: [province, província]
+    lower_level: [municipality, município, commune, comuna]

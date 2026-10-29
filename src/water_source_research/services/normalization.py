@@ -10,6 +10,9 @@ Checks (codes):
   VALUE_IN_QUOTE, MEASUREMENT_BASIS, REFERENCE_YEAR, DEPENDENCY, FORMAT, RESERVOIR_AS_SOURCE,
   DERIVED_FIELD, GENERATED_FIELD, METHOD_NOT_REPORTABLE, SOURCE_TIER, APPROXIMATE_VALUE,
   GEOGRAPHIC_SCOPE
+plus the semantic checks of services/semantics.py (does the evidence support what the field
+asks for: city, jurisdiction level, measurement type, measurement year, freshness, a year tied
+to its measurement, designated dataset, a utility shown to serve the city).
 """
 
 import hashlib
@@ -20,6 +23,7 @@ from urllib.parse import urlsplit
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 from water_source_research.core.versions import NORMALIZATION_VERSION
 from water_source_research.llm.extraction import normalize_quote
@@ -31,6 +35,8 @@ from water_source_research.schemas.research import (
     FieldDefinition, ValidationCheck,
 )
 from .rules_engine import days_in_year
+from .semantics import page_text, semantic_checks
+from .structure import date_line_years, structural_year
 
 OFFICIAL_SOURCE_TYPES = frozenset({"UTILITY", "GOVERNMENT", "REGULATORY"})
 NUMERIC_TOLERANCE = 0.01  # relative; value-in-quote and equivalence of numbers
@@ -276,17 +282,24 @@ def normalize_research(research: CityResearchState, fields: Mapping[str, FieldDe
     current_year = current_year or datetime.now(UTC).year
     out = research.model_copy(deep=True)
     for key, fs in out.fields.items():
-        fs.candidate_claims = [normalize_claim(c, fields.get(key), index, out, current_year)
+        fs.candidate_claims = [normalize_claim(c, fields.get(key), index, out, current_year,
+                                               fields)
                                for c in fs.candidate_claims]
         if fs.selected_claim is not None:
             uid = claim_uid(fs.selected_claim) if fs.selected_claim.claim_uid is None \
                 else fs.selected_claim.claim_uid
             fs.selected_claim = fs.claim(uid) or normalize_claim(
-                fs.selected_claim, fields.get(key), index, out, current_year)
+                fs.selected_claim, fields.get(key), index, out, current_year, fields)
     return out
 
+@lru_cache
+def _all_definitions() -> Mapping[str, FieldDefinition]:
+    from .field_state import load_field_definitions
+    return load_field_definitions()
+
 def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index: EvidenceIndex,
-                    research: CityResearchState, current_year: int) -> FieldClaim:
+                    research: CityResearchState, current_year: int,
+                    fields: Mapping[str, FieldDefinition] | None = None) -> FieldClaim:
     original = claim.original_value if claim.original_value is not None else claim.value
     claim = claim.model_copy(update={"original_value": original, "value": original})
     uid = claim.claim_uid or claim_uid(claim)
@@ -322,8 +335,11 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
             normalized = _check_format(normalized, definition, checks)
             _check_scope(definition, quotes, checks)
     _check_reference_year(claim, definition, normalized, quotes, located, checks, qualifiers,
-                          current_year)
+                          current_year, index)
     _check_dependencies(claim, definition, normalized, research, checks, qualifiers)
+    if status_ok:
+        semantic_checks(claim, definition, normalized, located, index, research, qualifiers,
+                        checks.add, fields or _all_definitions(), current_year)
     if definition.key in SOURCE_FIELDS and claim.value_status is ValueStatus.KNOWN:
         _check_source_kind(claim, definition, qualifiers, checks)
     _check_out_of_area(located, research, checks)
@@ -726,7 +742,7 @@ def _title_case(value: str) -> str:
 
 def _check_reference_year(claim: FieldClaim, d: FieldDefinition | None, normalized: Any,
                           quotes: list[str], located, checks: _Checks, q: ClaimQualifiers,
-                          current_year: int) -> None:
+                          current_year: int, index: "EvidenceIndex | None" = None) -> None:
     if d is not None and d.type == "integer" and d.key.endswith("_year"):
         if isinstance(normalized, int):
             q.reference_year, q.year_basis = normalized, "quote"
@@ -745,10 +761,25 @@ def _check_reference_year(claim: FieldClaim, d: FieldDefinition | None, normaliz
         if loc.chunk is None:
             continue
         sentence = sentence_around(loc.chunk.text, ref.passage)
-        years = years_in(sentence, max_year) if sentence else []
+        dated = date_line_years(loc.chunk.text)  # a page date run into the sentence
+        years = [y for y in years_in(sentence, max_year) if y not in dated] if sentence else []
         if len(years) == 1:
             q.reference_year, q.year_basis = years[0], "passage"
             checks.add("REFERENCE_YEAR", CheckResult.PASS, f"{years[0]} (same sentence)")
+            return
+    # A table row/header, heading/caption or record line attaching a year to the passage.
+    for ref, loc in located:
+        if loc.chunk is None or index is None:
+            continue
+        link = structural_year(page_text(index, ref), ref.passage,
+                               _figure_as_written(ref.passage))
+        if link.year is not None:
+            q.reference_year, q.year_basis = link.year, link.basis
+            checks.add("REFERENCE_YEAR", CheckResult.PASS,
+                       f"{link.year} ({link.basis}: {link.detail})")
+            return
+        if link.ambiguous:
+            checks.add("REFERENCE_YEAR", CheckResult.WARN, link.detail)
             return
     for date in q.source_dates:
         years = years_in(date, max_year)
@@ -758,6 +789,13 @@ def _check_reference_year(claim: FieldClaim, d: FieldDefinition | None, normaliz
                        f"{years[0]} (document date; publication, not measurement, year)")
             return
     checks.add("REFERENCE_YEAR", CheckResult.WARN, "no reference year found")
+
+def _figure_as_written(quote: str) -> str | None:
+    """The first number in a quote that isn't a year, as written (to find its table cell)."""
+    for m in _NUMBER.finditer(quote):
+        if not _YEAR.fullmatch(m.group(0)):
+            return m.group(0)
+    return None
 
 def sentence_around(text: str, quote: str) -> str | None:
     norm_quote = " ".join(quote.split()).casefold()

@@ -16,8 +16,17 @@ def load_field_definitions(path: Path = DEFAULT_FIELDS_PATH) -> dict[str, FieldD
     if DEFINITIONS_PATH.exists():
         definitions = (yaml.safe_load(DEFINITIONS_PATH.read_text(encoding="utf-8"))
                        or {}).get("fields", {})
-    return {f["key"]: FieldDefinition.model_validate(
+    out = {f["key"]: FieldDefinition.model_validate(
         {"definition": definitions.get(f["key"]), **f}) for f in data["fields"]}
+    # A measurement's year is as authoritative as the measurement: a year field without its
+    # own official sources takes its parent's (e.g. utility-reported population -> UTILITY).
+    for d in out.values():
+        if d.type == "integer" and d.key.endswith("_year") and d.depends_on \
+                and not d.official_sources:
+            parent = out.get(d.depends_on[0])
+            if parent is not None and parent.official_sources:
+                d.official_sources = list(parent.official_sources)
+    return out
 
 def load_field_keys(path: Path = DEFAULT_FIELDS_PATH) -> list[str]:
     return list(load_field_definitions(path))

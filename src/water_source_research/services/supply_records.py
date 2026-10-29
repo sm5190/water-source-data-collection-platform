@@ -209,7 +209,8 @@ def _total_year_and_history(rs: RecordSet, research: CityResearchState,
     claim = claims.get(total.claim_uids[0]) if total.claim_uids else None
     q = claim.qualifiers if claim else None
     if _open_for_derivation(rs.city_values.get(TOTAL_YEAR)) and q and q.reference_year \
-            and q.year_basis in ("quote", "passage", "reviewer"):
+            and q.year_basis in ("quote", "passage", "table", "heading", "record",
+                                 "reviewer"):
         _set(rs, TOTAL_YEAR, "", q.reference_year, ValueOrigin.REPORTED,
              "REFERENCE_YEAR_OF_TOTAL", "reference year stated with the total withdrawal",
              [total], q.reference_year)

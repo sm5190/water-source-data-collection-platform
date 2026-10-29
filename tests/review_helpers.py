@@ -23,8 +23,8 @@ ANSWERS = {
                       "division that provides drinking water", "confidence": 0.9}],
     "water_source": [{"value": "Lake Ontario", "quote": "Toronto draws its drinking water from "
                       "Lake Ontario", "confidence": 0.9}],
-    W: [{"value": 450000, "quote": "produced an average of 980,000 cubic metres of drinking "
-                                   "water per day", "confidence": 0.99}],
+    W: [{"value": 450000, "quote": "withdrew an average of 980,000 cubic metres of raw water "
+                                   "per day", "confidence": 0.99}],
 }
 
 class World:

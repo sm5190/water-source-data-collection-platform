@@ -17,16 +17,20 @@ version: 1
 #                derivations (services/supply_records.py) fill the gap, so "nothing found" is
 #                not a review item (candidate claims still are).
 # descriptive: differing free-text descriptions go to review, they are not conflicts.
+# Semantic acceptance keys (see FieldDefinition): risk, required_checks, authority,
+# designated_dataset, measurement, year_required, freshness, reporting_cadence_years,
+# publication_lag_years. City population has no designated dataset configured yet
+# (Standardization Rules 6-7 name a list that holds no figures), so it is always reviewed.
 fields:
   - {key: city_name, field_type: city_identity, subject: city, type: text, gap_filled_by: catalog, keywords: [city, municipality, metropolitan]}
-  - {key: jurisdiction, field_type: city_identity, subject: city, type: text, keywords: [province, state, region, county, prefecture]}
+  - {key: jurisdiction, field_type: city_identity, subject: city, type: text, keywords: [province, state, region, county, prefecture], risk: high, required_checks: [CITY_NAMED, JURISDICTION_LEVEL, VALUE_IN_QUOTE]}
   - {key: country, field_type: city_identity, subject: city, type: text, gap_filled_by: catalog, keywords: [country, nation]}
   - {key: city_latitude, field_type: city_identity, subject: city, type: coordinate, keywords: [latitude, coordinates, lat]}
   - {key: city_longitude, field_type: city_identity, subject: city, type: coordinate, keywords: [longitude, coordinates, lon]}
-  - {key: city_population_millions, field_type: population, subject: city, type: number, unit: million_people, official_sources: [GOVERNMENT, REGULATORY], keywords: [population, inhabitants, residents, census]}
-  - {key: city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [city_population_millions], keywords: [population, census, estimate]}
-  - {key: utility_reported_city_population_millions, field_type: population, subject: city, type: number, unit: million_people, keywords: [population served, service population, customers, residents]}
-  - {key: utility_reported_city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [utility_reported_city_population_millions], keywords: [population served, service population, annual report]}
+  - {key: city_population_millions, field_type: population, subject: city, type: number, unit: million_people, official_sources: [GOVERNMENT, REGULATORY], keywords: [population, inhabitants, residents, census], risk: high, authority: designated_dataset, measurement: population, year_required: true, required_checks: [DESIGNATED_SOURCE, CITY_NAMED, MEASUREMENT_TERM, MEASUREMENT_YEAR]}
+  - {key: city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [city_population_millions], keywords: [population, census, estimate], risk: high, authority: designated_dataset, required_checks: [DESIGNATED_SOURCE, YEAR_LINKED]}
+  - {key: utility_reported_city_population_millions, field_type: population, subject: city, type: number, unit: million_people, keywords: [population served, service population, customers, residents], risk: high, official_sources: [UTILITY], measurement: population, year_required: true, required_checks: [CITY_NAMED, MEASUREMENT_TERM, MEASUREMENT_YEAR, UTILITY_SERVES_CITY]}
+  - {key: utility_reported_city_population_reference_year, field_type: population, subject: city, type: integer, depends_on: [utility_reported_city_population_millions], keywords: [population served, service population, annual report], risk: high, required_checks: [YEAR_LINKED]}
   - {key: population_served_millions, field_type: population, subject: supply_record, type: number, unit: million_people, gap_filled_by: rules, keywords: [population served, people served, serves, customers]}
   - key: percentage_total_population
     field_type: population
@@ -35,7 +39,7 @@ fields:
     derived: true
     depends_on: [population_served_millions, city_population_millions]
     keywords: [percent, share, population served]
-  - {key: utility_name, field_type: utility, subject: supply_record, type: text, keywords: [utility, water authority, water board, water department, water company, water services, waterworks, drinking water, supplies]}
+  - {key: utility_name, field_type: utility, subject: supply_record, type: text, keywords: [utility, water authority, water board, water department, water company, water services, waterworks, drinking water, supplies], risk: high, required_checks: [UTILITY_SERVES_CITY]}
   - {key: water_source, field_type: water_source, subject: supply_record, type: text, multi_valued: true, scope: entity, keywords: [source, sources, river, rivers, lake, spring, springs, aquifer, aquifers, groundwater, wellfield, wells, supplied by, drawn from, sourced from, raw water, abstraction]}
   - {key: water_system, field_type: water_source, subject: supply_record, type: text, review_always: true, keywords: [water system, supply system, distribution system, network]}
   - key: water_type
@@ -58,11 +62,11 @@ fields:
     review_always: true
     keywords: [intake, point of diversion, coordinates]
   - {key: infrastructure_notes, field_type: infrastructure, subject: supply_record, type: text, descriptive: true, review_always: true, keywords: [treatment plant, pumping station, intake, pipeline, filtration, infrastructure]}
-  - {key: total_city_water_withdrawals_m3_day, field_type: withdrawal, subject: city, type: number, unit: m3/day, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, cubic metres]}
-  - {key: total_city_water_withdrawals_year, field_type: withdrawal, subject: city, type: integer, depends_on: [total_city_water_withdrawals_m3_day], gap_filled_by: rules, keywords: [withdrawal, production, annual report]}
+  - {key: total_city_water_withdrawals_m3_day, field_type: withdrawal, subject: city, type: number, unit: m3/day, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, cubic metres], risk: high, measurement: withdrawal, year_required: true, freshness: most_recent, reporting_cadence_years: 1, publication_lag_years: 1, required_checks: [CITY_NAMED, MEASUREMENT_TYPE, MEASUREMENT_YEAR, FRESHNESS]}
+  - {key: total_city_water_withdrawals_year, field_type: withdrawal, subject: city, type: integer, depends_on: [total_city_water_withdrawals_m3_day], gap_filled_by: rules, keywords: [withdrawal, production, annual report], risk: high, required_checks: [YEAR_LINKED]}
   - {key: past_total_city_water_withdrawals, field_type: withdrawal, subject: city, type: text, scope: time_series, review_always: true, descriptive: true, gap_filled_by: rules, keywords: [historical, trend, withdrawal, production, previous years]}
-  - {key: source_withdrawal_contribution_m3_day, field_type: withdrawal, subject: supply_record, type: number, unit: m3/day, gap_filled_by: rules, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, capacity]}
-  - {key: source_withdrawal_contribution_year, field_type: withdrawal, subject: supply_record, type: integer, depends_on: [source_withdrawal_contribution_m3_day], gap_filled_by: rules, keywords: [withdrawal, production, annual report]}
+  - {key: source_withdrawal_contribution_m3_day, field_type: withdrawal, subject: supply_record, type: number, unit: m3/day, gap_filled_by: rules, keywords: [withdrawal, production, abstraction, m3/day, megalitres, million litres, mld, mgd, capacity], risk: high, measurement: withdrawal, year_required: true, freshness: most_recent, reporting_cadence_years: 1, publication_lag_years: 1, required_checks: [MEASUREMENT_TYPE, MEASUREMENT_YEAR, FRESHNESS]}
+  - {key: source_withdrawal_contribution_year, field_type: withdrawal, subject: supply_record, type: integer, depends_on: [source_withdrawal_contribution_m3_day], gap_filled_by: rules, keywords: [withdrawal, production, annual report], risk: high, required_checks: [YEAR_LINKED]}
   - key: source_withdrawal_contribution_method
     field_type: withdrawal
     subject: supply_record
@@ -78,6 +82,6 @@ fields:
     derived: true
     depends_on: [source_withdrawal_contribution_m3_day, total_city_water_withdrawals_m3_day]
     keywords: [percent, share, withdrawal]
-  - {key: water_quality_notes, field_type: water_quality, subject: supply_record, type: text, descriptive: true, review_always: true, keywords: [water quality, turbidity, contaminant, nitrate, lead, compliance, treatment]}
+  - {key: water_quality_notes, field_type: water_quality, subject: supply_record, type: text, descriptive: true, review_always: true, keywords: [water quality, turbidity, contaminant, nitrate, lead, compliance, treatment], freshness: most_recent, reporting_cadence_years: 1, publication_lag_years: 1}
   - {key: water_quality_year, field_type: water_quality, subject: supply_record, type: integer, depends_on: [water_quality_notes], keywords: [water quality report, annual report, sampling]}
   - {key: references, field_type: references, subject: supply_record, type: text, generated: true, review_always: true, descriptive: true, keywords: [source, reference]}

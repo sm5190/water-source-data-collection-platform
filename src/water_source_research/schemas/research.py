@@ -60,6 +60,29 @@ class FieldDefinition(BaseModel):
     # Plain definition from the standardization methodology (config/field_descriptions.yaml):
     # shown to the extraction model and the evaluation judge.
     definition: str | None = None
+    # --- semantic acceptance (services/normalization.py, services/resolution.py) ----------
+    # "high": accepted automatically only when every ``required_checks`` code PASSes
+    # explicitly and no warning is left (a lone candidate is not trusted just because nothing
+    # contradicts it).
+    risk: Literal["high"] | None = None
+    required_checks: list[str] = Field(default_factory=list)
+    # "designated_dataset": the value must come from the methodology's designated dataset
+    # (``designated_dataset``: {name, hosts}); none configured -> always reviewed.
+    authority: Literal["designated_dataset"] | None = None
+    designated_dataset: dict[str, Any] | None = None
+    # What the number measures, checked against the evidence's wording (population: a
+    # population figure, not a service-area count, for city population; withdrawal: water
+    # withdrawn/abstracted, not produced, treated, delivered or consumed).
+    measurement: Literal["population", "withdrawal"] | None = None
+    # The measurement's year must be stated with it (quote, sentence, table, heading,
+    # caption or record), never taken from the publication date.
+    year_required: bool = False
+    # "most_recent": the methodology asks for the most current value; a value older than the
+    # latest expected reporting year (current year - publication lag - reporting cadence)
+    # goes to review as possibly superseded, and one whose year can't be established too.
+    freshness: Literal["most_recent"] | None = None
+    reporting_cadence_years: int | None = None
+    publication_lag_years: int | None = None
 
     @model_validator(mode="after")
     def _default_scope(self) -> "FieldDefinition":
@@ -96,7 +119,11 @@ class ClaimQualifiers(BaseModel):
     """Context that decides whether two claims describe the same measurement."""
 
     reference_year: int | None = None
-    year_basis: Literal["quote", "passage", "document", "reviewer"] | None = None
+    # Where the year comes from: the quote, its sentence ("passage"), the document's structure
+    # ("table" row/header, "heading"/caption, key-value "record"; services/structure.py), the
+    # publication date ("document": never a measurement year), or a reviewer.
+    year_basis: Literal["quote", "passage", "table", "heading", "record", "document",
+                        "reviewer"] | None = None
     reported_value: float | None = None  # the number as the source states it
     reported_unit: str | None = None
     measurement_basis: str | None = None  # average | maximum | capacity | annual

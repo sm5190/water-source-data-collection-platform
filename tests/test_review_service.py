@@ -17,12 +17,12 @@ def two_sources_and_an_ambiguous_volume():
     world = World()
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario and the Oak Ridges "
                     "Aquifer.")
-    world.doc(BOTH, "Lake Ontario and the Oak Ridges Aquifer: the intakes supplied "
-                    "950,000 m3/d in 2023.", source_type="GOVERNMENT")
+    world.doc(BOTH, "Lake Ontario and the Oak Ridges Aquifer: the intakes withdrew "
+                    "950,000 m3/d in 2025.", source_type="GOVERNMENT")
     state, _ = resolve(world,
                        claim("water_source", "Lake Ontario", (UTIL, "water from Lake Ontario")),
                        claim("water_source", "Oak Ridges Aquifer", (UTIL, "the Oak Ridges Aquifer")),
-                       claim(C, 950000, (BOTH, "the intakes supplied 950,000 m3/d in 2023")))
+                       claim(C, 950000, (BOTH, "the intakes withdrew 950,000 m3/d in 2025")))
     return world, state
 
 def items_for(state, world, round_no=1):

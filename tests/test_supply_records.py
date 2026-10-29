@@ -2,21 +2,30 @@
 (services/supply_records.py), from claims through normalization and resolution."""
 
 import pytest
-from resolution_helpers import FIELDS, World, claim, normalize
+from resolution_helpers import FIELDS as ALL_FIELDS
+from resolution_helpers import YEAR, World, claim, state_with
 from water_source_research.schemas.common import FieldResolutionStatus as S
 from water_source_research.schemas.common import ValueStatus
 from water_source_research.schemas.research import EntityResolution, FieldResolution
+from water_source_research.services.normalization import normalize_research
 from water_source_research.services.resolution import resolve_research
 from water_source_research.services.supply_records import build_record_set, typed_row
 
 UTIL = "https://www.toronto.ca/services/water"
-REPORT = "https://www.toronto.ca/water-report-2023.pdf"
+REPORT = "https://www.toronto.ca/water-report-2025.pdf"
 CENSUS = "https://www12.statcan.gc.ca/census/toronto"
 T = "total_city_water_withdrawals_m3_day"
 C = "source_withdrawal_contribution_m3_day"
+# The derivations need an accepted city population: these tests designate the census as the
+# city population dataset (none is configured in production, so there it is always reviewed).
+FIELDS = dict(ALL_FIELDS)
+for _key in ("city_population_millions", "city_population_reference_year"):
+    FIELDS[_key] = ALL_FIELDS[_key].model_copy(update={"designated_dataset": {
+        "name": "Statistics Canada census", "hosts": ["statcan.gc.ca"]}})
 
 def records(world, *claims, researched=None, edit=None):
-    research, _ = resolve_research(normalize(world, *claims), FIELDS, world.index)
+    research = normalize_research(state_with(*claims), FIELDS, world.index, current_year=YEAR)
+    research, _ = resolve_research(research, FIELDS, world.index)
     if edit:
         edit(research)
     keys = researched if researched is not None else sorted({c.field_key for c in claims})
@@ -28,14 +37,15 @@ def rows(rs):
 def toronto() -> World:
     world = World()
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario.")
-    world.doc(REPORT, "In 2023 the plants produced an average of 980,000 cubic metres of "
-                      "drinking water per day.", source_type="GOVERNMENT")
+    world.doc(REPORT, "In 2025 Toronto's intakes withdrew an average of 980,000 cubic metres of "
+                      "raw water per day.", source_type="GOVERNMENT")
     world.doc(CENSUS, "The 2021 census counted 2,794,356 residents in Toronto.",
               source_type="GOVERNMENT")
     return world
 
 SOURCE = claim("water_source", "Lake Ontario", (UTIL, "drinking water from Lake Ontario"))
-TOTAL_QUOTE = "produced an average of 980,000 cubic metres of drinking water per day"
+TOTAL_QUOTE = "In 2025 Toronto's intakes withdrew an average of 980,000 cubic metres of raw water " \
+              "per day"
 TOTAL = claim(T, 980000, (REPORT, TOTAL_QUOTE))
 POP = claim("city_population_millions", 2.794356, (CENSUS, "counted 2,794,356 residents"))
 
@@ -47,8 +57,8 @@ def test_single_source_city_gets_one_row_with_allocated_contribution():
     [row] = rows(rs)
     assert row["water_source"] == "Lake Ontario"
     assert row[C] == 980000 and row["source_withdrawal_contribution_method"] == "Reported Daily"
-    assert row["source_withdrawal_contribution_year"] == 2023
-    assert row["total_city_water_withdrawals_year"] == 2023
+    assert row["source_withdrawal_contribution_year"] == 2025
+    assert row["total_city_water_withdrawals_year"] == 2025
     assert row["source_withdrawal_percentage"] == 100.0
     assert row["population_served_millions"] == pytest.approx(2.794)
     assert row["percentage_total_population"] == 100.0
@@ -88,19 +98,20 @@ def test_unknown_source_still_produces_a_row():
 def two_sources(world: World):
     world.doc(UTIL + "/both", "Toronto draws its water from Lake Ontario and the Oak Ridges "
                               "Aquifer.")
-    world.doc(REPORT + "/split", "In 2023 the Lake Ontario intakes supplied 950,000 m3/d. In "
-                                 "2023 the Oak Ridges Aquifer wells supplied 30,000 m3/d.",
+    world.doc(REPORT + "/split", "In 2025 the Lake Ontario intakes withdrew 950,000 m3/d. In "
+                                 "2025 the Oak Ridges Aquifer wells withdrew 30,000 m3/d.",
               source_type="GOVERNMENT")
     return [claim("water_source", "Lake Ontario", (UTIL + "/both", "water from Lake Ontario")),
             claim("water_source", "Oak Ridges Aquifer", (UTIL + "/both",
                                                          "the Oak Ridges Aquifer"))]
 
-LAKE = claim(C, 950000, (REPORT + "/split", "the Lake Ontario intakes supplied 950,000 m3/d"))
+LAKE = claim(C, 950000, (REPORT + "/split",
+                         "In 2025 the Lake Ontario intakes withdrew 950,000 m3/d"))
 
 def test_multiple_sources_keep_city_values_once():
     world = toronto()
     sources = two_sources(world)
-    aquifer = "Oak Ridges Aquifer wells supplied 30,000 m3/d"
+    aquifer = "2025 the Oak Ridges Aquifer wells withdrew 30,000 m3/d"
     rs = records(world, *sources, TOTAL, LAKE, claim(C, 30000, (REPORT + "/split", aquifer)))
     by_source = {r["water_source"]: r for r in rows(rs)}
     assert set(by_source) == {"Lake Ontario", "Oak Ridges Aquifer"}
@@ -121,7 +132,7 @@ def test_remainder_is_allocated_to_the_one_unknown_source():
     aquifer = by_source["Oak Ridges Aquifer"]
     assert aquifer[C] == 30000
     assert aquifer["source_withdrawal_contribution_method"] == "Remainder Allocated"
-    assert aquifer["source_withdrawal_contribution_year"] == 2023
+    assert aquifer["source_withdrawal_contribution_year"] == 2025
     assert by_source["Lake Ontario"]["source_withdrawal_contribution_method"] == "Reported Daily"
 
 def test_contribution_that_cannot_be_estimated_is_zero_with_unknown_method():
@@ -136,15 +147,15 @@ def test_contribution_that_cannot_be_estimated_is_zero_with_unknown_method():
 
 def test_annual_contribution_is_reported_annually_and_years_must_match():
     world = toronto()
-    world.doc(REPORT + "/annual", "Lake Ontario supplied 346,750,000 m3/year in 2019.",
+    world.doc(REPORT + "/annual", "Lake Ontario intakes withdrew 346,750,000 m3/year in 2024.",
               source_type="GOVERNMENT")
     rs = records(world, SOURCE, TOTAL, claim(C, 950000, (
-        REPORT + "/annual", "Lake Ontario supplied 346,750,000 m3/year in 2019")))
+        REPORT + "/annual", "Lake Ontario intakes withdrew 346,750,000 m3/year in 2024")))
     [row] = rows(rs)
     assert row["source_withdrawal_contribution_method"] == "Reported Annually"
-    assert row[C] == pytest.approx(346_750_000 / 365)
-    assert row["source_withdrawal_contribution_year"] == 2019
-    # 2019 contribution vs 2023 total: not divided
+    assert row[C] == pytest.approx(346_750_000 / 366)  # 2024 is a leap year
+    assert row["source_withdrawal_contribution_year"] == 2024
+    # 2024 contribution vs 2025 total: not divided
     assert row["source_withdrawal_percentage"] == "Unknown"
     rec = rs.records[0]
     assert "years differ" in rs.record_values[rec.record_key][
@@ -171,10 +182,10 @@ def test_not_applicable_is_exported_as_na_and_never_derived_over():
 
 def test_conflicting_field_makes_the_run_incomplete():
     world = toronto()
-    world.doc(REPORT + "/other", "In 2023 the plants produced 1,200,000 m3/d.",
+    world.doc(REPORT + "/other", "In 2025 Toronto's intakes withdrew 1,200,000 m3/d.",
               source_type="GOVERNMENT")
     rs = records(world, SOURCE, TOTAL, claim(T, 1200000, (REPORT + "/other",
-                                                          "produced 1,200,000 m3/d")))
+                                                          "In 2025 Toronto's intakes withdrew 1,200,000 m3/d")))
     assert rs.completion == "INCOMPLETE"
     fail = next(c for c in rs.quality if c.code == "OPEN_FIELD" and c.result == "FAIL")
     assert fail.field_key == T and "CONFLICT" in fail.detail

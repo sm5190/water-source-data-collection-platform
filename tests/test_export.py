@@ -51,11 +51,11 @@ def test_reviewed_run_exports_one_standardized_row_per_source(engine):
     [row] = rows
     assert row["Water Source"] == "Lake Ontario" and row["Utility Name"] == "Toronto Water"
     assert row["Total City Water Withdrawals (m3/d)"] == "980000"
-    assert row["Total City Water Withdrawals Date"] == "2023"
+    assert row["Total City Water Withdrawals Date"] == "2025"
     # one source: its contribution is the total (allocated), 100% of withdrawals
     assert row["Source Water Withdrawal Contribution (m3/d)"] == "980000"
     assert row["Source Water Withdrawal Contribution Method"] == "Reported Daily"
-    assert row["Source Water Withdrawal Contribution Date"] == "2023"
+    assert row["Source Water Withdrawal Contribution Date"] == "2025"
     assert row["Source Water Withdrawal Percentage"] == "100.000"
     assert row["Water Type"] == "Unknown"  # reviewer: not stated anywhere
     assert row["POD Latitude"] == "Unknown"  # not researched in this run: never blank

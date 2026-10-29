@@ -44,7 +44,7 @@ def test_full_slice_three_fields_with_provenance():
     assert docs[UTIL_URL]["acquisition_method"] == "DIRECT_HTTP"
     assert docs[PDF_URL]["status"] == "OK"
     assert docs[PDF_URL]["acquisition_method"] == "DIRECT_HTTP_PDF"
-    assert docs[PDF_URL]["page_count"] == 2 and docs[PDF_URL]["source_date"] == "2024-03-15"
+    assert docs[PDF_URL]["page_count"] == 2 and docs[PDF_URL]["source_date"] == "2026-03-15"
     assert docs[DOWN_URL]["status"] == "FAILED"  # one failure doesn't stop the run
     # the tracking-param duplicate of UTIL_URL was never fetched twice
     assert site.fetched().count(UTIL_URL) == 1
@@ -89,7 +89,7 @@ def test_full_slice_three_fields_with_provenance():
     assert not w["review_required"] and w["researched"] and w["status"] == "RESOLVED"
     cite = w["candidates"][0]["citations"][0]
     assert cite["source_type"] and cite["acquisition_method"] == "DIRECT_HTTP_PDF"
-    assert cite["source_date"] == "2024-03-15" and cite["page_number"] == 2
+    assert cite["source_date"] == "2026-03-15" and cite["page_number"] == 2
     assert not rows["water_type"]["researched"] and not rows["water_type"]["review_required"]
 
     # the multi-valued instruction reached the model for water_source only
