@@ -85,7 +85,9 @@ async def revalidate_run(engine: Engine, parent_run_id: str) -> tuple[str, dict[
         raise LookupError(f"run {parent_run_id} has no stored claims to revalidate")
     run_id = str(uuid4())
     started = datetime.now(UTC)
-    evidence.copy_run_evidence(parent_run_id, run_id)
+    reclassified: list[dict[str, Any]] = []
+    evidence.copy_run_evidence(parent_run_id, run_id, reclassify_city=city,
+                               changes=reclassified)
     research, counts = claims_as_extracted(stored, city, country)
     graph = build_graph(
         run_recorder=RunRecorder(engine, enqueue_distillation_jobs=False),
@@ -102,7 +104,8 @@ async def revalidate_run(engine: Engine, parent_run_id: str) -> tuple[str, dict[
         "reprocess_of": parent_run_id,
     }, {"recursion_limit": 100})
     final = dict(final)
-    final["revalidation"] = {"parent_run_id": parent_run_id, **counts}
+    final["revalidation"] = {"parent_run_id": parent_run_id, **counts,
+                             "reclassified": reclassified}
     with Session(engine) as session, session.begin():
         session.add(ResearchJobRecord(
             run_id=run_id, city_name=city, country=country, city_key=city_key,

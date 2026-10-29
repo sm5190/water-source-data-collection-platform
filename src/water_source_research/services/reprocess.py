@@ -22,7 +22,7 @@ def reprocess_input(engine: Engine, job: Any, parent_result: Mapping[str, Any] |
     """Graph input for REPROCESS ``job`` (idempotent: a retried claim copies nothing twice)."""
     parent = job.parent_run_id
     evidence = EvidenceRepository(engine)
-    evidence.copy_run_evidence(parent, job.run_id)
+    evidence.copy_run_evidence(parent, job.run_id, reclassify_city=job.city_name)
     result = parent_result or {}
     if result.get("research_state"):
         research = CityResearchState.model_validate(result["research_state"])

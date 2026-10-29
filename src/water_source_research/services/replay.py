@@ -39,7 +39,7 @@ async def replay_run(engine: Engine, parent_run_id: str, gateway: Any,
         city, country, keys = parent.city_name, parent.country, parent.field_keys
         city_key = parent.city_key
     evidence = EvidenceRepository(engine)
-    acquisition = ReplayAcquisition.from_run(evidence, parent_run_id)
+    acquisition = ReplayAcquisition.from_run(evidence, parent_run_id, city)
     if acquisition.rounds == 0:
         raise LookupError(f"run {parent_run_id} has no stored documents to replay")
     rounds = max_rounds or acquisition.rounds
@@ -58,7 +58,7 @@ async def replay_run(engine: Engine, parent_run_id: str, gateway: Any,
     }, {"recursion_limit": 100})
     final = dict(final)
     final["replay"] = {"parent_run_id": parent_run_id, "rounds_served": acquisition.served,
-                       "max_rounds": rounds}
+                       "max_rounds": rounds, "reclassified": acquisition.reclassified}
     with Session(engine) as session, session.begin():
         session.add(ResearchJobRecord(
             run_id=run_id, city_name=city, country=country, city_key=city_key,

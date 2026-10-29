@@ -213,10 +213,14 @@ class EvidenceRepository:
 
     # --- reads (API / smoke test) ------------------------------------------------------
 
-    def copy_run_evidence(self, from_run: str, to_run: str) -> int:
+    def copy_run_evidence(self, from_run: str, to_run: str, reclassify_city: str | None = None,
+                          changes: list[dict[str, Any]] | None = None) -> int:
         """Copy a run's document and chunk rows to another run (reprocessing reuses stored
         evidence; raw files are content-addressed and shared). Insert-or-skip; returns the
-        number of chunks copied."""
+        number of chunks copied. With ``reclassify_city`` each copied document gets its source
+        type under the current rules (discovery/normalize.py::reclassify); every change is
+        appended to ``changes`` ({url, from, to}). The source rows are never changed."""
+        from water_source_research.discovery.normalize import reclassify
         copied = 0
         with Session(self.engine) as session, session.begin():
             sources = session.scalars(select(SourceDocumentRecord).where(
@@ -226,8 +230,17 @@ class EvidenceRepository:
                     SourceDocumentRecord.run_id == to_run,
                     SourceDocumentRecord.canonical_url == src.canonical_url))
                 if doc is None:
+                    columns = {k: getattr(src, k) for k in _DOC_COLUMNS}
+                    if reclassify_city is not None:
+                        current = reclassify(columns, reclassify_city)
+                        if current != columns["source_type"]:
+                            if changes is not None:
+                                changes.append({"url": src.final_url or src.requested_url,
+                                                "from": columns["source_type"],
+                                                "to": current})
+                            columns["source_type"] = current
                     doc = SourceDocumentRecord(run_id=to_run, chunk_count=src.chunk_count,
-                                               **{k: getattr(src, k) for k in _DOC_COLUMNS})
+                                               **columns)
                     session.add(doc)
                     session.flush()
                 existing = set(session.scalars(select(EvidenceChunkRecord.chunk_id).where(

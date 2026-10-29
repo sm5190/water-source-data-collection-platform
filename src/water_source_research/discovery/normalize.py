@@ -1,6 +1,8 @@
 """Pure normalization helpers used for deduplication and source-type classification."""
 
 import re
+from collections.abc import Mapping
+from typing import Any
 import unicodedata
 from datetime import date
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
@@ -169,6 +171,20 @@ def classify_source_type(url: str | None, title: str | None = None, provider: st
     if _TECHNICAL.search(title) or (url or "").lower().split("?")[0].endswith(".pdf"):
         return "TECHNICAL"
     return "OTHER"
+
+def reclassify(record: Mapping[str, Any], city: str | None) -> str | None:
+    """The source type a stored document gets under the current rules (replays, reprocessing
+    and revalidation re-check what was stored when it was fetched). Academic labels from a
+    scholarly provider or DOI are kept: the provider is the evidence for them."""
+    old = record.get("source_type")
+    url = record.get("final_url") or record.get("requested_url") or record.get("canonical_url")
+    if not url:
+        return old
+    new = classify_source_type(url, record.get("title"),
+                               provider=record.get("discovery_provider") or "", city=city)
+    if old == "ACADEMIC" and new != "ACADEMIC":
+        return old
+    return new
 
 def _is_utility(url: str, host: str, title: str, city: str | None) -> bool:
     path = urlsplit(url).path if url else ""

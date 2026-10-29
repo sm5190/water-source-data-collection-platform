@@ -12,6 +12,7 @@ run, so the replay gets its own document ids; the original is found again by
 
 from collections.abc import Mapping
 from typing import Any
+from water_source_research.discovery.normalize import reclassify
 from water_source_research.schemas.research import EvidenceChunk
 from water_source_research.services.evidence_store import EvidenceRepository
 from .service import AcquisitionOutcome
@@ -23,8 +24,13 @@ _COPIED = ("requested_url", "canonical_url", "final_url", "title", "source_type"
            "discovery_provider", "discovery_query", "duration_ms")
 
 class ReplayAcquisition:
+    """``city``: re-check each document's source type under the current rules
+    (discovery/normalize.py::reclassify); changes are listed in ``reclassified``."""
+
     def __init__(self, documents: list[Mapping[str, Any]],
-                 chunks: list[Mapping[str, Any]]) -> None:
+                 chunks: list[Mapping[str, Any]], city: str | None = None) -> None:
+        self.city = city
+        self.reclassified: list[dict[str, Any]] = []
         self.by_round: dict[int, list[Mapping[str, Any]]] = {}
         for d in documents:
             self.by_round.setdefault(int(d.get("round") or 1), []).append(d)
@@ -34,8 +40,9 @@ class ReplayAcquisition:
         self.served: list[int] = []  # rounds served, in order (for tests and reports)
 
     @classmethod
-    def from_run(cls, evidence: EvidenceRepository, run_id: str) -> "ReplayAcquisition":
-        return cls(evidence.documents(run_id), evidence.chunks(run_id, limit=1_000_000))
+    def from_run(cls, evidence: EvidenceRepository, run_id: str,
+                 city: str | None = None) -> "ReplayAcquisition":
+        return cls(evidence.documents(run_id), evidence.chunks(run_id, limit=1_000_000), city)
 
     @property
     def rounds(self) -> int:
@@ -53,6 +60,13 @@ class ReplayAcquisition:
             if doc.get("canonical_url") in done:
                 continue
             record = {k: doc.get(k) for k in _COPIED}
+            if self.city is not None:
+                current = reclassify(record, self.city)
+                if current != record["source_type"]:
+                    self.reclassified.append({"url": record.get("final_url")
+                                              or record.get("requested_url"),
+                                              "from": record["source_type"], "to": current})
+                    record["source_type"] = current
             record["round"] = round_no
             record["chunks"] = 0
             if doc.get("status") == "OK":
@@ -62,7 +76,7 @@ class ReplayAcquisition:
                     outcome.chunks.append(EvidenceChunk(
                         chunk_id=c["chunk_id"], url=c["url"], text=c["text"],
                         title=doc.get("title"), page_number=c.get("page_number"),
-                        source_type=doc.get("source_type"),
+                        source_type=record["source_type"],
                         acquisition_method=doc.get("acquisition_method"),
                         retrieved_at=doc.get("retrieved_at")))
                 record["chunks"] = len(parts)
