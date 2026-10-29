@@ -702,10 +702,10 @@ class ContextManager:
                     candidates.append((i, keys, passage))
                     continue
                 stats["dropped_duplicate"] += 1
-                j, j_keys, j_passage = candidates[dup]
+                j, _, j_passage = candidates[dup]
                 if chunks[i].url == chunks[j].url:
                     continue  # overlapping windows of one document: nothing to keep
-                if _tier(chunks[i]) < _tier(chunks[j]):
+                if source_tier(chunks[i]) < source_tier(chunks[j]):
                     also.setdefault(dup, []).append(_location(chunks[j], j_passage))
                     candidates[dup] = (i, keys, passage)
                     stats["duplicate_promoted"] += 1
@@ -923,7 +923,7 @@ class ContextManager:
             stats["over_budget"] = 1
         return used
 
-def _tier(chunk: EvidenceChunk) -> int:
+def source_tier(chunk: EvidenceChunk) -> int:
     """Source authority tier: 0 official, 1 technical/academic, 2 anything else."""
     kind = (chunk.source_type or "").upper()
     return 0 if kind in OFFICIAL_TIER else 1 if kind in ("TECHNICAL", "ACADEMIC") else 2
@@ -948,8 +948,8 @@ def _seen_content(chunks: list[EvidenceChunk], seen: set[tuple[str, str]],
         if c is None or key not in targets:
             continue
         slot = (key, _content_digest(c.text))
-        if slot not in out or _tier(c) < out[slot][1]:
-            out[slot] = (cid, _tier(c))
+        if slot not in out or source_tier(c) < out[slot][1]:
+            out[slot] = (cid, source_tier(c))
     return out
 
 def _repeat_of(chunk: EvidenceChunk, key: str,
@@ -957,7 +957,7 @@ def _repeat_of(chunk: EvidenceChunk, key: str,
     """The seen chunk this one repeats for ``key``, unless this copy is more authoritative
     (new authority is a reason to ask the model again)."""
     hit = repeats.get((key, _content_digest(chunk.text))) if repeats else None
-    if hit is None or hit[0] == chunk.chunk_id or _tier(chunk) < hit[1]:
+    if hit is None or hit[0] == chunk.chunk_id or source_tier(chunk) < hit[1]:
         return None
     return hit[0]
 

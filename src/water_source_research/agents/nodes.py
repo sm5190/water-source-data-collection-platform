@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Mapping
+from typing import Any
 from urllib.parse import urlsplit
 from uuid import uuid4
 from langgraph.types import interrupt
@@ -244,9 +245,14 @@ REEXTRACT_FIELDS = ("water_source", "utility_name", "reservoir_names")
 MAX_REEXTRACTIONS_PER_FIELD = 2  # per run; at most one per round
 
 def reextraction_targets(context_service: ContextService, state: GraphState,
-                         already: list[str]) -> dict[str, int]:
+                         already: list[str], *, skip_no_new_entity: bool = False,
+                         skipped: dict[str, int] | None = None) -> dict[str, int]:
     """field -> number of new relevant chunks, for entity-defining fields that already have
-    candidates, are still researched, have re-extractions left and got new evidence."""
+    candidates, are still researched, have re-extractions left and got new evidence.
+
+    ``skip_no_new_entity`` (off by default): source fields whose new chunks only name known
+    water bodies, from no more authoritative source, are left out and reported in
+    ``skipped``."""
     if "fields_needing_evidence" not in state:  # first pass: everything is extracted anyway
         return {}
     research = CityResearchState.model_validate(state["research_state"])
@@ -262,11 +268,47 @@ def reextraction_targets(context_service: ContextService, state: GraphState,
                 or done.get(key, 0) >= MAX_REEXTRACTIONS_PER_FIELD):
             continue
         new = context_service.manager.new_relevant_evidence(key, research, chunks, seen)
-        if new:
-            out[key] = len(new)
+        if not new:
+            continue
+        if skip_no_new_entity and key in NO_NEW_ENTITY_FIELDS and no_new_entity(
+                research.fields[key], [c for c in chunks if c["chunk_id"] in set(new)], chunks):
+            if skipped is not None:
+                skipped[key] = len(new)
+            continue
+        out[key] = len(new)
     return out
 
-def make_extract_node(context_service: ContextService, gateway: LLMGateway):
+NO_NEW_ENTITY_FIELDS = ("water_source", "reservoir_names")
+
+def no_new_entity(fs: Any, new_chunks: list[dict], all_chunks: list[dict]) -> bool:
+    """Every new chunk names at least one water body, all of them already candidates of the
+    field, and none comes from a more authoritative source tier than the candidates' best
+    cited source. A chunk naming no water body may still carry relations or quantities, so it
+    never counts as nothing new."""
+    from water_source_research.context_manager.manager import source_tier
+    from water_source_research.schemas.research import EvidenceChunk
+    from water_source_research.services.places import HYDRONYM
+    from water_source_research.services.resolution import name_key
+    known = {name_key(str(c.value)) for c in fs.candidate_claims
+             if c.value is not None and c.review_status != "REJECTED"}
+    cited = {e.url for c in fs.candidate_claims for e in c.evidence}
+    tiers = [source_tier(EvidenceChunk.model_validate(c)) for c in all_chunks
+             if c["url"] in cited]
+    best = min(tiers, default=2)
+
+    def is_known(name: str) -> bool:
+        return any(name == k or f" {k} " in f" {name} " or f" {name} " in f" {k} "
+                   for k in known)
+    for c in new_chunks:
+        names = {name_key(m.group(0)) for m in HYDRONYM.finditer(c["text"])}
+        if not names or not all(is_known(n) for n in names):
+            return False
+        if source_tier(EvidenceChunk.model_validate(c)) < best:
+            return False
+    return True
+
+def make_extract_node(context_service: ContextService, gateway: LLMGateway, *,
+                      skip_no_new_entity: bool = False):
     async def extract_node(state: GraphState) -> GraphState:
         run_id = state["run_id"]
         # First pass: every unresolved field. Re-entry after discovery: fields that lacked
@@ -275,7 +317,9 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             fields = list(state["fields_needing_evidence"])
         else:
             fields = list(state.get("unresolved_fields", []))
-        again = reextraction_targets(context_service, state, fields)
+        held: dict[str, int] = {}
+        again = reextraction_targets(context_service, state, fields,
+                                     skip_no_new_entity=skip_no_new_entity, skipped=held)
         fields += list(again)
         extraction_round = max(1, state.get("discovery_rounds", 0))
 
@@ -299,6 +343,14 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
             events = list(state.get("events", []))
             needing: list[str] = []
             reextractions = dict(state.get("reextractions") or {})
+            for field_key, n in held.items():  # NO_NEW_ENTITY: recorded, no model call
+                events = append_event(
+                    events, kind=EventKind.NODE, node="extract", field_key=field_key,
+                    strategy="reextract:NO_NEW_ENTITY",
+                    attrs={"bundle_status": "NO_NEW_ENTITY", "claims": 0,
+                           "discovery_round": extraction_round, "new_chunks": n,
+                           "skip_reason": "new passages only name known water bodies, from "
+                                          "no more authoritative source"})
             for field_key, bundle, new_claims, calls in results:
                 if bundle.bundle_id:
                     bundle_ids[field_key] = bundle.bundle_id
@@ -454,7 +506,7 @@ def relevance_attrs(bundle: ContextBundle, field_key: str) -> dict[str, object]:
             rules[r] = rules.get(r, 0) + 1
         if i.repeat_of and field_key in i.repeat_of:  # already sent for this field
             rules["REPEAT_OF_SEEN"] = rules.get("REPEAT_OF_SEEN", 0) + 1
-    fmt = lambda d: ",".join(f"{k}:{v}" for k, v in sorted(d.items())) or "none"  # noqa: E731
+    fmt = lambda d: ",".join(f"{k}:{v}" for k, v in sorted(d.items())) or "none"
     return {"items_by_locality": fmt(localities), "rule_hits": fmt(rules)}
 
 def llm_usage(calls: list[dict]) -> dict[str, object]:

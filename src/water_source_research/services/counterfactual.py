@@ -154,22 +154,22 @@ async def counterfactual(engine: Engine, parent_run_id: str) -> dict[str, Any]:
                             for s in cf_slots if s["bundle_status"] != "READY"]}
 
 def render_markdown(reports: list[Mapping[str, Any]]) -> str:
-    lines = ["# Counterfactual replay (recorded answers, no model calls)", "",
-             "Each run's saved documents replayed in their original rounds with the current "
-             "code; extraction answered with the claims the run got in the same (field, round). "
-             "Counterfactual tokens are estimates from the run's own slots.", ""]
+    intro = ("Each run's saved documents replayed in their original rounds with the current "
+             "code; extraction answered with the claims the run got in the same (field, "
+             "round). Counterfactual tokens are estimates from the run's own slots.")
+    lines = ["# Counterfactual replay (recorded answers, no model calls)", "", intro, ""]
     for r in reports:
+        tokens = (f"- Tokens (input+output): {r['parent_tokens']:,} → "
+                  f"~{r['counterfactual_tokens_estimate']:,} ({r['token_change_pct']}%)")
+        sources = ("- water_source candidates: "
+                   f"{', '.join(r['parent_water_source_candidates']) or '—'} → "
+                   f"{', '.join(r['water_source_candidates']) or '—'}")
         lines += [f"## {r['city']} — {r['run_id'][:8]}", "",
-                  f"- Model calls: {r['parent_calls']} → {r['counterfactual_calls']}",
-                  f"- Tokens (input+output): {r['parent_tokens']:,} → "
-                  f"~{r['counterfactual_tokens_estimate']:,} ({r['token_change_pct']}%)",
-                  f"- Skipped slots that had usable claims: "
-                  f"**{len(r['skipped_with_usable_claims'])}**",
-                  f"- Claims not reproducible from the passages now shown: "
-                  f"{len(r['unreproduced_claims'])}",
-                  "- water_source candidates: "
-                  f"{', '.join(r['parent_water_source_candidates']) or '—'} → "
-                  f"{', '.join(r['water_source_candidates']) or '—'}", ""]
+                  f"- Model calls: {r['parent_calls']} → {r['counterfactual_calls']}", tokens,
+                  "- Skipped slots that had usable claims: "
+                  + f"**{len(r['skipped_with_usable_claims'])}**",
+                  "- Claims not reproducible from the passages now shown: "
+                  + str(len(r["unreproduced_claims"])), sources, ""]
         if r["skipped_slots"]:
             lines += ["| round | field | stage | now | tokens | claims the run got there |",
                       "|---|---|---|---|---|---|"]

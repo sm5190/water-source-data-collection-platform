@@ -46,15 +46,7 @@ GATE_FIELDS = ("utility_name", "water_source", "reservoir_names", "jurisdiction"
 _SOURCE_FIELDS = ("water_source", "reservoir_names")
 # Words that don't name a particular feature: a candidate made only of these ("groundwater",
 # "mountain spring water") would make every passage on the topic look local.
-_GENERIC = frozenset("""
-    the a an and of de del la el los las da do dos das di du des le
-    groundwater ground surface water waters river rivers lake lakes spring springs aquifer
-    aquifers well wells wellfield wellfields field fields reservoir reservoirs dam dams creek
-    creeks stream streams basin basins catchment watershed source sources supply supplies
-    mountain mountains local municipal public drinking raw fresh sea ocean desalination
-    reclaimed plant plants system systems region regional area areas province state county
-    district city metropolitan national main other various several
-    """.split())
+_GENERIC = frozenset(["the", "a", "an", "and", "of", "de", "del", "la", "el", "los", "las", "da", "do", "dos", "das", "di", "du", "des", "le", "groundwater", "ground", "surface", "water", "waters", "river", "rivers", "lake", "lakes", "spring", "springs", "aquifer", "aquifers", "well", "wells", "wellfield", "wellfields", "field", "fields", "reservoir", "reservoirs", "dam", "dams", "creek", "creeks", "stream", "streams", "basin", "basins", "catchment", "watershed", "source", "sources", "supply", "supplies", "mountain", "mountains", "local", "municipal", "public", "drinking", "raw", "fresh", "sea", "ocean", "desalination", "reclaimed", "plant", "plants", "system", "systems", "region", "regional", "area", "areas", "province", "state", "county", "district", "city", "metropolitan", "national", "main", "other", "various", "several"])
 _SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
 
 def water_system_field(field: FieldDefinition) -> bool:

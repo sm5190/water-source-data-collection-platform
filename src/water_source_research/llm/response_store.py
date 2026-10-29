@@ -39,7 +39,7 @@ class ResponseStore:
                                         last_hit_at=datetime.now(UTC)))
                 return {"response": row.response, "input_tokens": row.input_tokens,
                         "output_tokens": row.output_tokens, "requests": row.requests}
-        except Exception:  # noqa: BLE001 - a cache read never fails the call
+        except Exception:  # a cache read never fails the call: the model is asked instead
             log.warning("persistent LLM cache read failed", exc_info=True)
             return None
 
@@ -54,7 +54,7 @@ class ResponseStore:
                     cache_key=key, response=response, hit_count=0, **components, **usage))
         except IntegrityError:
             pass
-        except Exception:  # noqa: BLE001
+        except Exception:  # nor does a failed write
             log.warning("persistent LLM cache write failed", exc_info=True)
 
 _store: ResponseStore | None = None

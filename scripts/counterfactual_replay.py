@@ -16,7 +16,7 @@ from water_source_research.research_queue.checkpointing import run_async
 from water_source_research.services.counterfactual import counterfactual, render_markdown
 
 sys.path.insert(0, str(Path(__file__).parent))
-from token_audit import resolve_ids  # noqa: E402
+from token_audit import resolve_ids
 
 async def main(run_ids: list[str], out: Path) -> int:
     engine = get_engine()

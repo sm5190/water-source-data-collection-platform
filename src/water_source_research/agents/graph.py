@@ -96,6 +96,7 @@ def build_graph(
                if acquisition is not None else acquire_node)
     g.add_node("extract", make_extract_node(
         context_service or ContextService(), gateway or UnconfiguredGateway(),
+        skip_no_new_entity=settings.extraction.skip_no_new_entity,
     ))
     g.add_node("validate", make_validate_node(fields))
     g.add_node("resolve", make_resolve_node(fields))
