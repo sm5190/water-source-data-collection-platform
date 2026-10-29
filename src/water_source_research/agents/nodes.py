@@ -310,6 +310,7 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
                 attrs: dict[str, object] = {"bundle_status": bundle.status.value,
                                             "claims": len(new_claims),
                                             "discovery_round": extraction_round,
+                                            **context_attrs(bundle, field_key),
                                             **llm_usage(calls)}
                 if re_run:
                     attrs.update(reextraction=reextractions[field_key],
@@ -415,6 +416,17 @@ async def _extract_field(
         span.set_attribute("extraction.claims", len(claims))
         return field_key, bundle, claims, calls
 
+def context_attrs(bundle: ContextBundle, field_key: str) -> dict[str, object]:
+    """What the model was (or would have been) shown, for the token audit: the number of
+    evidence passages for the field and a short digest of the rendered context, so repeated
+    identical contexts can be counted. 16 hex characters: long enough to tell contexts apart,
+    short enough not to be mistaken for a secret by the event sanitizer."""
+    items = sum(1 for i in bundle.items if i.kind == "evidence" and field_key in i.field_keys)
+    attrs: dict[str, object] = {"evidence_items": items}
+    if items:
+        attrs["context_digest"] = bundle.fingerprint[:16]
+    return attrs
+
 def llm_usage(calls: list[dict]) -> dict[str, object]:
     """Model usage of one extraction for its trusted event: real model requests (a response
     cache hit makes 0), tokens and latency, so a run's LLM usage is auditable in run_events.
@@ -432,6 +444,9 @@ def llm_usage(calls: list[dict]) -> dict[str, object]:
         "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
     if unknown:  # token sums cover only the calls whose usage the provider reported
         usage["usage_unknown_calls"] = unknown
+    cached = [c.get("cached_tokens") for c in calls if c.get("cached_tokens") is not None]
+    if cached:  # provider-side prompt cache; absent when the provider doesn't report it
+        usage["cached_tokens"] = sum(cached)
     return usage
 
 def make_validate_node(fields: Mapping[str, FieldDefinition]):
