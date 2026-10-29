@@ -17,8 +17,9 @@ def monitoring_router(engine: Engine, settings: Any) -> APIRouter:
                 "backends": health.backends(settings)}
 
     @r.get("/runs")
-    def runs(limit: int = 200):
-        return monitoring.runs(engine, limit=min(limit, 1000))
+    def runs(limit: int = 200, include_revalidation: bool = False):
+        return monitoring.runs(engine, limit=min(limit, 1000),
+                               include_revalidation=include_revalidation)
 
     @r.get("/runs/{run_id}")
     def run(run_id: str):

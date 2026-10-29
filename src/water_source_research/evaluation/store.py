@@ -216,6 +216,11 @@ class EvaluationStore:
                 .order_by(EvalAdjudicationRecord.id)).all()
             return [_adjudication_dict(r) for r in rows]
 
+def is_revalidation(run: dict[str, Any]) -> bool:
+    """An evaluation of a REVALIDATE run (re-validated stored claims, not independent
+    research): kept out of the per-city "latest" views unless asked for."""
+    return (run.get("config") or {}).get("research_mode") == "REVALIDATE"
+
 def _run_dict(r: EvalRunRecord) -> dict[str, Any]:
     return {"id": r.id, "research_run_id": r.research_run_id, "origin_run_id": r.origin_run_id,
             "dataset_id": r.dataset_id, "city_key": r.city_key,

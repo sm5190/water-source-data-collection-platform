@@ -17,7 +17,7 @@ from typing import Any
 from water_source_research.schemas.research import FieldDefinition
 from water_source_research.services.field_state import load_field_definitions
 from .metrics import compute_metrics
-from .store import EvaluationStore
+from .store import EvaluationStore, is_revalidation
 
 ADJUDICATED_STATUS = {"CONFIRM_MATCH": "MATCH", "CONFIRM_MISMATCH": "MISMATCH",
                       "AMBIGUOUS": "NEEDS_REVIEW", "REFERENCE_ERROR": "NOT_COMPARABLE"}
@@ -248,12 +248,15 @@ def summary_markdown(view: dict[str, Any]) -> str:
     lines += [f"- **{g['code']}**: {g['detail']}" for g in run["gaps"]] + [""]
     return "\n".join(lines)
 
-def overview(store: EvaluationStore) -> list[dict[str, Any]]:
-    """The latest completed evaluation per city, with its headline metrics."""
+def overview(store: EvaluationStore, include_revalidation: bool = False
+             ) -> list[dict[str, Any]]:
+    """The latest completed evaluation per city, with its headline metrics (evaluations
+    of REVALIDATE runs only with ``include_revalidation``)."""
     seen: set[str] = set()
     out = []
     for run in store.runs():  # newest first
-        if run["status"] != "COMPLETED" or run["city_key"] in seen:
+        if run["status"] != "COMPLETED" or run["city_key"] in seen \
+                or (is_revalidation(run) and not include_revalidation):
             continue
         seen.add(run["city_key"])
         view = effective(store, run["id"])

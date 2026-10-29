@@ -196,7 +196,8 @@ def apply_judge(results: list[dict[str, Any]], judge: SemanticJudge,
     return {"prompt_version": JUDGE_PROMPT_VERSION, "provider": judge.provider,
             "model": judge.model, "judged": counts["judged"],
             "unavailable_cells": counts["unavailable"], "new_calls": judge.calls,
-            "errors": judge.errors[-5:], "unavailable": judge.unavailable}
+            "errors": judge.errors[-5:], "unavailable": judge.unavailable,
+            "cache_only": judge.cache_only, "cache_misses": judge.cache_misses}
 
 def _judged(judge: SemanticJudge, field_key: str, ref: dict[str, Any], value: Any,
             quote_texts: list[str], cmp: dict[str, Any], status: str,
@@ -210,7 +211,9 @@ def _judged(judge: SemanticJudge, field_key: str, ref: dict[str, Any], value: An
     cmp = {**cmp, "deterministic_status": status}
     if j is None:
         counts["unavailable"] += 1
-        reason = judge.unavailable or (judge.errors[-1] if judge.errors else "model error")
+        reason = judge.unavailable or (
+            "no stored verdict; cache-only" if judge.cache_only
+            else judge.errors[-1] if judge.errors else "model error")
         cmp.update(status="NEEDS_REVIEW", tags=[*(cmp.get("tags") or []), "SEMANTIC_UNAVAILABLE"],
                    detail=f"semantic check unavailable ({reason}); needs a person")
         return cmp
@@ -678,6 +681,7 @@ def _run_evaluation(engine, research_run_id: str, dataset_id: str | None,
     return store.save_run(research_run_id, origin, dataset_id, city.city_key, snap,
                           snapshot_sha256(snap), evaluation, policy.version,
                           config={"reference_policy": ds.policy_version,
+                                  "research_mode": run.get("mode") or "RESEARCH",
                                   "snapshot_version": snap["version"],
                                   "pairing": evaluation["pairing"],
                                   "judge": evaluation["judge"],

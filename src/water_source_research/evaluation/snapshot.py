@@ -33,7 +33,8 @@ def build_snapshot(engine: Engine, run_id: str) -> dict[str, Any]:
         job = session.get(ResearchJobRecord, run_id)
         if job is None:
             raise LookupError(f"unknown research run {run_id}")
-        origin_id = job.parent_run_id if job.mode == "REPROCESS" and job.parent_run_id \
+        origin_id = job.parent_run_id if job.mode in ("REPROCESS", "REVALIDATE") \
+            and job.parent_run_id \
             else run_id
         origin = session.get(ResearchJobRecord, origin_id)
         result = job.result or {}

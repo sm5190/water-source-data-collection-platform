@@ -17,7 +17,7 @@ from water_source_research.evaluation.evaluate import run_evaluation
 from water_source_research.evaluation.judge import SemanticJudge
 from water_source_research.evaluation.reference import import_reference
 from water_source_research.evaluation.report import REPORT_KINDS, effective, overview, render
-from water_source_research.evaluation.store import EvaluationStore
+from water_source_research.evaluation.store import EvaluationStore, is_revalidation
 from water_source_research.evaluation.views import city_comparison, performance
 
 class ImportRequest(BaseModel):
@@ -71,9 +71,9 @@ def evaluation_router(engine: Engine, store: EvaluationStore | None = None,
                 "issues": [i.model_dump(mode="json") for i in ds.issues]}
 
     @router.get("/overview")
-    async def evaluation_overview():
+    async def evaluation_overview(include_revalidation: bool = False):
         """Latest completed evaluation per city, with headline metrics."""
-        return overview(store)
+        return overview(store, include_revalidation)
 
     @router.post("/runs", status_code=201)
     async def evaluate(body: EvaluateRequest):
@@ -154,11 +154,12 @@ def evaluation_router(engine: Engine, store: EvaluationStore | None = None,
                                       body.reviewer, body.status, body.root_cause, body.note)
 
     @router.get("/cities")
-    async def evaluated_cities():
-        """Cities with a completed evaluation: the latest one per city, and all of them."""
+    async def evaluated_cities(include_revalidation: bool = False):
+        """Cities with a completed evaluation: the latest one per city, and all of them
+        (evaluations of REVALIDATE runs only with ``include_revalidation``)."""
         out: dict[str, dict] = {}
         for r in store.runs():  # newest first
-            if r["status"] != "COMPLETED":
+            if r["status"] != "COMPLETED" or (is_revalidation(r) and not include_revalidation):
                 continue
             entry = out.setdefault(r["city_key"], {"city_key": r["city_key"],
                                                    "latest_eval_run_id": r["id"],
@@ -178,9 +179,9 @@ def evaluation_router(engine: Engine, store: EvaluationStore | None = None,
         return city_comparison(v, stage)
 
     @router.get("/performance")
-    async def research_performance():
+    async def research_performance(include_revalidation: bool = False):
         """Accuracy and coverage by city, by field and overall (latest evaluation per city)."""
-        return performance(store)
+        return performance(store, include_revalidation)
 
     @router.get("/runs/{eval_id}/report")
     async def report(eval_id: str, kind: str = "summary", format: str = "md"):

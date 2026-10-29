@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, or_, select
 from sqlalchemy.orm import Session
 from water_source_research.db.evidence_models import (
     DiscoveryResultRecord, EvidenceChunkRecord, FieldClaimRecord, SourceDocumentRecord,
@@ -225,10 +225,17 @@ JOB_COLUMNS = (J.run_id, J.city_name, J.country, J.status, J.completion, J.mode,
                J.last_error, J.created_at, J.started_at, J.finished_at, J.review_round,
                J.trace_requested, J.updated_at)
 
-def runs(engine: Engine, *, limit: int = 200, now: datetime | None = None) -> list[dict]:
+# Revalidation runs (services/revalidate.py) re-check stored claims; they are not research
+# runs, so the run lists and counts leave them out unless asked for.
+NOT_REVALIDATION = or_(J.mode.is_(None), J.mode != "REVALIDATE")
+
+def runs(engine: Engine, *, limit: int = 200, now: datetime | None = None,
+         include_revalidation: bool = False) -> list[dict]:
     with Session(engine) as session:
-        jobs = session.execute(select(*JOB_COLUMNS).order_by(J.created_at.desc())
-                               .limit(limit)).all()
+        q = select(*JOB_COLUMNS).order_by(J.created_at.desc()).limit(limit)
+        if not include_revalidation:
+            q = q.where(NOT_REVALIDATION)
+        jobs = session.execute(q).all()
         steps = _steps(session, (j.run_id for j in jobs))
     return [{**_job_row(j), **time_split(j.created_at, j.finished_at, j.status,
                                          steps.get(j.run_id, []), now)} for j in jobs]
@@ -434,13 +441,15 @@ def overview(engine: Engine, *, hours: float = 24, settings: Any = None,
     since = now - timedelta(hours=hours)
     with Session(engine) as session:
         by_status = dict(session.execute(select(J.status, func.count())
-                                         .group_by(J.status)).all())
+                                         .where(NOT_REVALIDATION).group_by(J.status)).all())
         recent = session.execute(select(J.status, func.count())
-                                 .where(J.finished_at >= since).group_by(J.status)).all()
+                                 .where(J.finished_at >= since, NOT_REVALIDATION)
+                                 .group_by(J.status)).all()
         errors = session.execute(select(J.run_id, J.city_name, J.last_error, J.updated_at)
                                  .where(J.last_error.is_not(None), J.updated_at >= since)
                                  .order_by(J.updated_at.desc()).limit(10)).all()
-        finished = session.execute(select(*JOB_COLUMNS).where(J.finished_at >= since)).all()
+        finished = session.execute(select(*JOB_COLUMNS).where(
+            J.finished_at >= since, NOT_REVALIDATION)).all()
         steps = _steps(session, (j.run_id for j in finished))
         ledger = _usage_rows(session, since)
     splits = [time_split(j.created_at, j.finished_at, j.status, steps.get(j.run_id, []), now)

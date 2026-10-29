@@ -39,13 +39,16 @@ def main() -> int:
                         help="with --compare-manual: the evaluation to check")
     parser.add_argument("--no-judge", action="store_true",
                         help="deterministic comparison only (no semantic LLM judge)")
+    parser.add_argument("--judge-cache-only", action="store_true",
+                        help="semantic judge from stored verdicts only, never a model call "
+                             "(reproducible comparisons); cells without one need a person")
     args = parser.parse_args()
     engine = get_engine()
     if args.compare_manual:
         return compare(engine, args)
     if not args.run_id:
         parser.error("run_id is required (unless --compare-manual)")
-    judge = None if args.no_judge else build_judge(engine)
+    judge = None if args.no_judge else build_judge(engine, cache_only=args.judge_cache_only)
     if judge is not None and judge.llm is None:
         print(f"semantic judge unavailable ({judge.unavailable}): undecided cells will need "
               "a person")
@@ -101,7 +104,8 @@ def compare(engine, args) -> int:
     if eval_id is None:
         try:
             eval_id = run_evaluation(engine, run_id, args.dataset,
-                                     judge=None if args.no_judge else build_judge(engine))
+                                     judge=None if args.no_judge
+                                     else build_judge(engine, cache_only=args.judge_cache_only))
         except LookupError as exc:
             print(f"cannot evaluate: {exc}")
             return 2

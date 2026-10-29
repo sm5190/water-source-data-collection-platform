@@ -159,12 +159,17 @@ def render_runs(client: Any) -> None:
     if d:
         render_run(d)
 
+MODE_LABEL = {"REPROCESS": "Reprocess of an earlier run",
+              "REPLAY": "Replay on saved documents",
+              "REVALIDATE": "Revalidation (stored claims re-checked; not a research run)"}
+
 def render_run(d: dict[str, Any]) -> None:
     run, t = d["run"], d["time"]
     st.markdown(f"**{RUN_ICON.get(run['status'], '')} {run['status']}**"
                 + (f" · {run['completion']}" if run.get("completion") else "")
                 + f" · attempts {run['attempts']} (retries {d['retries']})"
-                + (" · mode " + run["mode"] if run.get("mode") not in (None, "RESEARCH") else ""))
+                + (" · " + MODE_LABEL.get(run["mode"], "mode " + run["mode"])
+                   if run.get("mode") not in (None, "RESEARCH") else ""))
     done = [p for p in d["progress"] if p["done"]]
     st.progress(len(done) / len(d["progress"]),
                 text=" → ".join(("✅ " if p["done"] else "⬜ ") + NODE_LABEL.get(p["node"],

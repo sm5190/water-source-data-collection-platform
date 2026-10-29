@@ -94,6 +94,22 @@ def test_unavailable_judge_makes_no_calls(engine):
     x = judge.make_input("utility_name", "A", None, "B", None, [])
     assert judge.judge(x) is None and judge.unavailable == "no VT key"
 
+def test_cache_only_judge_uses_stored_verdicts_and_never_calls_the_model(engine):
+    judge, server = judge_with(engine, chat_json(answer()))
+    stored = judge.make_input("utility_name", "City of Toronto Water Division", None,
+                              "Toronto Water", None, [])
+    assert judge.judge(stored)["status"] == "MATCH"  # stored by a normal judge
+    assert len(server.requests) == 1
+    frozen = SemanticJudge(judge.llm, JudgmentStore(engine), cache_only=True)
+    assert frozen.judge(stored)["cached"]
+    new = frozen.make_input("utility_name", "Toronto Water", None, "Metrolinx", None, [])
+    assert frozen.judge(new) is None and frozen.cache_misses == 1
+    assert len(server.requests) == 1 and frozen.calls == 0  # no new model call
+    results = [result("utility_name", "NEEDS_REVIEW", value="Metrolinx", ref="Toronto Water")]
+    from water_source_research.evaluation.evaluate import apply_judge
+    info = apply_judge(results, frozen, {"claims": [], "citations": []})
+    assert info["cache_only"] and info["new_calls"] == 0
+
 # --- what the judge may decide ----------------------------------------------------------------
 
 def result(field, status, stage="PROPOSED", tags=(), value="x", ref="y"):

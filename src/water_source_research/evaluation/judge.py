@@ -176,8 +176,12 @@ class SemanticJudge:
 
     def __init__(self, llm: Any, store: JudgmentStore,
                  descriptions: Mapping[str, str] | None = None,
-                 unavailable: str | None = None) -> None:
+                 unavailable: str | None = None, cache_only: bool = False) -> None:
         self.llm = llm
+        # cache_only: stored verdicts only, never a model call (reproducible comparisons);
+        # a cell without a stored verdict needs a person, like an unavailable judge.
+        self.cache_only = cache_only
+        self.cache_misses = 0
         self.store = store
         self.descriptions = dict(descriptions or load_descriptions())
         self.unavailable = unavailable if llm is None else None
@@ -212,6 +216,10 @@ class SemanticJudge:
             span.set_attribute("evaluation.judge_cached", cached is not None)
             if cached is not None:
                 return {**cached, "cached": True}
+            if self.cache_only:
+                self.cache_misses += 1
+                span.set_attribute("evaluation.judge_cache_miss", True)
+                return None
             from water_source_research.observability.llm_telemetry import llm_call_context
             try:
                 self.calls += 1
@@ -225,9 +233,12 @@ class SemanticJudge:
             span.set_attribute("evaluation.verdict", str(out.get("verdict") or ""))
             return {**out, "cached": False}
 
-def build_judge(engine: Engine, settings: Any = None) -> SemanticJudge:
+def build_judge(engine: Engine, settings: Any = None, cache_only: bool = False
+                ) -> SemanticJudge:
     """The judge on the configured LLM provider; unavailable (not an error) without
-    credentials, so evaluation still completes with those cells marked for verification."""
+    credentials, so evaluation still completes with those cells marked for verification.
+    ``cache_only``: only stored verdicts for this provider/model are used; the model is never
+    called (building the client makes no request)."""
     from water_source_research.core.config import get_settings
     from water_source_research.llm.router import build_structured_llm
     settings = settings or get_settings()
@@ -236,7 +247,7 @@ def build_judge(engine: Engine, settings: Any = None) -> SemanticJudge:
                                    prompt_version=JUDGE_PROMPT_VERSION)
     except LLMError as exc:
         return SemanticJudge(None, JudgmentStore(engine), unavailable=str(exc)[:200])
-    return SemanticJudge(llm, JudgmentStore(engine))
+    return SemanticJudge(llm, JudgmentStore(engine), cache_only=cache_only)
 
 def _judgment_dict(r: EvalJudgmentRecord) -> dict[str, Any]:
     return {"judgment_id": r.id, "cache_key": r.cache_key, "field_key": r.field_key,

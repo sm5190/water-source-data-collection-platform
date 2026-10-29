@@ -14,7 +14,7 @@ from typing import Any
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from .metrics import GROUP, SIMPLE_STAGES, is_provisional, simple_scores
 from .report import _show, effective, reference_text
-from .store import EvaluationStore
+from .store import EvaluationStore, is_revalidation
 
 STAGE_LABEL = {"PROPOSED": "Proposed", "AUTO": "Auto-accepted", "FINAL": "Final reviewed"}
 SUB_LABEL = {"TEMPORAL_MISMATCH": "different year", "SCOPE_MISMATCH": "different area or measure"}
@@ -148,12 +148,15 @@ def _record_labels(results: list[dict[str, Any]]) -> dict[str, str]:
 
 # --- across cities --------------------------------------------------------------------------
 
-def latest_views(store: EvaluationStore) -> list[dict[str, Any]]:
-    """The adjudicated view of the latest completed evaluation per city."""
+def latest_views(store: EvaluationStore, include_revalidation: bool = False
+                 ) -> list[dict[str, Any]]:
+    """The adjudicated view of the latest completed evaluation per city (evaluations of
+    REVALIDATE runs only with ``include_revalidation``)."""
     seen: set[str] = set()
     out = []
     for run in store.runs():  # newest first
-        if run["status"] != "COMPLETED" or run["city_key"] in seen:
+        if run["status"] != "COMPLETED" or run["city_key"] in seen \
+                or (is_revalidation(run) and not include_revalidation):
             continue
         seen.add(run["city_key"])
         view = effective(store, run["id"])
@@ -161,8 +164,8 @@ def latest_views(store: EvaluationStore) -> list[dict[str, Any]]:
             out.append(view)
     return out
 
-def performance(store: EvaluationStore) -> dict[str, Any]:
-    views = latest_views(store)
+def performance(store: EvaluationStore, include_revalidation: bool = False) -> dict[str, Any]:
+    views = latest_views(store, include_revalidation)
     cities = []
     pooled: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_field: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
