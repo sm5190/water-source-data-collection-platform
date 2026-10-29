@@ -99,4 +99,40 @@ class ProviderUsageRecord(Base):
     cost_usd: Mapped[float | None] = mapped_column(Float)
     cost_basis: Mapped[str | None] = mapped_column(String(128))  # price-table key used
     trace_id: Mapped[str | None] = mapped_column(String(32))
+    # App-cache hits: which cache answered (memory | persistent; NULL = a model call) and, for
+    # a persistent hit, the cache entry (llm_response_cache.cache_key) whose original call's
+    # tokens were avoided. A hit's own tokens stay NULL: nothing was spent.
+    cache_layer: Mapped[str | None] = mapped_column(String(16))
+    cache_source: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class LLMResponseCacheRecord(Base):
+    """Persistent application cache of validated model responses (llm/response_store.py).
+
+    The key covers every input that can change the response; each component is also stored
+    in its own column so a miss can be explained. Only the validated raw response is kept,
+    never EvidenceRefs: a hit is re-grounded against the run's own passages. The original
+    call's usage is kept so the tokens a hit avoided can be reported (never as spent)."""
+
+    __tablename__ = "llm_response_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    base_url: Mapped[str | None] = mapped_column(String(512))
+    model: Mapped[str | None] = mapped_column(String(128))
+    generation_hash: Mapped[str] = mapped_column(String(64))
+    task: Mapped[str] = mapped_column(String(64), index=True)
+    prompt_version: Mapped[str] = mapped_column(String(64))
+    schema_hash: Mapped[str] = mapped_column(String(64))
+    context: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    prompt_hash: Mapped[str] = mapped_column(String(64))
+    response: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    requests: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    cached_tokens: Mapped[int | None] = mapped_column(Integer)
+    source_run_id: Mapped[str | None] = mapped_column(String(64))
+    source_trace_id: Mapped[str | None] = mapped_column(String(32))
+    hit_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_hit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

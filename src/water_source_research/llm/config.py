@@ -33,6 +33,10 @@ class LLMSettings(BaseModel):
     # In-process response cache (per worker process)
     cache_ttl_seconds: float = Field(default=86_400, ge=0)  # 0 disables caching
     cache_max_entries: int = Field(default=1024, ge=1)
+    # Persistent response cache (llm/response_store.py) for callers that pass a cache context
+    # (extraction): off | read_write | write_only (stores answers, never reads: for A/B
+    # measurements that must pay for every call).
+    persistent_cache: Literal["off", "read_write", "write_only"] = "read_write"
 
     # Retrieval queries to VT's Qwen3 embedding model get this one-line task prefix.
     embedding_query_instruction: str = (

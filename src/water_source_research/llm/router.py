@@ -17,7 +17,7 @@ import random
 import threading
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Protocol, TypeVar
@@ -144,6 +144,7 @@ class ReliableStructuredLLM:
 
     def __init__(self, backend: Backend, *, task: str, prompt_version: str,
                  settings: LLMSettings, limiter: RateLimiter, cache: Any,
+                 store: Any = None,
                  sleep: Callable[[float], None] = time.sleep,
                  asleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
                  jitter: Callable[[], float] = random.random,
@@ -156,17 +157,30 @@ class ReliableStructuredLLM:
         self.settings = settings
         self.limiter = limiter
         self.cache = cache
+        self._store = store  # persistent tier; None = the process-wide one (if configured)
+        self.generation = generation_signature(backend, settings)
         self.sleep = sleep
         self.asleep = asleep
         self.jitter = jitter
         self.clock = clock
 
-    def cache_key(self, system: str, user: str, schema: type[BaseModel]) -> str:
-        schema_hash = hashlib.sha256(json.dumps(schema.model_json_schema(), sort_keys=True)
-                                     .encode("utf-8")).hexdigest()
-        payload = [self.provider, self.backend.base_url, self.model, self.task,
-                   self.prompt_version, schema.__name__, schema_hash, system, user]
-        return hashlib.sha256(json.dumps(payload).encode("utf-8")).hexdigest()
+    def key_components(self, system: str, user: str, schema: type[BaseModel],
+                       context: Mapping[str, str] | None = None) -> dict[str, Any]:
+        """Everything that can change the response, separately (stored with a persistent
+        entry so a miss can be explained). ``context`` = inputs the prompt was built from
+        that the router can't see (field definition, scope, evidence hashes, policy)."""
+        return {
+            "provider": self.provider, "base_url": self.backend.base_url, "model": self.model,
+            "generation_hash": _digest(self.generation), "task": self.task,
+            "prompt_version": self.prompt_version,
+            "schema_hash": _digest([schema.__name__, schema.model_json_schema()]),
+            "context": dict(sorted((context or {}).items())),
+            "prompt_hash": _digest([system, user]),
+        }
+
+    def cache_key(self, system: str, user: str, schema: type[BaseModel],
+                  context: Mapping[str, str] | None = None) -> str:
+        return _digest(self.key_components(system, user, schema, context))
 
     def structured(self, system: str, user: str, schema: type[T]) -> T:
         with self._span() as stats:
@@ -183,20 +197,47 @@ class ReliableStructuredLLM:
                     return result
             raise AssertionError("unreachable")
 
-    async def astructured(self, system: str, user: str, schema: type[T]) -> T:
+    async def astructured(self, system: str, user: str, schema: type[T],
+                          cache_context: Mapping[str, str] | None = None) -> T:
+        """``cache_context`` opts the call into the persistent cache (see key_components)."""
         with self._span() as stats:
             stats.prompt = f"{system}\n\n{user}"
-            key = self.cache_key(system, user, schema)
+            components = self.key_components(system, user, schema, cache_context)
+            key = _digest(components)
             if (hit := self._cached(key, schema, stats)) is not None:
                 return hit
+            store = self._persistent(cache_context)
+            if store is not None and self.settings.persistent_cache == "read_write":
+                entry = await asyncio.to_thread(store.get, key)
+                if entry is not None:
+                    try:
+                        result = schema.model_validate(entry["response"])
+                    except ValidationError:
+                        result = None  # stale shape: ask the model (the key should prevent it)
+                    if result is not None:
+                        stats.hit("persistent", key)
+                        self.cache.set(key, result.model_dump(mode="json"))
+                        return result
             messages = _messages(system, user)
             for repair in range(self.settings.structured_max_attempts + 1):
                 completion = await self._acall(messages, schema, stats)
                 result, messages = self._validate(completion, schema, messages, repair, stats)
                 if result is not None:
                     self.cache.set(key, result.model_dump(mode="json"))
+                    if store is not None:
+                        await asyncio.to_thread(store.put, key, components,
+                                                result.model_dump(mode="json"),
+                                                stats.usage_record())
                     return result
             raise AssertionError("unreachable")
+
+    def _persistent(self, cache_context: Mapping[str, str] | None) -> Any:
+        if cache_context is None or self.settings.persistent_cache == "off":
+            return None
+        if self._store is not None:
+            return self._store
+        from .response_store import response_store
+        return response_store()
 
     # --- internals ----------------------------------------------------------------------
 
@@ -224,9 +265,11 @@ class ReliableStructuredLLM:
 
     def _cached(self, key: str, schema: type[T], stats: "_CallStats") -> T | None:
         cached = self.cache.get(key)
-        stats.cache_hit = cached is not None
-        stats.span.set_attribute("llm.cache_hit", cached is not None)
-        return schema.model_validate(cached) if cached is not None else None
+        if cached is None:
+            stats.span.set_attribute("llm.cache_hit", False)
+            return None
+        stats.hit("memory", None)
+        return schema.model_validate(cached)
 
     def _call(self, messages: list[dict[str, str]], schema: type[BaseModel],
               stats: "_CallStats") -> Completion:
@@ -351,6 +394,8 @@ class _CallStats:
         self.prompt_version = prompt_version
         self.attempt_errors: dict[str, int] = {}
         self.cache_hit = False
+        self.cache_layer: str | None = None  # memory | persistent (app cache that answered)
+        self.cache_source: str | None = None  # persistent entry whose tokens were avoided
         self.attempts = 0
         self.repairs = 0
         self.latency_ms = 0
@@ -363,6 +408,26 @@ class _CallStats:
         self.status: int | None = None
         self.prompt: str | None = None
         self.response: str | None = None
+
+    def hit(self, layer: str, source: str | None) -> None:
+        self.cache_hit = True
+        self.cache_layer = layer
+        self.cache_source = source
+        self.span.set_attribute("llm.cache_hit", True)
+        self.span.set_attribute("llm.cache_layer", layer)
+
+    def usage_record(self) -> dict[str, Any]:
+        """This (fresh) call's usage, stored with a persistent cache entry."""
+        from water_source_research.observability.llm_telemetry import llm_context
+        ctx = llm_context.get() or {}
+        span = self.span.get_span_context()
+        known = not self.usage_unknown
+        return {"requests": self.attempts,
+                "input_tokens": self.prompt_tokens if known else None,
+                "output_tokens": self.completion_tokens if known else None,
+                "cached_tokens": self.cached_tokens if known else None,
+                "source_run_id": ctx.get("run_id"),
+                "source_trace_id": f"{span.trace_id:032x}" if span.is_valid else None}
 
     def record(self, completion: Completion, seconds: float) -> Completion:
         self.attempts += 1
@@ -404,7 +469,8 @@ class _CallStats:
         if log is not None:
             # None = the provider didn't report usage (UNKNOWN, never counted as 0).
             log.append({"provider": self.provider, "model": self.model,
-                        "cache_hit": self.cache_hit, "requests": self.attempts,
+                        "cache_hit": self.cache_hit, "cache_layer": self.cache_layer,
+                        "requests": self.attempts,
                         "repairs": self.repairs, "latency_ms": self.latency_ms,
                         "prompt_tokens": self.prompt_tokens if usage_known or self.cache_hit
                         else None,
@@ -478,12 +544,24 @@ class _CallStats:
             "cached_tokens": self.cached_tokens if usage_known else None,
             "latency_ms": self.latency_ms, "cost_usd": cost,
             "cost_basis": f"{self.provider}:{self.model}" if cost is not None else None,
-            "trace_id": f"{ctx_span.trace_id:032x}" if ctx_span.is_valid else None})
+            "trace_id": f"{ctx_span.trace_id:032x}" if ctx_span.is_valid else None,
+            "cache_layer": self.cache_layer, "cache_source": self.cache_source})
 
 # Optional per-task log of model calls: a caller (e.g. a graph node) sets a list here to learn
 # what its calls cost; each structured call appends one record when it finishes.
 llm_call_log: ContextVar[list[dict[str, Any]] | None] = ContextVar("llm_call_log",
                                                                    default=None)
+
+def _digest(payload: Any) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str)
+                          .encode("utf-8")).hexdigest()
+
+def generation_signature(backend: Any, settings: LLMSettings) -> dict[str, Any]:
+    """The generation settings a response depends on: the backend's request options as sent
+    (model, max tokens, structured mode, any sampling parameter) and the repair budget."""
+    options = getattr(backend, "generation_options", None)
+    sent = options() if callable(options) else {"model": backend.model}
+    return {"request": sent, "structured_max_attempts": settings.structured_max_attempts}
 
 def _messages(system: str, user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

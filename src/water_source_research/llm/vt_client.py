@@ -63,6 +63,16 @@ class VTChatBackend:
             raise classify_openai_error(PROVIDER, exc) from None
         return _completion(response)
 
+    def generation_options(self) -> dict[str, Any]:
+        """Every request option except the conversation and the schema, exactly as
+        ``_request`` sends them (part of the response cache key: a new option added to
+        ``_request`` is covered automatically)."""
+        request = self._request([{"role": "system", "content": ""}], _Probe)
+        request.pop("messages")
+        if "response_format" in request and "json_schema" in request["response_format"]:
+            request["response_format"] = {"type": "json_schema", "strict": True}
+        return request
+
     def _request(self, messages: list[dict[str, str]],
                  schema: type[BaseModel]) -> dict[str, Any]:
         json_schema = schema.model_json_schema()
@@ -82,6 +92,9 @@ class VTChatBackend:
         elif mode == "json_object":
             request["response_format"] = {"type": "json_object"}
         return request
+
+class _Probe(BaseModel):
+    """Stand-in schema for ``generation_options`` (the real schema is keyed separately)."""
 
 def _completion(response: Any) -> Completion:
     prompt_tokens, completion_tokens = usage_tokens(getattr(response, "usage", None))

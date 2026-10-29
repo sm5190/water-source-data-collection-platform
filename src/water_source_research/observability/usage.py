@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 COLUMNS = ("run_id", "category", "kind", "provider", "model", "task", "field_key",
            "prompt_version", "requests", "retries", "cache_hit", "attempt_errors", "error",
            "input_tokens", "output_tokens", "cached_tokens", "credits", "latency_ms",
-           "cost_usd", "cost_basis", "trace_id", "created_at")
+           "cost_usd", "cost_basis", "trace_id", "cache_layer", "cache_source", "created_at")
 
 class UsageRecorder:
     def __init__(self, engine: Engine, max_queue: int = 10_000, batch_size: int = 200,

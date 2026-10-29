@@ -116,3 +116,23 @@ def test_cache_hit_spends_nothing(engine):
 def test_unknown_run(engine):
     with pytest.raises(LookupError):
         audit_run(engine, "nope")
+
+def test_persistent_hit_reports_tokens_avoided_from_the_cache_entry(engine):
+    from water_source_research.db.observability_models import LLMResponseCacheRecord
+    add_job(engine, result={"events": [node(1, "water_type", 1, claims=1, requests=0,
+                                            tokens=(0, 0)),
+                                       node(2, "water_source", 1, claims=1, requests=0,
+                                            tokens=(0, 0))]})
+    with Session(engine) as s, s.begin():
+        s.add(LLMResponseCacheRecord(
+            cache_key="k1", provider="vt", generation_hash="g", task="extract",
+            prompt_version="p", schema_hash="s", context={}, prompt_hash="h", response={},
+            requests=1, input_tokens=900, output_tokens=120, hit_count=1))
+        hit = ledger("water_type", None, None, None, hit=True)
+        hit.cache_layer, hit.cache_source = "persistent", "k1"
+        memory = ledger("water_source", None, None, None, hit=True)
+        memory.cache_layer = "memory"
+        s.add_all([hit, memory])
+    t = audit_run(engine, "run-1")["total"]
+    assert (t["app_cache_hits"], t["input_tokens"], t["output_tokens"]) == (2, 0, 0)
+    assert (t["tokens_avoided"], t["avoided_unknown_hits"]) == (1020, 1)

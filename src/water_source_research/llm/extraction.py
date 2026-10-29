@@ -8,13 +8,17 @@ passage the model was shown. Ungrounded citations are dropped, and claims left w
 grounded citation are rejected, so no unsupported value reaches field state.
 """
 
+import hashlib
+import json
 import logging
 import re
 import unicodedata
 from collections.abc import Mapping
 from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model, model_validator
-from water_source_research.context_manager import ContextBundle, ContextStatus
+from water_source_research.context_manager import (
+    RETRIEVAL_POLICY_VERSION, ContextBundle, ContextStatus,
+)
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.observability.otel import get_tracer
 from water_source_research.schemas.common import ValueOrigin, ValueStatus
@@ -156,7 +160,8 @@ class StructuredExtractionGateway:
             schema = response_model(field, sorted(passages, key=_source_order))
             try:
                 response = await self.llm.astructured(
-                    SYSTEM_PROMPT, user_prompt(bundle, field, passages), schema)
+                    SYSTEM_PROMPT, user_prompt(bundle, field, passages), schema,
+                    cache_context=cache_context(bundle, field, passages))
             except LLMError as exc:
                 if exc.kind is not LLMErrorKind.SCHEMA:
                     raise  # transient/config errors fail the run; the queue retries it
@@ -174,6 +179,21 @@ class StructuredExtractionGateway:
             span.set_attribute("extraction.claims_rejected", rejected_claims)
             span.set_attribute("extraction.citations_rejected", rejected_citations)
             return claims
+
+def cache_context(bundle: ContextBundle, field: FieldDefinition,
+                  passages: Mapping[str, str]) -> dict[str, str]:
+    """What the prompt was built from, for the response cache key (llm/router.py): the field
+    definition, the research scope, the content of every passage shown (by source id) and
+    the retrieval policy. Any change is a different key, so a stored answer is only reused
+    for the same question on the same evidence."""
+    def digest(payload: Any) -> str:
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str)
+                              .encode("utf-8")).hexdigest()
+    return {"field_definition": digest(field.model_dump(mode="json")),
+            "scope": bundle.scope,
+            "evidence": digest({sid: hashlib.sha256(text.encode("utf-8")).hexdigest()
+                                for sid, text in passages.items()}),
+            "retrieval_policy": RETRIEVAL_POLICY_VERSION}
 
 def evidence_passages(bundle: ContextBundle, field_key: str) -> dict[str, str]:
     """``S#`` -> the evidence text shown for ``field_key`` (what citations may point at)."""

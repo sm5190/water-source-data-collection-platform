@@ -56,6 +56,8 @@ async def main(once: bool, concurrency: int | None, log_dir: Path, instance_id: 
         queue_settings = queue_settings.model_copy(update={"worker_concurrency": concurrency})
     engine = get_engine()
     configure_usage(engine, settings)  # provider_usage ledger (soft)
+    from water_source_research.llm.response_store import configure_response_store
+    configure_response_store(engine)  # persistent extraction cache (LLM__PERSISTENT_CACHE)
     sink = build_sink(log_dir, instance_id, engine, obs.events_max_mb)
     procedures = (build_procedure_services(settings, engine)
                   if settings.procedure_memory.enabled else None)

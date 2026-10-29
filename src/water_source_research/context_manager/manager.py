@@ -37,7 +37,7 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "6"
+RETRIEVAL_POLICY_VERSION = "7"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -179,6 +179,7 @@ class ContextBundle:
     sources: dict[str, SourceRef] = field(default_factory=dict)
     skipped_fields: dict[str, str] = field(default_factory=dict)
     stats: dict[str, int] = field(default_factory=dict)
+    scope: str = ""  # "city|country" the bundle was built for (part of response cache keys)
     # Set by ContextBundleStore; not part of the serialized payload or the fingerprint.
     bundle_id: str | None = None
     cache_key: str | None = None
@@ -193,6 +194,7 @@ class ContextBundle:
             "sources": {sid: asdict(s) for sid, s in self.sources.items()},
             "skipped_fields": self.skipped_fields,
             "stats": self.stats,
+            "scope": self.scope,
         }
 
     @classmethod
@@ -205,6 +207,7 @@ class ContextBundle:
             sources={sid: SourceRef(**s) for sid, s in data["sources"].items()},
             skipped_fields=dict(data["skipped_fields"]),
             stats=dict(data["stats"]),
+            scope=data.get("scope", ""),
             **ids,
         )
 
@@ -448,7 +451,8 @@ class ContextManager:
         self._check_fields(task.target_fields)
         budget = task.max_tokens or DEFAULT_TOKEN_BUDGETS[purpose]
         targets, skipped = self._prune(purpose, task.target_fields, state)
-        bundle = ContextBundle(purpose=purpose.value, target_fields=targets, skipped_fields=skipped)
+        bundle = ContextBundle(purpose=purpose.value, target_fields=targets, skipped_fields=skipped,
+                               scope=f"{state.city_name}|{state.country or ''}")
         stats: Counter[str] = Counter(budget_tokens=budget)
         if not targets:
             bundle.stats = dict(stats)
@@ -530,6 +534,11 @@ class ContextManager:
 
     def _header(self, purpose: ContextPurpose, targets: list[str], state: CityResearchState) -> str:
         place = ", ".join(x for x in (state.city_name, _country(state)) if x)
+        if purpose is ContextPurpose.EXTRACT:
+            # Stable across rounds and runs (no field status or candidate counts, which the
+            # extraction doesn't use): identical evidence gives an identical prompt, so the
+            # response caches can answer it. The target field is stated in the instructions.
+            return f"# Task: {purpose.value}\nCity: {place}"
         lines = [f"# Task: {purpose.value}", f"City: {place}", "## Target fields"]
         for key in targets:
             d = self.fields[key]

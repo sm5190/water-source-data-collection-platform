@@ -312,6 +312,21 @@ def usage_table(groups: list[dict[str, Any]], label: str) -> pd.DataFrame:
         "Median latency": latency(g["latency_p50_ms"]), "p95": latency(g["latency_p95_ms"]),
         "Estimated cost": cost(g)} for g in groups])
 
+def cache_note(t: dict[str, Any]) -> str:
+    """Application cache (no model call) and provider prompt cache (a model call whose repeated
+    prompt prefix the provider billed as cached input), kept apart."""
+    app = (f"Application cache: {t.get('cache_hits', 0)} call(s) answered without the model "
+           f"({t.get('memory_cache_hits', 0)} in process, "
+           f"{t.get('persistent_cache_hits', 0)} from the persistent cache")
+    if t.get("tokens_avoided"):
+        app += f"; {t['tokens_avoided']:,} tokens not spent"
+    if t.get("avoided_unknown_hits"):
+        app += f"; {t['avoided_unknown_hits']} hit(s) of unknown size"
+    provider = t.get("cached_tokens")
+    return app + "). Provider prompt cache: " + (
+        f"{provider:,} input tokens were billed as cached (they are part of input tokens)."
+        if provider is not None else "Unknown (not reported).")
+
 def render_usage(client: Any) -> None:
     c = st.columns(2)
     window = c[0].selectbox("Period", list(WINDOWS), key="mon_usage_window")
@@ -334,6 +349,7 @@ def render_usage(client: Any) -> None:
     c[1].metric("Failed calls", t["failed_calls"])
     c[2].metric("Median latency", latency(t["latency_p50_ms"]))
     c[3].metric("p95 latency", latency(t["latency_p95_ms"]))
+    st.caption(cache_note(t))
     if t["attempt_errors"]:
         st.caption("Errors on individual attempts (retried or final): "
                    + ", ".join(f"{k}: {v}" for k, v in t["attempt_errors"].items()))

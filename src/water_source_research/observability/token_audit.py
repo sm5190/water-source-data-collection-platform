@@ -15,7 +15,10 @@ Sources, in order of authority:
   to a slot by ``qualifiers.extraction_round``.
 
 Spent and avoided tokens are never added together: a cache hit spends nothing (requests 0); the
-tokens it avoided are reported separately when the ledger names the call it reused.
+tokens it avoided are reported separately, from the persistent cache entry it reused
+(``provider_usage.cache_source`` -> ``llm_response_cache``, which keeps the original call's
+usage). A hit whose original usage isn't known (in-process cache) is counted in
+``avoided_unknown_hits``, never as 0 tokens.
 """
 
 from collections import Counter, defaultdict
@@ -24,7 +27,9 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from water_source_research.db.evidence_models import FieldClaimRecord
-from water_source_research.db.observability_models import ProviderUsageRecord
+from water_source_research.db.observability_models import (
+    LLMResponseCacheRecord, ProviderUsageRecord,
+)
 from water_source_research.db.research_models import ResearchJobRecord, RunEventRecord
 
 USABLE = ("VALID", "VALID_WITH_WARNINGS")
@@ -66,7 +71,7 @@ def slots_from_events(events: Iterable[Mapping[str, Any]]) -> list[dict[str, Any
     return out
 
 def _match_ledger(slots: list[dict[str, Any]], rows: list[ProviderUsageRecord],
-                  avoided: Mapping[int, ProviderUsageRecord]) -> None:
+                  avoided: Mapping[str, LLMResponseCacheRecord]) -> None:
     by_field: dict[str, list[ProviderUsageRecord]] = defaultdict(list)
     for r in rows:
         if r.field_key:
@@ -83,9 +88,10 @@ def _match_ledger(slots: list[dict[str, Any]], rows: list[ProviderUsageRecord],
             s["ledger_matched"] = True
             if r.cache_hit:
                 s["input_tokens"] = s["output_tokens"] = 0
-                src = avoided.get(getattr(r, "cached_from_usage_id", None) or -1)
-                if src is not None:
-                    s["tokens_avoided"] = (src.input_tokens or 0) + (src.output_tokens or 0)
+                s["cache_layer"] = r.cache_layer
+                src = avoided.get(r.cache_source or "")
+                if src is not None and src.input_tokens is not None:
+                    s["tokens_avoided"] = src.input_tokens + (src.output_tokens or 0)
                 continue
             s["input_tokens"] = r.input_tokens
             s["output_tokens"] = r.output_tokens
@@ -123,7 +129,8 @@ def summarize(slots: list[dict[str, Any]]) -> dict[str, Any]:
         "input_tokens": _sum(s["input_tokens"] for s in model),
         "output_tokens": _sum(s["output_tokens"] for s in model),
         "provider_cached_tokens": _sum(s["provider_cached_tokens"] for s in model),
-        "tokens_avoided": _sum(avoided) if avoided else 0,
+        "tokens_avoided": sum(a for a in avoided if a is not None),
+        "avoided_unknown_hits": sum(1 for a in avoided if a is None),
         "zero_claim_calls": sum(1 for s in called if s["claims"] == 0),
         "productive_calls": sum(1 for s in called if s.get("valid_claims")),
         "claims": sum(s["claims"] for s in called),
@@ -150,10 +157,9 @@ def audit_run(engine: Engine, run_id: str) -> dict[str, Any]:
             select(ProviderUsageRecord).where(ProviderUsageRecord.run_id == run_id,
                                               ProviderUsageRecord.task == "extract")
             .order_by(ProviderUsageRecord.id)))
-        reused = {getattr(r, "cached_from_usage_id", None) for r in ledger} - {None}
-        originals = {r.id: r for r in session.scalars(
-            select(ProviderUsageRecord).where(ProviderUsageRecord.id.in_(reused)))} \
-            if reused else {}
+        reused = {r.cache_source for r in ledger} - {None}
+        originals = {r.cache_key: r for r in session.scalars(select(LLMResponseCacheRecord)
+                     .where(LLMResponseCacheRecord.cache_key.in_(reused)))} if reused else {}
         claims = list(session.scalars(
             select(FieldClaimRecord).where(FieldClaimRecord.run_id == run_id)))
         claims = [c for c in claims if c.review_status != "CORRECTED"]
@@ -206,7 +212,9 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                  f"{t['productive_calls']}")
         tokens = (f"- Input {_n(t['input_tokens'])} (provider-cached "
                   f"{_n(t['provider_cached_tokens'])}), output {_n(t['output_tokens'])}; "
-                  f"avoided by app cache {_n(t['tokens_avoided'])}")
+                  f"avoided by app cache {_n(t['tokens_avoided'])}"
+                  + (f" (+{t['avoided_unknown_hits']} in-process hit(s) of unknown size)"
+                     if t["avoided_unknown_hits"] else ""))
         claims = (f"- Claims {t['claims']} (VALID {t['valid_claims']}, selected "
                   f"{t['selected_claims']}); repeated identical contexts "
                   f"{_n(t['duplicate_contexts'])}")

@@ -471,6 +471,9 @@ def llm_usage(calls: list[dict]) -> dict[str, object]:
         "model": f'{calls[0]["provider"]}:{calls[0]["model"]}'}
     if unknown:  # token sums cover only the calls whose usage the provider reported
         usage["usage_unknown_calls"] = unknown
+    persistent = sum(1 for c in calls if c.get("cache_layer") == "persistent")
+    if persistent:  # app-cache hits answered by the persistent tier (the rest: in process)
+        usage["persistent_cache_hits"] = persistent
     cached = [c.get("cached_tokens") for c in calls if c.get("cached_tokens") is not None]
     if cached:  # provider-side prompt cache; absent when the provider doesn't report it
         usage["cached_tokens"] = sum(cached)

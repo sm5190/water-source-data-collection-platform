@@ -86,6 +86,10 @@ class OpenAIResponsesBackend:
                                                      http_client=async_http_client))
         self.base_url = str(self._sync.client.base_url).rstrip("/")
 
+    def generation_options(self) -> dict[str, Any]:
+        """Request options besides the conversation and schema (response cache key)."""
+        return {"model": self.model, "api": "responses.parse", "text_format": "schema"}
+
     def complete(self, messages: list[dict[str, str]], schema: type[BaseModel]) -> Completion:
         try:
             response = self._sync.parse(messages, schema)

@@ -29,7 +29,8 @@ class AsyncStructuredLLM(Protocol):
 
     model: str
 
-    async def astructured(self, system: str, user: str, schema: type[T]) -> T: ...
+    async def astructured(self, system: str, user: str, schema: type[T],
+                          cache_context: Mapping[str, str] | None = None) -> T: ...
 
 class LLMErrorKind(StrEnum):
     RATE_LIMITED = "rate_limited"   # 429: retried, honouring the server's wait hint

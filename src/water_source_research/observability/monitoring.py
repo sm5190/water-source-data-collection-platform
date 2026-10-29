@@ -131,8 +131,15 @@ def _usage_rows(session: Session, since: datetime | None = None,
         q = q.where(U.run_id.in_(list(run_ids)))
     return list(session.scalars(q))
 
-def summarize_usage(rows: Iterable[Any]) -> dict[str, Any]:
+def summarize_usage(rows: Iterable[Any],
+                    avoided: Mapping[str, int] | None = None) -> dict[str, Any]:
+    """``avoided``: persistent cache key -> tokens its original call spent (what a hit on it
+    avoided). Avoided tokens are reported apart and never counted as spent."""
     rows = list(rows)
+    hits = [r for r in rows if r.cache_hit]
+    persistent = [r for r in hits if getattr(r, "cache_layer", None) == "persistent"]
+    known_avoided = [avoided[r.cache_source] for r in persistent
+                     if avoided and r.cache_source in avoided]
     invocations = [r for r in rows if not r.cache_hit and (r.requests or 0) > 0]
     known_tokens = [r for r in invocations if r.input_tokens is not None
                     and r.output_tokens is not None]
@@ -144,7 +151,11 @@ def summarize_usage(rows: Iterable[Any]) -> dict[str, Any]:
     unknown_cost = len(invocations) - len(priced)
     return {
         "calls": len(rows), "invocations": len(invocations),
-        "cache_hits": sum(1 for r in rows if r.cache_hit),
+        "cache_hits": len(hits),
+        "persistent_cache_hits": len(persistent),
+        "memory_cache_hits": len(hits) - len(persistent),
+        "tokens_avoided": sum(known_avoided),
+        "avoided_unknown_hits": len(hits) - len(known_avoided),
         "requests": sum(r.requests or 0 for r in rows),
         "retries": sum(r.retries or 0 for r in rows),
         "failed_calls": sum(1 for r in rows if r.error),
@@ -193,6 +204,7 @@ def usage(engine: Engine, *, hours: float | None = 24, group_by: str = "provider
     since = now - timedelta(hours=hours) if hours else None
     with Session(engine) as session:
         rows = _usage_rows(session, since)
+        avoided = _avoided(session, rows)
         cities = dict(session.execute(select(J.run_id, J.city_name)).all()) \
             if group_by in ("city", "run") else {}
     groups: dict[str, list[Any]] = defaultdict(list)
@@ -207,9 +219,19 @@ def usage(engine: Engine, *, hours: float | None = 24, group_by: str = "provider
             key = f"{r.provider}:{r.model or '?'}"
         groups[key].append(r)
     out = [{"group": k, **({"city": cities.get(k)} if group_by == "run" else {}),
-            **summarize_usage(v)} for k, v in sorted(groups.items())]
-    return {"window_hours": hours, "group_by": group_by, "total": summarize_usage(rows),
-            "groups": out}
+            **summarize_usage(v, avoided)} for k, v in sorted(groups.items())]
+    return {"window_hours": hours, "group_by": group_by,
+            "total": summarize_usage(rows, avoided), "groups": out}
+
+def _avoided(session: Session, rows: list[Any]) -> dict[str, int]:
+    """Tokens each reused persistent cache entry's original call spent."""
+    from water_source_research.db.observability_models import LLMResponseCacheRecord as C
+    keys = {r.cache_source for r in rows if getattr(r, "cache_source", None)}
+    if not keys:
+        return {}
+    return {k: i + (o or 0) for k, i, o in session.execute(
+        select(C.cache_key, C.input_tokens, C.output_tokens).where(C.cache_key.in_(keys)))
+        if i is not None}
 
 # --- runs -------------------------------------------------------------------------------
 

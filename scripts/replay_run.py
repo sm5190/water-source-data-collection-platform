@@ -37,6 +37,8 @@ if __name__ == "__main__":
     from water_source_research.db.session import get_engine
     from water_source_research.observability.usage import configure_usage
     configure_usage(get_engine())  # extraction calls -> provider_usage
+    from water_source_research.llm.response_store import configure_response_store
+    configure_response_store(get_engine())  # persistent extraction cache (LLM__PERSISTENT_CACHE)
     try:
         code = run_async(main(args.run_ids, args.max_rounds))
     finally:
