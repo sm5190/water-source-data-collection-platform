@@ -27,6 +27,9 @@ from water_source_research.schemas.research import (
     FieldDefinition,
 )
 from water_source_research.services.city_catalog import catalog_entry
+from .relevance import (
+    GATE_FIELDS, RelevanceContext, build_relevance_context, context_signature,
+)
 from water_source_research.services.field_state import load_field_definitions
 from water_source_research.services.places import HYDRONYM
 from water_source_research.services.places import place_patterns as _place_patterns
@@ -34,7 +37,7 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "5"
+RETRIEVAL_POLICY_VERSION = "6"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -46,6 +49,9 @@ class ContextPurpose(StrEnum):
 class ContextStatus(StrEnum):
     READY = "READY"
     NO_SUFFICIENT_EVIDENCE = "NO_SUFFICIENT_EVIDENCE"
+    # EXTRACT: evidence was found, but no passage is about the city or its water system
+    # (context_manager/relevance.py); no model call.
+    NO_RELEVANT_EVIDENCE = "NO_RELEVANT_EVIDENCE"
     NOT_NEEDED = "NOT_NEEDED"  # every target was pruned (resolved, derived, nothing to do)
 
 DEFAULT_TOKEN_BUDGETS: dict[ContextPurpose, int] = {
@@ -146,6 +152,10 @@ class ContextItem:
     field_keys: list[str] = field(default_factory=list)
     chunk_id: str | None = None
     tokens: int = 0
+    # EXTRACT evidence only: locality and relevance rules met, per field key. None = not
+    # judged (hand-built bundles), which counts as relevant.
+    locality: dict[str, str] | None = None
+    relevance: dict[str, list[str]] | None = None
 
 @dataclass(slots=True)
 class SourceRef:
@@ -212,11 +222,23 @@ class ContextBundle:
         return [k for k in self.target_fields if k not in covered]
 
     @property
+    def relevant_fields(self) -> list[str]:
+        """EXTRACT targets with at least one relevant evidence passage (the extraction gate)."""
+        if self.purpose != ContextPurpose.EXTRACT:
+            return list(self.target_fields)
+        ok = {k for i in self.items if i.kind == "evidence" for k in i.field_keys
+              if i.relevance is None or i.relevance.get(k)}
+        return [k for k in self.target_fields if k in ok]
+
+    @property
     def status(self) -> ContextStatus:
         if self.is_empty:
             return ContextStatus.NOT_NEEDED
-        if self.purpose == ContextPurpose.EXTRACT and self.uncovered_fields == self.target_fields:
-            return ContextStatus.NO_SUFFICIENT_EVIDENCE
+        if self.purpose == ContextPurpose.EXTRACT:
+            if self.uncovered_fields == self.target_fields:
+                return ContextStatus.NO_SUFFICIENT_EVIDENCE
+            if not self.relevant_fields:
+                return ContextStatus.NO_RELEVANT_EVIDENCE
         return ContextStatus.READY
 
     @property
@@ -316,6 +338,7 @@ class ContextManager:
     ) -> None:
         self.fields = dict(field_definitions or load_field_definitions())
         self.catalog = catalog
+        self._relevance_memo: dict[str, RelevanceContext] = {}
         self.estimate = token_estimator
         self.max_chunks_per_source = max_chunks_per_source
         self.dedupe_threshold = dedupe_threshold
@@ -350,6 +373,8 @@ class ContextManager:
         targets = list(dict.fromkeys(task.target_fields))
         read = set(targets) | set(_ANCHOR_FIELDS)
         read.update(d for k in targets for d in self.fields[k].depends_on)
+        if purpose is ContextPurpose.EXTRACT:
+            read.update(GATE_FIELDS)  # the relevance rules read these
         payload: dict[str, Any] = {
             "policy": self.policy_signature,
             "purpose": purpose.value,
@@ -378,6 +403,18 @@ class ContextManager:
         """The run's city|country is in the approved city catalog, so its identity fields
         (``gap_filled_by: catalog``) are filled at assemble and need no extraction."""
         return self.catalog(state.city_name, state.country) is not None
+
+    def relevance_context(self, state: CityResearchState,
+                          chunks: Sequence[EvidenceChunk]) -> RelevanceContext:
+        """The run-wide facts the relevance rules need (memoized per city, gate-field values
+        and chunk set: every field's bundle in a round shares one)."""
+        key = context_signature(state, chunks)
+        ctx = self._relevance_memo.get(key)
+        if ctx is None:
+            if len(self._relevance_memo) > 64:
+                self._relevance_memo.clear()
+            ctx = self._relevance_memo[key] = build_relevance_context(state, chunks)
+        return ctx
 
     def _check_fields(self, keys: Iterable[str]) -> None:
         unknown = [k for k in keys if k not in self.fields]
@@ -646,6 +683,7 @@ class ContextManager:
             span.set_attribute("context.dropped_duplicate", stats["dropped_duplicate"])
 
         with tracer.start_as_current_span("context.budgeting") as span:
+            relevance = self.relevance_context(state, chunks)
             per_source: Counter[str] = Counter()
             for i, keys, passage in candidates:
                 chunk = chunks[i]
@@ -667,9 +705,12 @@ class ContextManager:
                     continue
                 sid = sources.add(chunk.url, chunk.title, chunk.page_number, chunk.retrieved_at,
                                   passage)
+                locality = {k: meta[i]["locality"].get(k, "NONE") for k in keys}
                 bundle.items.append(ContextItem(
                     "evidence", passage, sid, round(scores[i][keys[0]], 4), keys,
-                    chunk.chunk_id, cost,
+                    chunk.chunk_id, cost, locality=locality,
+                    relevance={k: relevance.rules(chunk, locality[k], passage, self.fields[k])
+                               for k in keys},
                 ))
                 used += cost
                 per_source[chunk.url] += 1
@@ -679,6 +720,10 @@ class ContextManager:
             span.set_attribute("context.chunks_selected", stats["chunks_selected"])
             span.set_attribute("context.dropped_budget", stats["dropped_budget"])
             span.set_attribute("context.dropped_source_cap", stats["dropped_source_cap"])
+            stats["chunks_relevant"] = sum(
+                1 for item in bundle.items if item.kind == "evidence" and item.relevance
+                and any(item.relevance.values()))
+            span.set_attribute("context.chunks_relevant", stats["chunks_relevant"])
         return used
 
     def _term_frequencies(
@@ -755,20 +800,23 @@ class ContextManager:
         seen: Iterable[tuple[str, str]],
     ) -> list[str]:
         """Chunk ids not yet shown to the model for ``field_key`` that are materially relevant
-        to it: about the target city (TARGET locality on the matching sentences) and either
-        naming a water body (source fields) or matching the field's terms. Deliberately not a
-        score threshold: a weaker passage can still name an additional legitimate source."""
+        to it: naming a water body in a sentence about the city (source fields) or matching the
+        field's terms, and relevant under the extraction gate's rules (relevance.py), so
+        re-extraction and the gate agree. Deliberately not a score threshold: a weaker passage
+        can still name an additional legitimate source."""
         seen_pairs = set(seen)
-        chunks = [c for c in (_as_chunk(c) for c in raw_chunks)
-                  if (c.chunk_id, field_key) not in seen_pairs]
+        everything = [_as_chunk(c) for c in raw_chunks]
+        chunks = [c for c in everything if (c.chunk_id, field_key) not in seen_pairs]
         if not chunks:
             return []
         terms = {field_key: self._terms(field_key)}
         tf = self._term_frequencies(chunks, terms)
         _, meta = self._score(chunks, [field_key], terms, tf, state, set())
+        relevance = self.relevance_context(state, everything)
+        field = self.fields[field_key]
         return [c.chunk_id for c, m, row in zip(chunks, meta, tf, strict=True)
-                if m["locality"].get(field_key) == "TARGET"
-                and (m["hydronym_local"] or row)]
+                if (m["hydronym_local"] or row)
+                and relevance.rules(c, m["locality"].get(field_key), c.text, field)]
 
     def _terms(self, key: str) -> list[str]:
         d = self.fields[key]

@@ -313,21 +313,25 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
                                    "skip_reason": reason})
                     continue
                 re_run = field_key in again
-                if re_run:
+                called = bundle.status is ContextStatus.READY
+                if re_run and called:  # only a re-extraction the model saw uses the budget
                     reextractions[field_key] = reextractions.get(field_key, 0) + 1
                 attrs: dict[str, object] = {"bundle_status": bundle.status.value,
                                             "claims": len(new_claims),
                                             "discovery_round": extraction_round,
                                             **context_attrs(bundle, field_key),
                                             **llm_usage(calls)}
+                if bundle.status is ContextStatus.NO_RELEVANT_EVIDENCE:
+                    attrs.update(skip_reason="no passage about the city or its water system",
+                                 **relevance_attrs(bundle, field_key))
                 if re_run:
-                    attrs.update(reextraction=reextractions[field_key],
+                    attrs.update(reextraction=reextractions.get(field_key, 0),
                                  new_chunks=again[field_key])
                 events = append_event(events, kind=EventKind.NODE, node="extract",
                                       field_key=field_key,
                                       strategy=("reextract:" if re_run else "")
                                       + bundle.status.value, attrs=attrs)
-                if bundle.status is ContextStatus.NO_SUFFICIENT_EVIDENCE:
+                if not called:  # no evidence, or none about the city: back to discovery
                     if not re_run:
                         needing.append(field_key)
                     continue
@@ -434,6 +438,21 @@ def context_attrs(bundle: ContextBundle, field_key: str) -> dict[str, object]:
     if items:
         attrs["context_digest"] = bundle.fingerprint[:16]
     return attrs
+
+def relevance_attrs(bundle: ContextBundle, field_key: str) -> dict[str, object]:
+    """Why the gate held a field back: the passages' locality and the relevance rules they met
+    (event attrs are scalars, so as "TARGET:1,NONE:3")."""
+    localities: dict[str, int] = {}
+    rules: dict[str, int] = {}
+    for i in bundle.items:
+        if i.kind != "evidence" or field_key not in i.field_keys:
+            continue
+        loc = (i.locality or {}).get(field_key, "UNKNOWN")
+        localities[loc] = localities.get(loc, 0) + 1
+        for r in (i.relevance or {}).get(field_key, []):
+            rules[r] = rules.get(r, 0) + 1
+    fmt = lambda d: ",".join(f"{k}:{v}" for k, v in sorted(d.items())) or "none"  # noqa: E731
+    return {"items_by_locality": fmt(localities), "rule_hits": fmt(rules)}
 
 def llm_usage(calls: list[dict]) -> dict[str, object]:
     """Model usage of one extraction for its trusted event: real model requests (a response

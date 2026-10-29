@@ -30,8 +30,11 @@ REPLAY = "REPLAY"
 _DROPPED = ("evidence_chunks",)  # kept in evidence_chunks, not duplicated in the job result
 
 async def replay_run(engine: Engine, parent_run_id: str, gateway: Any,
-                     max_rounds: int | None = None) -> tuple[str, dict[str, Any]]:
-    """(replay run id, final state)."""
+                     max_rounds: int | None = None,
+                     persist: bool = True) -> tuple[str, dict[str, Any]]:
+    """(replay run id, final state). ``persist=False`` runs in memory only (no documents,
+    claims, records, events, bundles or job row are written; the parent is only read), for
+    counterfactual replays with a scripted gateway (services/counterfactual.py)."""
     with Session(engine) as session:
         parent = session.get(ResearchJobRecord, parent_run_id)
         if parent is None:
@@ -43,11 +46,15 @@ async def replay_run(engine: Engine, parent_run_id: str, gateway: Any,
     if acquisition.rounds == 0:
         raise LookupError(f"run {parent_run_id} has no stored documents to replay")
     rounds = max_rounds or acquisition.rounds
-    graph = build_graph(
-        gateway=gateway, context_service=ContextService(store=ContextBundleStore(engine)),
-        run_recorder=RunRecorder(engine, enqueue_distillation_jobs=False),
-        acquisition=acquisition, evidence_store=evidence, record_store=RecordRepository(engine),
-        max_discovery_rounds=rounds)
+    if persist:
+        graph = build_graph(
+            gateway=gateway, context_service=ContextService(store=ContextBundleStore(engine)),
+            run_recorder=RunRecorder(engine, enqueue_distillation_jobs=False),
+            acquisition=acquisition, evidence_store=evidence,
+            record_store=RecordRepository(engine), max_discovery_rounds=rounds)
+    else:
+        graph = build_graph(gateway=gateway, context_service=ContextService(),
+                            acquisition=acquisition, max_discovery_rounds=rounds)
     run_id = str(uuid4())
     state = initialize_city_state(city, country)
     started = datetime.now(UTC)
@@ -59,6 +66,8 @@ async def replay_run(engine: Engine, parent_run_id: str, gateway: Any,
     final = dict(final)
     final["replay"] = {"parent_run_id": parent_run_id, "rounds_served": acquisition.served,
                        "max_rounds": rounds, "reclassified": acquisition.reclassified}
+    if not persist:
+        return run_id, final
     with Session(engine) as session, session.begin():
         session.add(ResearchJobRecord(
             run_id=run_id, city_name=city, country=country, city_key=city_key,

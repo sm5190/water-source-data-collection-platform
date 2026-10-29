@@ -354,29 +354,29 @@ def utility_service_evidence(index: Any, name: str, research: CityResearchState)
     key = (name.casefold(), research.city_name.casefold())
     if key in cache:
         return cache[key]
-    found = None
-    pattern = _name_pattern(name)
-    city = city_pattern(research.city_name)
-    if pattern is not None:
-        for chunks in index.by_key.values():
-            for c in chunks:
-                if not pattern.search(c.text):
-                    continue
-                for s in _sentences(c.text):
-                    m = pattern.search(s)
-                    if m is None:
-                        continue
-                    rest = without_water_bodies(pattern.sub(" ", s))
-                    if city.search(rest) and (SERVICE_VERBS.search(rest)
-                                              or UTILITY_NOUNS.search(rest)):
-                        found = c.url
-                        break
-                if found:
-                    break
-            if found:
-                break
+    found = service_statement_url(((c.text, c.url) for chunks in index.by_key.values()
+                                   for c in chunks), name, research.city_name)
     cache[key] = found
     return found
+
+def service_statement_url(texts: Iterable[tuple[str, str]], name: str,
+                          city_name: str) -> str | None:
+    """The URL of the first (text, url) whose sentence names ``name``, names the city outside
+    the name and water-body names, and has a service verb or utility noun."""
+    pattern = _name_pattern(name)
+    if pattern is None:
+        return None
+    city = city_pattern(city_name)
+    for text, url in texts:
+        if not pattern.search(text):
+            continue
+        for s in _sentences(text):
+            if pattern.search(s) is None:
+                continue
+            rest = without_water_bodies(pattern.sub(" ", s))
+            if city.search(rest) and (SERVICE_VERBS.search(rest) or UTILITY_NOUNS.search(rest)):
+                return url
+    return None
 
 def _service_result(url: str | None, name: str, add: Add) -> None:
     if url:

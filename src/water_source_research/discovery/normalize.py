@@ -208,6 +208,12 @@ def _is_utility(url: str, host: str, title: str, city: str | None) -> bool:
             or bool(host and _UTILITY.search(host.removeprefix("www.")))
             or bool(_UTILITY_PHRASE.search(title)))
 
+def host_names_org(org: str, host: str) -> bool:
+    """Does ``host`` spell the organisation ``org`` (see ``_host_names_org``)?"""
+    labels = [label.replace("-", "") for label in host.removeprefix("www.").split(".")[:-1]
+              if label not in _GENERIC_LABELS]
+    return _host_names_org(org, labels)
+
 def _host_names_org(org: str, labels: list[str]) -> bool:
     """Does a host label spell the organisation: in full (sydneywater ~ "Sydney Water"), by
     initials (cmwc ~ "Consolidated Mutual Water Company"), or abbreviated before "water"
@@ -225,6 +231,10 @@ def _host_names_org(org: str, labels: list[str]) -> bool:
                                                          for w in words[:-1]):
             return True
     return False
+
+def is_city_domain(host: str, city: str) -> bool:
+    """Is ``host`` the city's own website (toronto.ca, cityofhouston.gov, ville-paris.fr)?"""
+    return _is_city_domain(host.replace("-", ""), city)
 
 def _is_city_domain(host: str, city: str) -> bool:
     compact = _NON_ALNUM.sub("", fold(city))
