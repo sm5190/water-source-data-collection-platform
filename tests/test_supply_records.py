@@ -194,3 +194,21 @@ def test_conflicting_field_makes_the_run_incomplete():
 def test_every_row_validates_against_the_standardized_schema():
     rs = records(toronto(), SOURCE, TOTAL, POP)
     assert all(c.result == "PASS" for c in rs.quality if c.code == "SCHEMA")
+
+# --- catalog identity (Milestone 2: city/country are not extracted for catalog cities) ------
+
+def test_unextracted_catalog_identity_is_filled_and_labelled():
+    rs = records(toronto(), SOURCE, researched=["water_source", "city_name", "country"])
+    for key, name in (("city_name", "Toronto"), ("country", "Canada")):
+        rv = rs.city_values[key]
+        assert rv.value == name and rv.resolution_status == "FROM_CITY_CATALOG"
+        assert not rv.claim_uids  # catalog identity, never presented as a reported claim
+
+def test_reported_identity_is_kept_apart_from_the_catalog():
+    world = toronto()
+    world.doc(UTIL + "/about", "The City of Toronto operates its water utility.")
+    named = claim("city_name", "City of Toronto", (UTIL + "/about", "The City of Toronto"))
+    rs = records(world, SOURCE, named, researched=["water_source", "city_name"])
+    rv = rs.city_values["city_name"]  # the extracted value, never overwritten by the catalog
+    assert (rv.value, rv.resolution_status) == ("City of Toronto", "RESOLVED")
+    assert rv.claim_uids

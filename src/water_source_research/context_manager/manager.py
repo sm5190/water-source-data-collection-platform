@@ -26,6 +26,7 @@ from water_source_research.schemas.research import (
     FieldClaim,
     FieldDefinition,
 )
+from water_source_research.services.city_catalog import catalog_entry
 from water_source_research.services.field_state import load_field_definitions
 from water_source_research.services.places import HYDRONYM
 from water_source_research.services.places import place_patterns as _place_patterns
@@ -33,7 +34,7 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "4"
+RETRIEVAL_POLICY_VERSION = "5"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -311,8 +312,10 @@ class ContextManager:
         dedupe_threshold: float = 0.85,
         policy_version: str = RETRIEVAL_POLICY_VERSION,
         procedure_hint_budget: int = PROCEDURE_HINT_TOKEN_BUDGET,
+        catalog: Callable[[str | None, str | None], Any] = catalog_entry,
     ) -> None:
         self.fields = dict(field_definitions or load_field_definitions())
+        self.catalog = catalog
         self.estimate = token_estimator
         self.max_chunks_per_source = max_chunks_per_source
         self.dedupe_threshold = dedupe_threshold
@@ -354,6 +357,7 @@ class ContextManager:
             "budget": task.max_tokens or DEFAULT_TOKEN_BUDGETS[purpose],
             "city": state.city_name,
             "country": state.country,
+            "catalog_city": self._in_catalog(state),
             "fields": {
                 k: state.fields[k].model_dump(mode="json")
                 for k in sorted(read) if k in state.fields
@@ -369,6 +373,11 @@ class ContextManager:
             )
             payload["seen"] = sorted([c, k] for c, k in set(seen or ()) if k in targets)
         return _digest(payload)
+
+    def _in_catalog(self, state: CityResearchState) -> bool:
+        """The run's city|country is in the approved city catalog, so its identity fields
+        (``gap_filled_by: catalog``) are filled at assemble and need no extraction."""
+        return self.catalog(state.city_name, state.country) is not None
 
     def _check_fields(self, keys: Iterable[str]) -> None:
         unknown = [k for k in keys if k not in self.fields]
@@ -466,6 +475,12 @@ class ContextManager:
                 skipped[key] = f"already {status.value}"
             elif purpose is ContextPurpose.EXTRACT and self.fields[key].derived:
                 skipped[key] = "derived: computed by the rules engine"
+            elif purpose is ContextPurpose.EXTRACT and self.fields[key].generated:
+                skipped[key] = "generated from the run's citations at assemble"
+            elif (purpose is ContextPurpose.EXTRACT
+                  and self.fields[key].gap_filled_by == "catalog"
+                  and self._in_catalog(state)):
+                skipped[key] = "from the approved city catalog"
             elif purpose is ContextPurpose.RESOLVE_CONFLICT and len(candidates) < 2:
                 skipped[key] = "fewer than two candidate claims"
             elif purpose is ContextPurpose.VALIDATE and not (

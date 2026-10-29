@@ -26,3 +26,17 @@ class CatalogCity(BaseModel):
 def load_city_catalog(path: Path = DEFAULT_CATALOG_PATH) -> tuple[CatalogCity, ...]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return tuple(CatalogCity.model_validate(c) for c in data["cities"])
+
+def catalog_entry(city: str | None, country: str | None,
+                  catalog: tuple[CatalogCity, ...] | None = None) -> CatalogCity | None:
+    """The approved catalog entry for a run's city (name or alias, and country, ignoring case
+    and surrounding whitespace), or None when the city isn't in the catalog. Only the identity
+    (city and country) is taken from it; its other columns are never used as research data."""
+    if not city or not country:
+        return None
+    want_city, want_country = city.strip().casefold(), country.strip().casefold()
+    for c in catalog if catalog is not None else load_city_catalog():
+        names = {c.city.casefold(), *(a.casefold() for a in c.aliases)}
+        if want_city in names and c.country.casefold() == want_country:
+            return c
+    return None

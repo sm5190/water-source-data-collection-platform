@@ -303,6 +303,14 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway):
                 if bundle.bundle_id:
                     bundle_ids[field_key] = bundle.bundle_id
                 if bundle.status is ContextStatus.NOT_NEEDED:
+                    reason = bundle.skipped_fields.get(field_key)
+                    if reason and not reason.startswith("already "):  # no model call, and why
+                        events = append_event(
+                            events, kind=EventKind.NODE, node="extract", field_key=field_key,
+                            strategy=ContextStatus.NOT_NEEDED.value,
+                            attrs={"bundle_status": ContextStatus.NOT_NEEDED.value,
+                                   "claims": 0, "discovery_round": extraction_round,
+                                   "skip_reason": reason})
                     continue
                 re_run = field_key in again
                 if re_run:

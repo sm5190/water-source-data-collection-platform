@@ -197,3 +197,31 @@ def test_evidence_ref_round_trip_and_fingerprint(state, mgr):
     assert ref.passage == UTILITY_TEXT
     with pytest.raises(KeyError):
         a.evidence_ref("S9")
+
+# --- fields that are never extracted values (Milestone 2, phase 1) ------------------------
+
+def test_generated_references_are_never_extracted(state, mgr):
+    chunks = [chunk("refs", "References: Toronto Water annual report 2024, reference year 2023.")]
+    bundle = mgr.build(extract(["references"]), state, chunks)
+    assert bundle.is_empty and "generated" in bundle.skipped_fields["references"]
+
+def test_catalog_city_identity_is_not_extracted(state, mgr):
+    chunks = [chunk("id", "Toronto is the capital of Ontario, Canada.")]
+    bundle = mgr.build(extract(["city_name", "country"]), state, chunks)
+    assert bundle.is_empty
+    assert set(bundle.skipped_fields) == {"city_name", "country"}
+    assert all("catalog" in r for r in bundle.skipped_fields.values())
+
+def test_city_outside_the_catalog_is_still_extracted(mgr):
+    state = initialize_city_state("Springfield", "Freedonia")
+    chunks = [chunk("id", "Springfield is a city in Freedonia; the city name dates from 1820.")]
+    bundle = mgr.build(extract(["city_name", "country"]), state, chunks)
+    assert set(bundle.target_fields) == {"city_name", "country"}
+    assert not bundle.skipped_fields
+
+def test_catalog_membership_is_part_of_the_cache_key(state):
+    inside = ContextManager(catalog=lambda city, country: object())
+    outside = ContextManager(catalog=lambda city, country: None)
+    task = extract(["city_name"])
+    assert inside.cache_key(task, state) != outside.cache_key(task, state)
+    assert outside.build(task, state, [chunk("c", "Toronto city name")]).target_fields
