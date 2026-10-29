@@ -37,7 +37,7 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "8"
+RETRIEVAL_POLICY_VERSION = "9"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -542,12 +542,11 @@ class ContextManager:
 
     def _header(self, purpose: ContextPurpose, targets: list[str], state: CityResearchState) -> str:
         place = ", ".join(x for x in (state.city_name, _country(state)) if x)
-        if purpose is ContextPurpose.EXTRACT:
-            # Stable across rounds and runs (no field status or candidate counts, which the
-            # extraction doesn't use): identical evidence gives an identical prompt, so the
-            # response caches can answer it. The target field is stated in the instructions.
-            return f"# Task: {purpose.value}\nCity: {place}"
-        lines = [f"# Task: {purpose.value}", f"City: {place}", "## Target fields"]
+        # The EXTRACT header keeps its "Target fields" section: dropping it (extract-4) made the
+        # model miss a source named only in a dam's location ("on Ruiru River": 8 of 9 calls
+        # with it, 3 of 10 without, same evidence). It costs the response cache nothing in a
+        # replay or retry: the same state gives the same status line.
+        lines =[f"# Task: {purpose.value}", f"City: {place}", "## Target fields"]
         for key in targets:
             d = self.fields[key]
             kind = f"enum: {' | '.join(d.allowed)}" if d.allowed else d.type

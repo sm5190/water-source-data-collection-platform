@@ -225,3 +225,9 @@ def test_catalog_membership_is_part_of_the_cache_key(state):
     task = extract(["city_name"])
     assert inside.cache_key(task, state) != outside.cache_key(task, state)
     assert outside.build(task, state, [chunk("c", "Toronto city name")]).target_fields
+
+def test_extract_header_names_the_target_field(state, mgr):
+    # Dropping this section (extract-4) lowered recall of sources named only in passing.
+    bundle = mgr.build(extract(["water_source"]), state,
+                       [chunk("util", UTILITY_TEXT)])
+    assert "## Target fields\n- water_source (text)" in bundle.header
