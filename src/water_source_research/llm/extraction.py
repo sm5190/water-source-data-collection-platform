@@ -296,7 +296,7 @@ def corroborating_refs(bundle: ContextBundle, citations: set[tuple[str, str]],
     out: list[EvidenceRef] = []
     for sid, quote in citations:
         q = _normalize(quote)
-        for item in bundle.items:
+        for item in getattr(bundle, "items", ()):  # minimal bundles carry no collapsed copies
             if (item.kind != "evidence" or item.source_id != sid or not item.also_found_in
                     or q not in _normalize(item.text)):
                 continue
