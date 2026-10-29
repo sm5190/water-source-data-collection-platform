@@ -37,7 +37,7 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "7"
+RETRIEVAL_POLICY_VERSION = "8"
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -156,6 +156,13 @@ class ContextItem:
     # judged (hand-built bundles), which counts as relevant.
     locality: dict[str, str] | None = None
     relevance: dict[str, list[str]] | None = None
+    # Near-duplicate copies of this passage in other documents (shown once, every location
+    # kept): chunk_id, url, title, page_number, retrieved_at, source_type, passage.
+    also_found_in: list[dict[str, Any]] | None = None
+    # field -> chunk id of identical content already shown to the model for that field from a
+    # source at least as authoritative: it is still shown, but doesn't make the field worth a
+    # model call on its own.
+    repeat_of: dict[str, str] | None = None
 
 @dataclass(slots=True)
 class SourceRef:
@@ -230,7 +237,8 @@ class ContextBundle:
         if self.purpose != ContextPurpose.EXTRACT:
             return list(self.target_fields)
         ok = {k for i in self.items if i.kind == "evidence" for k in i.field_keys
-              if i.relevance is None or i.relevance.get(k)}
+              if (i.relevance is None or i.relevance.get(k))
+              and not (i.repeat_of and k in i.repeat_of)}
         return [k for k in self.target_fields if k in ok]
 
     @property
@@ -670,10 +678,13 @@ class ContextManager:
             span.set_attribute("context.chunks_irrelevant", stats["chunks_irrelevant"])
 
         with tracer.start_as_current_span("context.dedupe") as span:
-            # Ranked order, so a near-duplicate always collapses onto its best-ranked copy.
+            # Ranked order, so a near-duplicate collapses onto its best-ranked copy, except that
+            # a copy from a more authoritative source tier is the one shown. Copies in other
+            # documents are kept as ``also_found_in`` (provenance and corroboration), never lost.
             candidates: list[tuple[int, list[str], str]] = []
-            kept_hashes: set[str] = set()
-            kept_shingles: list[set[str]] = []
+            also: dict[int, list[dict[str, Any]]] = {}
+            kept_hashes: dict[str, int] = {}
+            kept_shingles: list[tuple[set[str], int]] = []
             for i in order:
                 keys = sorted(scores[i], key=lambda k: -scores[i][k])
                 passage = self._passage(chunks[i].text, [t for k in keys for t in terms[k]],
@@ -681,20 +692,33 @@ class ContextManager:
                 norm = " ".join(re.findall(r"\w+", passage.lower()))
                 digest = hashlib.sha1(norm.encode()).hexdigest()
                 shingles = _shingles(norm)
-                if digest in kept_hashes or any(
-                    _jaccard(shingles, s) >= self.dedupe_threshold for s in kept_shingles
-                ):
-                    stats["dropped_duplicate"] += 1
+                dup = kept_hashes.get(digest)
+                if dup is None:
+                    dup = next((pos for s, pos in kept_shingles
+                                if _jaccard(shingles, s) >= self.dedupe_threshold), None)
+                if dup is None:
+                    kept_hashes[digest] = len(candidates)
+                    kept_shingles.append((shingles, len(candidates)))
+                    candidates.append((i, keys, passage))
                     continue
-                kept_hashes.add(digest)
-                kept_shingles.append(shingles)
-                candidates.append((i, keys, passage))
+                stats["dropped_duplicate"] += 1
+                j, j_keys, j_passage = candidates[dup]
+                if chunks[i].url == chunks[j].url:
+                    continue  # overlapping windows of one document: nothing to keep
+                if _tier(chunks[i]) < _tier(chunks[j]):
+                    also.setdefault(dup, []).append(_location(chunks[j], j_passage))
+                    candidates[dup] = (i, keys, passage)
+                    stats["duplicate_promoted"] += 1
+                else:
+                    also.setdefault(dup, []).append(_location(chunks[i], passage))
+                stats["duplicate_locations_kept"] += 1
             span.set_attribute("context.dropped_duplicate", stats["dropped_duplicate"])
 
         with tracer.start_as_current_span("context.budgeting") as span:
             relevance = self.relevance_context(state, chunks)
+            repeats = _seen_content(chunks, seen, targets)
             per_source: Counter[str] = Counter()
-            for i, keys, passage in candidates:
+            for pos, (i, keys, passage) in enumerate(candidates):
                 chunk = chunks[i]
                 if per_source[chunk.url] >= self.max_chunks_per_source:
                     relaxed = (per_source[chunk.url]
@@ -715,11 +739,16 @@ class ContextManager:
                 sid = sources.add(chunk.url, chunk.title, chunk.page_number, chunk.retrieved_at,
                                   passage)
                 locality = {k: meta[i]["locality"].get(k, "NONE") for k in keys}
+                repeat = {k: seen_id for k in keys
+                          if (seen_id := _repeat_of(chunk, k, repeats)) is not None}
+                if repeat:
+                    stats["repeats_of_seen"] += 1
                 bundle.items.append(ContextItem(
                     "evidence", passage, sid, round(scores[i][keys[0]], 4), keys,
                     chunk.chunk_id, cost, locality=locality,
                     relevance={k: relevance.rules(chunk, locality[k], passage, self.fields[k])
                                for k in keys},
+                    also_found_in=also.get(pos), repeat_of=repeat or None,
                 ))
                 used += cost
                 per_source[chunk.url] += 1
@@ -893,6 +922,44 @@ class ContextManager:
         if used > budget:
             stats["over_budget"] = 1
         return used
+
+def _tier(chunk: EvidenceChunk) -> int:
+    """Source authority tier: 0 official, 1 technical/academic, 2 anything else."""
+    kind = (chunk.source_type or "").upper()
+    return 0 if kind in OFFICIAL_TIER else 1 if kind in ("TECHNICAL", "ACADEMIC") else 2
+
+OFFICIAL_TIER = ("UTILITY", "GOVERNMENT", "REGULATORY")
+
+def _location(chunk: EvidenceChunk, passage: str) -> dict[str, Any]:
+    return {"chunk_id": chunk.chunk_id, "url": chunk.url, "title": chunk.title,
+            "page_number": chunk.page_number, "retrieved_at": chunk.retrieved_at,
+            "source_type": chunk.source_type, "passage": passage}
+
+def _content_digest(text: str) -> str:
+    return hashlib.sha1(" ".join(re.findall(r"\w+", text.lower())).encode()).hexdigest()
+
+def _seen_content(chunks: list[EvidenceChunk], seen: set[tuple[str, str]],
+                  targets: list[str]) -> dict[tuple[str, str], tuple[str, int]]:
+    """(field, content digest) -> (chunk id, best tier) of content already shown for the field."""
+    by_id = {c.chunk_id: c for c in chunks}
+    out: dict[tuple[str, str], tuple[str, int]] = {}
+    for cid, key in seen:
+        c = by_id.get(cid)
+        if c is None or key not in targets:
+            continue
+        slot = (key, _content_digest(c.text))
+        if slot not in out or _tier(c) < out[slot][1]:
+            out[slot] = (cid, _tier(c))
+    return out
+
+def _repeat_of(chunk: EvidenceChunk, key: str,
+               repeats: Mapping[tuple[str, str], tuple[str, int]]) -> str | None:
+    """The seen chunk this one repeats for ``key``, unless this copy is more authoritative
+    (new authority is a reason to ask the model again)."""
+    hit = repeats.get((key, _content_digest(chunk.text))) if repeats else None
+    if hit is None or hit[0] == chunk.chunk_id or _tier(chunk) < hit[1]:
+        return None
+    return hit[0]
 
 def _as_chunk(c: EvidenceChunk | Mapping[str, Any]) -> EvidenceChunk:
     return c if isinstance(c, EvidenceChunk) else EvidenceChunk.model_validate(c)

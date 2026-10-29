@@ -138,6 +138,9 @@ class ClaimQualifiers(BaseModel):
     # Never inferred from names or geography.
     source_kind: str | None = None
     relations: list[dict[str, Any]] = Field(default_factory=list)
+    # Other documents carrying the same passage, whose copy of the quote was verified verbatim
+    # and attached as evidence (the model was shown the passage once; context_manager dedupe).
+    corroborating_urls: list[str] = Field(default_factory=list)
     # How the claim's evidence is established:
     #   MACHINE_VERIFIED   the quote was found in an acquired chunk (normal extraction, or a
     #                      reviewer correction quoting the run's evidence)

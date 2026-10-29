@@ -309,6 +309,7 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
         extraction_round=previous.extraction_round if previous else None,
         source_kind=previous.source_kind if previous else None,
         relations=list(previous.relations) if previous else [],
+        corroborating_urls=list(previous.corroborating_urls) if previous else [],
         evidence_class=previous.evidence_class if previous else None)
     normalized: Any = None
 

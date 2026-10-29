@@ -262,6 +262,9 @@ def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[s
         if not evidence:
             rejected_claims += 1
             continue
+        corroborating = corroborating_refs(bundle, seen, {(e.url, e.page_number)
+                                                          for e in evidence})
+        evidence += corroborating
         qualifiers = None
         if field_key in SOURCE_FIELDS:
             relations = []
@@ -274,6 +277,9 @@ def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[s
                                   "quote": r["quote"], "url": bundle.sources[sid].url})
             qualifiers = ClaimQualifiers(source_kind=raw.get("source_kind"),
                                          relations=relations)
+        if corroborating:
+            qualifiers = (qualifiers or ClaimQualifiers()).model_copy(update={
+                "corroborating_urls": list(dict.fromkeys(e.url for e in corroborating))})
         claims.append(FieldClaim(
             field_key=field_key, value=raw["value"],
             value_status=ValueStatus(raw["value_status"]),
@@ -281,6 +287,28 @@ def ground_claims(bundle: ContextBundle, field_key: str, raw_claims: list[dict[s
             confidence=raw["confidence"], evidence=evidence, qualifiers=qualifiers,
         ))
     return claims, rejected_citations, rejected_claims
+
+def corroborating_refs(bundle: ContextBundle, citations: set[tuple[str, str]],
+                       have: set[tuple[str, int | None]]) -> list[EvidenceRef]:
+    """Evidence from other documents carrying a cited passage (collapsed by the context
+    manager's dedupe into ``also_found_in``): one EvidenceRef per copy whose own text contains
+    the quote verbatim. Nothing unverified is added."""
+    out: list[EvidenceRef] = []
+    for sid, quote in citations:
+        q = _normalize(quote)
+        for item in bundle.items:
+            if (item.kind != "evidence" or item.source_id != sid or not item.also_found_in
+                    or q not in _normalize(item.text)):
+                continue
+            for loc in item.also_found_in:
+                where = (loc["url"], loc.get("page_number"))
+                if where in have or q not in _normalize(loc.get("passage") or ""):
+                    continue
+                have.add(where)
+                out.append(EvidenceRef(url=loc["url"], title=loc.get("title"),
+                                       page_number=loc.get("page_number"), passage=quote,
+                                       retrieved_at=loc.get("retrieved_at")))
+    return out
 
 _SPACE = re.compile(r"\s+")
 
