@@ -1,0 +1,339 @@
+{
+ "_note": "Drafted by the assistant from the quoted text only, 2026-11-02; UNCONFIRMED.",
+ "F001": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Statewide data-apps portal"
+ },
+ "F002": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "YES",
+  "basis": "City of Houston water utility capital plan: potable water sold in the Houston area"
+ },
+ "F003": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Statewide water use dashboard (public water systems incl. Houston possible)"
+ },
+ "F004": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS: groundwater pumping and declines in the Houston, Texas, area"
+ },
+ "F005": {
+  "relevant": "YES",
+  "publisher_kind": "OTHER",
+  "serving_utility": "N_A",
+  "basis": "Santiago-Maipo water fund: water security of the Maipo basin"
+ },
+ "F006": {
+  "relevant": "NO",
+  "publisher_kind": "REGULATOR",
+  "serving_utility": "N_A",
+  "basis": "Texas utility commission report index"
+ },
+ "F007": {
+  "relevant": "YES",
+  "publisher_kind": "INDEPENDENT_DATABASE",
+  "serving_utility": "N_A",
+  "basis": "Tap-water test data for the City of Houston public water system"
+ },
+ "F008": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "YES",
+  "basis": "Aguas Andinas home page; content blocked by a bot check"
+ },
+ "F009": {
+  "relevant": "NO",
+  "publisher_kind": "OTHER",
+  "serving_utility": "N_A",
+  "basis": "Water fund financial statements list"
+ },
+ "F010": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "Ecosystem services in the Santiago-Valparaiso region; water supply not clear"
+ },
+ "F011": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS: Lake Houston, a water-supply reservoir near Houston, Texas"
+ },
+ "F012": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Private water company account page (not Houston's utility)"
+ },
+ "F013": {
+  "relevant": "NO",
+  "publisher_kind": "REGULATOR",
+  "serving_utility": "N_A",
+  "basis": "Texas drinking water viewer instructions"
+ },
+ "F014": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Another utility's water quality report (Bermuda water company)"
+ },
+ "F015": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Another utility's water quality report (South Carolina)"
+ },
+ "F016": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Private 'Texas Water Utilities' serving select communities"
+ },
+ "F017": {
+  "relevant": "YES",
+  "publisher_kind": "DIRECTORY",
+  "serving_utility": "N_A",
+  "basis": "Directory: City of Houston Water among Houston water providers"
+ },
+ "F018": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Chilean water directorate 2023 reports list"
+ },
+ "F019": {
+  "relevant": "NO",
+  "publisher_kind": "OTHER",
+  "serving_utility": "N_A",
+  "basis": "Water fund budgets list"
+ },
+ "F020": {
+  "relevant": "YES",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "CR2 infographic: Gran Santiago surface and groundwater sources, Aguas Andinas"
+ },
+ "F021": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS national annual water data reports page"
+ },
+ "F022": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Aguas de Santiago (Santiago del Estero, Argentina): another Santiago"
+ },
+ "F023": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Statewide groundwater data viewer"
+ },
+ "F024": {
+  "relevant": "NO",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "Legal assistance programmes in Santiago, Chile: not water"
+ },
+ "F025": {
+  "relevant": "YES",
+  "publisher_kind": "INDEPENDENT_DATABASE",
+  "serving_utility": "N_A",
+  "basis": "Aggregator page on Houston's water supply"
+ },
+ "F026": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "YES",
+  "basis": "City of Houston home page; no water-supply content"
+ },
+ "F027": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "COMMERCIAL",
+  "serving_utility": "N_A",
+  "basis": "Homeowner utility guide: Houston Public Works vs MUD districts"
+ },
+ "F028": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Private water company account login"
+ },
+ "F029": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "YES",
+  "basis": "City of Houston 2025 water utility capital plan"
+ },
+ "F030": {
+  "relevant": "YES",
+  "publisher_kind": "INDEPENDENT_DATABASE",
+  "serving_utility": "N_A",
+  "basis": "Aggregator: Houston's water system serves over 2.4 million people"
+ },
+ "F031": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS national land subsidence report (Houston groundwater pumping likely)"
+ },
+ "F032": {
+  "relevant": "YES",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "YES",
+  "basis": "Aguas Andinas investor site: integrated reports of Aguas Andinas, Cordillera, Manquehue"
+ },
+ "F033": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Aguas de Santiago, Argentina: serves localities of its province"
+ },
+ "F034": {
+  "relevant": "NO",
+  "publisher_kind": "REGULATOR",
+  "serving_utility": "N_A",
+  "basis": "Texas Office of Water programmes page"
+ },
+ "F035": {
+  "relevant": "YES",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "YES",
+  "basis": "Aguas Santiago Poniente: utility serving a western sector of Greater Santiago"
+ },
+ "F036": {
+  "relevant": "YES",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "North Fort Bend Water Authority: partner in the City of Houston's NEWPP expansion; water pumped across Houston to Fort Bend"
+ },
+ "F037": {
+  "relevant": "YES",
+  "publisher_kind": "DIRECTORY",
+  "serving_utility": "N_A",
+  "basis": "Directory: City of Houston Water (duplicate listing)"
+ },
+ "F038": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "YES",
+  "basis": "City of Houston redirect page; no content"
+ },
+ "F039": {
+  "relevant": "YES",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "YES",
+  "basis": "Aguas Andinas investor site: integrated reports (duplicate)"
+ },
+ "F040": {
+  "relevant": "YES",
+  "publisher_kind": "TECHNICAL",
+  "serving_utility": "N_A",
+  "basis": "World Bank: wastewater and the Mapocho river, potable water for the Santiago region"
+ },
+ "F041": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "YES",
+  "basis": "Houston Water planning: water supply partnerships, Lake Livingston, Conroe, Houston"
+ },
+ "F042": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Harris County: the City of Houston's system is the largest in Texas"
+ },
+ "F043": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Private water company page for Louisiana"
+ },
+ "F044": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Texas groundwater division page (statewide)"
+ },
+ "F045": {
+  "relevant": "NO",
+  "publisher_kind": "REGULATOR",
+  "serving_utility": "N_A",
+  "basis": "TCEQ guidance on counting connections and population served"
+ },
+ "F046": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "Fluoride intake in two Santiago communes with/without fluoridated public water"
+ },
+ "F047": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS real-time data app for Lake Houston"
+ },
+ "F048": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "Texas groundwater committee page on public suppliers"
+ },
+ "F049": {
+  "relevant": "NO",
+  "publisher_kind": "COMMERCIAL",
+  "serving_utility": "N_A",
+  "basis": "Well-drilling company page about wells in Santiago"
+ },
+ "F050": {
+  "relevant": "YES",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "Paper: water supply and subsidence in the Greater Houston area"
+ },
+ "F051": {
+  "relevant": "NO",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "TWDB reports index"
+ },
+ "F052": {
+  "relevant": "YES",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "North Harris County Regional Water Authority: Luce Bayou transfer from the Trinity River to Lake Houston with the City"
+ },
+ "F053": {
+  "relevant": "UNCERTAIN",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "JSTOR bot-check page; no content"
+ },
+ "F054": {
+  "relevant": "YES",
+  "publisher_kind": "GOVERNMENT",
+  "serving_utility": "N_A",
+  "basis": "USGS Lake Houston water quality, in cooperation with the City of Houston"
+ },
+ "F055": {
+  "relevant": "YES",
+  "publisher_kind": "ACADEMIC",
+  "serving_utility": "N_A",
+  "basis": "Abstract: water supply and subsidence in the Greater Houston area"
+ },
+ "F056": {
+  "relevant": "NO",
+  "publisher_kind": "UTILITY_OPERATOR",
+  "serving_utility": "NO",
+  "basis": "Private water company in Alaska"
+ }
+}

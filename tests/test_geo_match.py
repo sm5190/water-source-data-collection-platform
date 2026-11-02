@@ -142,3 +142,9 @@ def test_no_matcher_without_an_approved_identity(monkeypatch):
     monkeypatch.setenv("CITY_IDENTITY_ALLOW_DRAFT", "1")
     assert matcher_for("Santiago", "Chile") is not None
     assert identity_signature("Santiago", "Chile") != "catalog-only"
+
+def test_a_city_host_with_another_state_code_is_another_region(houston):
+    """houstonms.gov (Houston, Mississippi) was fetched on a fresh Houston run."""
+    assert houston.host_scope("https://houstonms.gov/water").label() == "OTHER_REGION"
+    tx = houston.host_scope("https://www.houstontx.gov/water/")
+    assert tx.country == "TARGET" and tx.region == "TARGET"

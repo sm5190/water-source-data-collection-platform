@@ -1,0 +1,506 @@
+{
+  "F001": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.twdb.texas.gov/mapping/index.asp",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F002": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.houstontx.gov/cip/22cipadopt/e_water.pdf",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F003": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.twdb.texas.gov/waterplanning/waterusesurvey/dashboard/index.asp",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F004": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.usgs.gov/water-science-school/science/groundwater-decline-and-depletion",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F005": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://fondodeaguasantiago.cl/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F006": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.puc.texas.gov/industry/water/reports/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F007": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://mytapwater.org/pws/tx1010013/city-of-houston/harris-tx/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|UNKNOWN"
+  },
+  "F008": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.aguasandinas.cl/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F009": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://fondodeaguasantiago.cl/balances-anuales/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F010": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0188117",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "ACADEMIC|TARGET_COUNTRY"
+  },
+  "F011": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.usgs.gov/publications/watershed-influences-and-lake-processes-a-regional-scale-approach-monitoring-a-water",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F012": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://account.mywater.us/ForgotUserId",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F013": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.tceq.texas.gov/drinkingwater/dwv",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "REGULATOR|TARGET_COUNTRY"
+  },
+  "F014": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.mywater.us/docs/mywateruslibraries/water-quality-reports/bermuda-23ccr-023.pdf?sfvrsn=bbc90f5b_4",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F015": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.mywater.us/docs/mywateruslibraries/water-quality-reports/barney-rhett-25ccr-012.pdf?sfvrsn=a8420d5b_4",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F016": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.mywater.us/texas",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F017": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://waterzen.com/water-providers/city-of-houston-water/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "UTILITY_OPERATOR|UNKNOWN"
+  },
+  "F018": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://dga.mop.gob.cl/document/informes-2023/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F019": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://fondodeaguasantiago.cl/presupuestos-anuales/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F020": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.cr2.cl/wp-content/uploads/2022/06/Infografia_UsoAgua_062022.pdf",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "TECHNICAL|TARGET_COUNTRY"
+  },
+  "F021": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.usgs.gov/tools/annual-water-data-reports",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F022": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "http://www.aguasdesantiago.com.ar/nota/6/pequenos-habitos-que-ayudan-a-cuidar-el-agua",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "UTILITY_OPERATOR|ELSEWHERE"
+  },
+  "F023": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www3.twdb.texas.gov/apps/WaterDataInteractive/GroundwaterDataViewer/?map=gwdb",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F024": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://scholarship.law.duke.edu/djcil/vol6/iss2/5/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 3,
+    "stratum": "ACADEMIC|TARGET_COUNTRY"
+  },
+  "F025": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://hi3water.com/city/houston",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "UTILITY_OPERATOR|UNKNOWN"
+  },
+  "F026": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.houstontx.gov/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F027": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.harriscountyutility.com/city-utilities",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|UNKNOWN"
+  },
+  "F028": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://account.mywater.us/?sap-language=EN",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F029": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.houstontx.gov/cip/25cipadopt/e_water.pdf",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F030": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://cleanairandwater.net/houston/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "TECHNICAL|TARGET_COUNTRY"
+  },
+  "F031": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://pubs.usgs.gov/publication/cir1182",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F032": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.aguasandinasinversionistas.cl/es/informacion-financiera/memorias",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F033": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.aguasdesantiago.com.ar/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|ELSEWHERE"
+  },
+  "F034": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.tceq.texas.gov/agency/organization/water.html",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "REGULATOR|TARGET_COUNTRY"
+  },
+  "F035": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.aguasponiente.cl/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F036": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.nfbwa.com/our-projects",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F037": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://waterzen.com/water-providers/city-of-houston-water-3/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "UTILITY_OPERATOR|UNKNOWN"
+  },
+  "F038": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.houstontx.gov/redirect/waterbills.html",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F039": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.aguasandinasinversionistas.cl/informacion-financiera/memorias",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F040": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://documents1.worldbank.org/curated/en/284951573498126244/pdf/Wastewater-From-Waste-to-Resource-The-Case-of-Santiago-Chile.pdf",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "TECHNICAL|TARGET_COUNTRY"
+  },
+  "F041": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.houstontx.gov/council/committees/tti/20200206/Water-Supply-Partnerships.pdf",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F042": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://publichealth.harriscountytx.gov/About/Divisions/Environmental-Public-Health/Public-Drinking-Water-Safety",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F043": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.mywater.us/louisiana/water-101/how-it-works/drinking-water",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  },
+  "F044": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.twdb.texas.gov/groundwater/index.asp",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F045": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.tceq.texas.gov/downloads/drinking-water/rg-659_determining-connections-and-populations-served-for-public-water-systems.pdf/@@download/file/RG-659_Determining%20Connections%20and%20Populations%20Served%20for%20Public%20Water%20Systems.pdf",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F046": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "http://www.scielo.br/j/roc/a/bzmbFnrvRcVj6Dw4tcBbJPz/?lang=en",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "OTHER|TARGET_COUNTRY"
+  },
+  "F047": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.usgs.gov/news/state-news-release/new-app-lake-houston-provides-real-time-stream-and-water-quality-data",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 1,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F048": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://tgpc.texas.gov/water-wells/groundwater-as-drinking-water/water-from-a-public-supplier/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F049": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://pozosdeagua.org/pozos-de-agua-en-santiago/",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F050": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://archives.datapages.com/data/gcags/data/052/052001/pdfs/0724.pdf",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "TECHNICAL|TARGET_COUNTRY"
+  },
+  "F051": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.twdb.texas.gov/publications/reports/index.asp",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F052": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.nhcrwa.com/projects/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 2,
+    "stratum": "UTILITY_OPERATOR|TARGET_COUNTRY"
+  },
+  "F053": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.jstor.org/stable/resrep42654.10",
+    "city": "Santiago",
+    "country": "Chile",
+    "round": 1,
+    "stratum": "ACADEMIC|UNKNOWN"
+  },
+  "F054": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://webapps.usgs.gov/lake_houston/",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "GOVERNMENT|TARGET_COUNTRY"
+  },
+  "F055": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://archives.datapages.com/data/gcags/data/052/052001/0724.htm",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "OTHER|TARGET_COUNTRY"
+  },
+  "F056": {
+    "run_id": "fresh",
+    "document_id": 0,
+    "url": "https://www.mywater.us/alaska/water-quality/water-quality-reports",
+    "city": "Houston",
+    "country": "United States of America",
+    "round": 3,
+    "stratum": "DIRECTORY|TARGET_COUNTRY"
+  }
+}

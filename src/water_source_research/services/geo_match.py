@@ -225,6 +225,11 @@ class GeoMatcher:
             state = second if tld == "us" else (second if second in US_STATE_CODES else "")
             if not state and tld == "gov":
                 state = next((lab for lab in labels[:-1] if lab in US_STATE_CODES), "")
+                # A city's own host "<city><state code>.gov" (houstontx.gov, houstonms.gov).
+                city_key = fold(self.identity.catalog_names()[0]).replace(" ", "")
+                if not state and second.startswith(city_key) and \
+                        second[len(city_key):] in US_STATE_CODES:
+                    state = second[len(city_key):]
                 state = state or (second if second.isalpha() else "")
             if us and state:
                 if state in self.region_host_labels:
