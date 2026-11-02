@@ -31,13 +31,14 @@ from .relevance import (
     GATE_FIELDS, RelevanceContext, build_relevance_context, context_signature,
 )
 from water_source_research.services.field_state import load_field_definitions
+from water_source_research.services.geo_match import identity_signature
 from water_source_research.services.places import HYDRONYM
 from water_source_research.services.places import place_patterns as _place_patterns
 
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "9"
+RETRIEVAL_POLICY_VERSION = "10"  # 10: City + Region + Country identity (geo_match)
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -159,6 +160,9 @@ class ContextItem:
     # Near-duplicate copies of this passage in other documents (shown once, every location
     # kept): chunk_id, url, title, page_number, retrieved_at, source_type, passage.
     also_found_in: list[dict[str, Any]] | None = None
+    # With an approved city identity: whether the document is about the target country or
+    # another place, and why (services/geo_match.py).
+    geo: str | None = None
     # field -> chunk id of identical content already shown to the model for that field from a
     # source at least as authoritative: it is still shown, but doesn't make the field worth a
     # model call on its own.
@@ -393,6 +397,7 @@ class ContextManager:
             "budget": task.max_tokens or DEFAULT_TOKEN_BUDGETS[purpose],
             "city": state.city_name,
             "country": state.country,
+            "identity": identity_signature(state.city_name, state.country),
             "catalog_city": self._in_catalog(state),
             "fields": {
                 k: state.fields[k].model_dump(mode="json")
@@ -637,7 +642,8 @@ class ContextManager:
             return used
 
         with tracer.start_as_current_span("context.ranking") as span:
-            scores, meta = self._score(chunks, targets, terms, tf, state, seen)
+            scores, meta = self._score(chunks, targets, terms, tf, state, seen,
+                                       self.relevance_context(state, chunks))
             ranked = sorted(
                 ((max(pf.values()), i) for i, pf in enumerate(scores) if pf),
                 key=lambda x: (-x[0], x[1]),
@@ -748,6 +754,7 @@ class ContextManager:
                     relevance={k: relevance.rules(chunk, locality[k], passage, self.fields[k])
                                for k in keys},
                     also_found_in=also.get(pos), repeat_of=repeat or None,
+                    geo=relevance.geo_note(chunk),
                 ))
                 used += cost
                 per_source[chunk.url] += 1
@@ -780,6 +787,7 @@ class ContextManager:
         tf: list[dict[str, int]],
         state: CityResearchState,
         seen: set[tuple[str, str]],
+        relevance: RelevanceContext | None = None,
     ) -> tuple[list[dict[str, float]], list[dict[str, Any]]]:
         """Per-chunk, per-field relevance: BM25-style term saturation x IDF x priors, with
         locality judged on the matching sentences. Also returns per-chunk facts (locality per
@@ -788,6 +796,8 @@ class ContextManager:
         n_docs = len(chunks)
         idf = {t: math.log(1 + (n_docs - df[t] + 0.5) / (df[t] + 0.5)) for t in df}
         target, other = _place_patterns(state.city_name, state.country)
+        if relevance is not None and relevance.matcher is not None:
+            target, other = relevance.matcher.locality_patterns(other)
         source_targets = SOURCE_ENTITY_FIELDS & set(targets)
 
         out: list[dict[str, float]] = []
@@ -796,7 +806,10 @@ class ContextManager:
             base = SOURCE_TYPE_WEIGHTS.get((chunk.source_type or "").upper(),
                                            UNKNOWN_SOURCE_WEIGHT)
             has_digits = bool(_DIGIT.search(chunk.text))
-            sentences = [s for s in _SENTENCE_SPLIT.split(chunk.text) if s.strip()]
+            # Locality is judged on the text with other places sharing the city's name blanked
+            # (unchanged without an approved identity); scores use the original text.
+            place_text = relevance.place_text(chunk) if relevance is not None else chunk.text
+            sentences = [s for s in _SENTENCE_SPLIT.split(place_text) if s.strip()]
             hydronym_local = bool(source_targets) and _locality(
                 sentences, [HYDRONYM], target, other) == "TARGET"
             per_field: dict[str, float] = {}
@@ -848,8 +861,8 @@ class ContextManager:
             return []
         terms = {field_key: self._terms(field_key)}
         tf = self._term_frequencies(chunks, terms)
-        _, meta = self._score(chunks, [field_key], terms, tf, state, set())
         relevance = self.relevance_context(state, everything)
+        _, meta = self._score(chunks, [field_key], terms, tf, state, set(), relevance)
         field = self.fields[field_key]
         return [c.chunk_id for c, m, row in zip(chunks, meta, tf, strict=True)
                 if (m["hydronym_local"] or row)

@@ -56,9 +56,16 @@ def without_water_bodies(text: str) -> str:
     mention of Houston."""
     return HYDRONYM.sub(lambda m: " " * len(m.group(0)), text)
 
-def names_city(text: str, city: str, country: str | None = None) -> str:
+def names_city(text: str, city: str, country: str | None = None, scope=None) -> str:
     """TARGET (the city is named, outside water-body names), OTHER (only other listed places
-    are named) or NONE."""
+    are named) or NONE. With an approved city identity the City + Region + Country rules of
+    services/geo_match.py decide (``scope``: the document's DocumentScope); AMBIGUOUS -> NONE."""
+    from water_source_research.services.geo_match import matcher_for
+    matcher = matcher_for(city, country)
+    if matcher is not None:
+        status = matcher.match_place(text, scope).status
+        return {"CONFIRMED": "TARGET", "PROBABLE": "TARGET", "HOMONYM": "OTHER",
+                "OTHER_PLACE": "OTHER"}.get(status, "NONE")
     text = without_water_bodies(text)
     if city_pattern(city).search(text):
         return "TARGET"

@@ -471,6 +471,14 @@ def build_one(entry: dict, fetch: Fetcher, cities: list[dict], countries: dict, 
         return ident
     ident.ids["wikidata"] = qid
     entity = fetch.entity(qid)
+    for v in claims(entity, "P17")[:1]:  # the country's labels in English and local languages
+        if isinstance(v, dict) and v.get("id"):
+            country_entity = fetch.entity(v["id"])
+            extra = [lab["value"] for lang, lab in country_entity.get("labels", {}).items()
+                     if lang in langs and usable_name(lab["value"])]
+            known = {fold(country), *(fold(n) for n in ident.country_info.names)}
+            ident.country_info.names += [n for n in dict.fromkeys(extra) if fold(n) not in known]
+            ident.ids["wikidata_country"] = v["id"]
     region, notes = region_for(fetch, entity, qid, adm, alts, langs,
                                first_level_terms(country, c["name"]))
     ident.region, ident.notes = region, ident.notes + notes

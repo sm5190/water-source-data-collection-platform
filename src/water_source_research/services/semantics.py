@@ -183,7 +183,8 @@ def semantic_checks(claim: FieldClaim, d: FieldDefinition, normalized: Any, loca
     is_year = d.type == "integer" and d.key.endswith("_year")
     contexts = context_texts(claim, located, index)
     if d.risk == "high" and d.subject == "city" and not is_year:
-        _check_city_named(contexts, _titles(located), research, add)
+        _check_city_named(contexts, _titles(located), research, add,
+                          _scope(index, located, research))
     if d.key == "jurisdiction":
         add(*jurisdiction_level(str(normalized), research.country))
     if d.measurement == "population":
@@ -202,10 +203,18 @@ def semantic_checks(claim: FieldClaim, d: FieldDefinition, normalized: Any, loca
     elif d.key.startswith("utility_reported_city_population") and not is_year:
         _check_reported_by_serving_utility(located, index, research, add)
 
+def _scope(index: Any, located: list, research: CityResearchState):
+    """The cited document's scope (approved city identity only, else None)."""
+    from water_source_research.services.geo_match import index_scope, matcher_for
+    matcher = matcher_for(research.city_name, research.country)
+    if matcher is None or not located:
+        return None
+    return index_scope(matcher, index, located[0][0].url)
+
 def _check_city_named(contexts: list[str], titles: list[str], research: CityResearchState,
-                      add: Add) -> None:
+                      add: Add, scope: Any = None) -> None:
     text = "\n".join([*contexts, *titles])
-    where = names_city(text, research.city_name, research.country)
+    where = names_city(text, research.city_name, research.country, scope)
     if where == "TARGET":
         add("CITY_NAMED", CheckResult.PASS, None)
     elif where == "OTHER":

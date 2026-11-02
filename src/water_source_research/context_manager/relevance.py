@@ -23,15 +23,24 @@ never used (a weak passage that names another legitimate source must still reach
                      the city.
 
 A passage whose matching sentences name only other places (OTHER) is never relevant.
+
+With an approved city identity (services/geo_match.py) "names the city" means the City +
+Region + Country identity: homonyms ("Santiago de Cali", Houston, Mississippi) are blanked
+first, a bare name in a document about another country or region doesn't count, and the
+city's own website must not belong to another country. Without one, names are matched as
+before.
 """
 
 import hashlib
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 from water_source_research.discovery.normalize import host_names_org, is_city_domain
 from water_source_research.schemas.research import CityResearchState, EvidenceChunk, FieldDefinition
+from water_source_research.services.geo_match import (
+    UNKNOWN_SCOPE, DocumentScope, GeoMatcher, document_scopes, identity_signature, matcher_for,
+)
 from water_source_research.services.places import HYDRONYM, city_pattern, without_water_bodies
 
 CITY_NEARBY = "CITY_NEARBY"
@@ -80,6 +89,26 @@ class RelevanceContext:
     city_hosts: frozenset[str]  # the city's own website(s)
     verified_hosts: frozenset[str]
     features: frozenset[str]  # name_keys of the city's known water features
+    # Approved identity only: the document scope per URL and the matcher.
+    scopes: Mapping[str, DocumentScope] = field(default_factory=dict)
+    matcher: GeoMatcher | None = None
+
+    def scope(self, url: str) -> DocumentScope:
+        return self.scopes.get(url, UNKNOWN_SCOPE)
+
+    def place_text(self, chunk: EvidenceChunk) -> str:
+        """The chunk text with other places that share the city's name blanked (unchanged
+        without an approved identity)."""
+        if self.matcher is None:
+            return chunk.text
+        return self.matcher.neutralize(chunk.text, self.scope(chunk.url)).text
+
+    def geo_note(self, chunk: EvidenceChunk) -> str | None:
+        """Why the chunk's document counts as about the city or elsewhere (item metadata)."""
+        if self.matcher is None:
+            return None
+        s = self.scope(chunk.url)
+        return f"{s.label()}: {'; '.join(s.reasons)}"
 
     def doc_names_city(self, chunk: EvidenceChunk) -> bool:
         pages = self.city_pages.get(chunk.url)
@@ -137,14 +166,22 @@ def _relation_targets(state: CityResearchState) -> list[str]:
 def build_relevance_context(state: CityResearchState,
                             chunks: Sequence[EvidenceChunk]) -> RelevanceContext:
     city, country = state.city_name, state.country
+    matcher = matcher_for(city, country)
+    scopes = document_scopes(matcher, chunks) if matcher else {}
+
+    def names(text: str, url: str) -> bool:
+        if matcher is None:
+            return _names_city(text, city)
+        return matcher.names_city(text, scopes.get(url, UNKNOWN_SCOPE))
+
     pages: dict[str, set[int | None]] = {}
     hydronyms: set[str] = set()
     for c in chunks:
-        if not _names_city(c.text, city):
+        if not names(c.text, c.url):
             continue
         pages.setdefault(c.url, set()).add(c.page_number)
         for s in _SENTENCE.split(c.text):
-            if s.strip() and _names_city(s, city):
+            if s.strip() and names(s, c.url):
                 hydronyms.update(m.group(0) for m in HYDRONYM.finditer(s))
     excluded = {name_key(x) for x in (city, country) if x}
     features = {k for v in (*hydronyms, *(v for f in _SOURCE_FIELDS
@@ -153,20 +190,25 @@ def build_relevance_context(state: CityResearchState,
                 if (k := _feature_key(v)) and k not in excluded}
     from water_source_research.services.semantics import service_statement_url
     hosts = {h for c in chunks if (h := _host(c.url))}
+    elsewhere = {h for h in hosts if scopes and all(
+        s.elsewhere for u, s in scopes.items() if _host(u) == h)}
+    texts = [(c.text if matcher is None else matcher.neutralize(
+        c.text, scopes.get(c.url, UNKNOWN_SCOPE)).text, c.url) for c in chunks]
     verified: set[str] = set()
     for name in dict.fromkeys(_claim_values(state, "utility_name")):
-        corroborating = {h for h in hosts if host_names_org(name, h)}
-        if corroborating and service_statement_url(((c.text, c.url) for c in chunks),
-                                                   name, city):
+        corroborating = {h for h in hosts if host_names_org(name, h)} - elsewhere
+        if corroborating and service_statement_url(iter(texts), name, city):
             verified |= corroborating
     return RelevanceContext({u: frozenset(p) for u, p in pages.items()},
-                            frozenset(h for h in hosts if is_city_domain(h, city)),
-                            frozenset(verified), frozenset(features))
+                            frozenset(h for h in hosts if is_city_domain(h, city)
+                                      and h not in elsewhere),
+                            frozenset(verified), frozenset(features), scopes, matcher)
 
 def context_signature(state: CityResearchState, chunks: Iterable[EvidenceChunk]) -> str:
     """Memo key for ``build_relevance_context``: everything it reads."""
     h = hashlib.sha256()
     h.update(f"{state.city_name}|{state.country}".encode())
+    h.update(identity_signature(state.city_name, state.country).encode())
     for key in GATE_FIELDS:
         h.update(f"|{key}:".encode())
         for v in sorted(_claim_values(state, key)):

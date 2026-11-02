@@ -3,7 +3,7 @@ status: DRAFT
 note: 'Drafted by scripts/build_city_identity.py from GeoNames and Wikidata; a person reviews each entry
   and sets its status to APPROVED. Identity only: never utilities, water sources or research answers.
   The reference workbook is not an input.'
-generated_at: '2026-11-02T00:18:40+00:00'
+generated_at: '2026-11-02T00:23:40+00:00'
 sources:
   geonames:
     license: CC BY 4.0
@@ -110,6 +110,7 @@ cities:
   ids:
     geonames: '2240449'
     wikidata: Q3897
+    wikidata_country: Q916
   names:
   - name: Loanda
     kind: HISTORICAL_SPELLING
@@ -301,6 +302,10 @@ cities:
     iso2: AT
     iso3: AUT
     cctld: at
+    names:
+    - Österreich
+    - Ausztria
+    - Austrija
     languages:
     - de
     - hr
@@ -308,6 +313,7 @@ cities:
   ids:
     geonames: '2761369'
     wikidata: Q1741
+    wikidata_country: Q40
   names:
   - name: Wien
     kind: OFFICIAL_LOCAL
@@ -439,6 +445,8 @@ cities:
     iso2: BR
     iso3: BRA
     cctld: br
+    names:
+    - Brasil
     languages:
     - pt
     - es
@@ -446,6 +454,7 @@ cities:
   ids:
     geonames: '3405870'
     wikidata: Q12829733
+    wikidata_country: Q155
   names:
   - name: Mairi
     kind: OFFICIAL_LOCAL
@@ -656,6 +665,8 @@ cities:
     iso2: BR
     iso3: BRA
     cctld: br
+    names:
+    - Brasil
     languages:
     - pt
     - es
@@ -663,6 +674,7 @@ cities:
   ids:
     geonames: '3469058'
     wikidata: Q2844
+    wikidata_country: Q155
   homonyms:
   - name: Brasília de Minas
     country: Brazil
@@ -744,12 +756,15 @@ cities:
     iso2: CM
     iso3: CMR
     cctld: cm
+    names:
+    - Cameroun
     languages:
     - en
     - fr
   ids:
     geonames: '2232593'
     wikidata: Q132830
+    wikidata_country: Q1009
   unverified_names:
   - name: Douala City
     lang: en
@@ -804,6 +819,8 @@ cities:
     iso2: CA
     iso3: CAN
     cctld: ca
+    names:
+    - ᑲᓇᑕ
     languages:
     - en
     - fr
@@ -811,6 +828,7 @@ cities:
   ids:
     geonames: '6167865'
     wikidata: Q172
+    wikidata_country: Q16
   names:
   - name: City of Toronto
     kind: OFFICIAL_LOCAL
@@ -1000,6 +1018,7 @@ cities:
   ids:
     geonames: '3871336'
     wikidata: Q2887
+    wikidata_country: Q298
   names:
   - name: Santiago de Chile
     kind: OFFICIAL_LOCAL
@@ -1495,6 +1514,7 @@ cities:
   ids:
     geonames: '3688689'
     wikidata: Q2841
+    wikidata_country: Q739
   names:
   - name: Santafé de Bogotá
     kind: HISTORICAL_SPELLING
@@ -1593,6 +1613,7 @@ cities:
   ids:
     geonames: '3687925'
     wikidata: Q51103
+    wikidata_country: Q739
   names:
   - name: Santiago de Cali
     kind: OFFICIAL_LOCAL
@@ -1707,12 +1728,14 @@ cities:
     cctld: cz
     names:
     - Czechia
+    - Česko
     languages:
     - cs
     - sk
   ids:
     geonames: '3067696'
     wikidata: Q1085
+    wikidata_country: Q213
   names:
   - name: Praha
     kind: OFFICIAL_LOCAL
@@ -1848,6 +1871,7 @@ cities:
   ids:
     geonames: '3652462'
     wikidata: Q2900
+    wikidata_country: Q736
   names:
   - name: San Francisco de Quito
     kind: OFFICIAL_LOCAL
@@ -1937,6 +1961,7 @@ cities:
   ids:
     geonames: '3583361'
     wikidata: Q3110
+    wikidata_country: Q792
   context_names:
   - name: Metropolitan Area of San Salvador
     lang: en
@@ -2070,6 +2095,9 @@ cities:
     iso2: ET
     iso3: ETH
     cctld: et
+    names:
+    - ኢትዮጵያ
+    - Itoophiyaa
     languages:
     - am
     - en
@@ -2077,6 +2105,7 @@ cities:
   ids:
     geonames: '344979'
     wikidata: Q3624
+    wikidata_country: Q115
   names:
   - name: አዲስ አበባ
     kind: OFFICIAL_LOCAL
@@ -2215,12 +2244,16 @@ cities:
     iso2: FI
     iso3: FIN
     cctld: fi
+    names:
+    - Suomi
+    - Suomâ
     languages:
     - fi
     - sv
   ids:
     geonames: '658225'
     wikidata: Q1757
+    wikidata_country: Q33
   names:
   - name: Helsingin kaupunki
     kind: OFFICIAL_LOCAL
@@ -2500,6 +2533,8 @@ cities:
     iso2: FR
     iso3: FRA
     cctld: fr
+    names:
+    - Frañs
     languages:
     - fr
     - br
@@ -2507,6 +2542,7 @@ cities:
   ids:
     geonames: '2988507'
     wikidata: Q90
+    wikidata_country: Q142
   names:
   - name: Pariz
     lang: br
@@ -2738,11 +2774,14 @@ cities:
     iso2: DE
     iso3: DEU
     cctld: de
+    names:
+    - Deutschland
     languages:
     - de
   ids:
     geonames: '2911298'
     wikidata: Q1055
+    wikidata_country: Q183
   names:
   - name: Freie und Hansestadt Hamburg
     kind: OFFICIAL_LOCAL
@@ -2903,6 +2942,7 @@ cities:
   ids:
     geonames: '2298890'
     wikidata: Q182059
+    wikidata_country: Q117
   names:
   - name: Coomassie
     lang: en
@@ -2982,6 +3022,9 @@ cities:
     iso2: GR
     iso3: GRC
     cctld: gr
+    names:
+    - Ελλάδα
+    - Grèce
     languages:
     - el
     - en
@@ -2989,6 +3032,7 @@ cities:
   ids:
     geonames: '264371'
     wikidata: Q1524
+    wikidata_country: Q41
   names:
   - name: Αθήνα
     kind: OFFICIAL_LOCAL
@@ -3224,6 +3268,9 @@ cities:
     iso2: IN
     iso3: IND
     cctld: in
+    names:
+    - भारत
+    - ভারত
     languages:
     - en
     - hi
@@ -3231,6 +3278,7 @@ cities:
   ids:
     geonames: '1279259'
     wikidata: Q42941
+    wikidata_country: Q668
   names:
   - name: आगरा
     kind: OFFICIAL_LOCAL
@@ -3320,6 +3368,9 @@ cities:
     iso2: IN
     iso3: IND
     cctld: in
+    names:
+    - भारत
+    - ভারত
     languages:
     - en
     - hi
@@ -3327,6 +3378,7 @@ cities:
   ids:
     geonames: '1269843'
     wikidata: Q1361
+    wikidata_country: Q668
   names:
   - name: హైదరాబాద్
     kind: OFFICIAL_LOCAL
@@ -3487,6 +3539,9 @@ cities:
     iso2: IN
     iso3: IND
     cctld: in
+    names:
+    - भारत
+    - ভারত
     languages:
     - en
     - hi
@@ -3494,6 +3549,7 @@ cities:
   ids:
     geonames: '1269515'
     wikidata: Q66485
+    wikidata_country: Q668
   names:
   - name: जयपुर
     kind: OFFICIAL_LOCAL
@@ -3628,6 +3684,9 @@ cities:
     iso2: IN
     iso3: IND
     cctld: in
+    names:
+    - भारत
+    - ভারত
     languages:
     - en
     - hi
@@ -3635,6 +3694,7 @@ cities:
   ids:
     geonames: '1265873'
     wikidata: Q28729
+    wikidata_country: Q668
   names:
   - name: कोष़िक्कोड
     lang: hi
@@ -3759,6 +3819,9 @@ cities:
     iso2: IN
     iso3: IND
     cctld: in
+    names:
+    - भारत
+    - ভারত
     languages:
     - en
     - hi
@@ -3766,6 +3829,7 @@ cities:
   ids:
     geonames: '1259229'
     wikidata: Q1538
+    wikidata_country: Q668
   names:
   - name: पुणे
     kind: OFFICIAL_LOCAL
@@ -3939,6 +4003,8 @@ cities:
     iso2: ID
     iso3: IDN
     cctld: id
+    names:
+    - Indonesië
     languages:
     - id
     - en
@@ -3946,6 +4012,7 @@ cities:
   ids:
     geonames: '1649378'
     wikidata: Q10392
+    wikidata_country: Q252
   names:
   - name: Kota Bekasi
     kind: OFFICIAL_LOCAL
@@ -4101,6 +4168,9 @@ cities:
     iso2: IQ
     iso3: IRQ
     cctld: iq
+    names:
+    - العراق
+    - Իրաք
     languages:
     - ar
     - ku
@@ -4108,6 +4178,7 @@ cities:
   ids:
     geonames: '98182'
     wikidata: Q1530
+    wikidata_country: Q796
   names:
   - name: بغداد
     kind: OFFICIAL_LOCAL
@@ -4231,12 +4302,15 @@ cities:
     iso2: IE
     iso3: IRL
     cctld: ie
+    names:
+    - Éire
     languages:
     - en
     - ga
   ids:
     geonames: '2964574'
     wikidata: Q1761
+    wikidata_country: Q27
   names:
   - name: Baile Átha Cliath
     kind: OFFICIAL_LOCAL
@@ -4405,6 +4479,10 @@ cities:
     iso2: IT
     iso3: ITA
     cctld: it
+    names:
+    - Italia
+    - Italien
+    - Italie
     languages:
     - it
     - de
@@ -4412,6 +4490,7 @@ cities:
   ids:
     geonames: '3173435'
     wikidata: Q490
+    wikidata_country: Q38
   names:
   - name: Mailand
     lang: en
@@ -4589,6 +4668,10 @@ cities:
     iso2: IT
     iso3: ITA
     cctld: it
+    names:
+    - Italia
+    - Italien
+    - Italie
     languages:
     - it
     - de
@@ -4596,6 +4679,7 @@ cities:
   ids:
     geonames: '3169070'
     wikidata: Q220
+    wikidata_country: Q38
   names:
   - name: Roma
     kind: OFFICIAL_LOCAL
@@ -4846,11 +4930,14 @@ cities:
     iso2: JP
     iso3: JPN
     cctld: jp
+    names:
+    - 日本
     languages:
     - ja
   ids:
     geonames: '2128295'
     wikidata: Q37951
+    wikidata_country: Q17
   names:
   - name: 札幌市
     kind: OFFICIAL_LOCAL
@@ -5056,11 +5143,14 @@ cities:
     iso2: JP
     iso3: JPN
     cctld: jp
+    names:
+    - 日本
     languages:
     - ja
   ids:
     geonames: '2111149'
     wikidata: Q46747
+    wikidata_country: Q17
   names:
   - name: 仙台市
     kind: OFFICIAL_LOCAL
@@ -5276,6 +5366,7 @@ cities:
   ids:
     geonames: '184745'
     wikidata: Q3870
+    wikidata_country: Q114
   unverified_names:
   - name: Kenya's capital
     lang: en
@@ -5333,12 +5424,15 @@ cities:
     iso2: MG
     iso3: MDG
     cctld: mg
+    names:
+    - Madagasikara
     languages:
     - fr
     - mg
   ids:
     geonames: '1070940'
     wikidata: Q3915
+    wikidata_country: Q1019
   names:
   - name: Tananarive
     kind: OFFICIAL_LOCAL
@@ -5428,6 +5522,8 @@ cities:
     iso2: MY
     iso3: MYS
     cctld: my
+    names:
+    - 馬來西亞
     languages:
     - ms
     - en
@@ -5435,6 +5531,7 @@ cities:
   ids:
     geonames: '1735161'
     wikidata: Q1865
+    wikidata_country: Q833
   names:
   - name: KL
     kind: ABBREVIATION
@@ -5551,6 +5648,7 @@ cities:
   ids:
     geonames: '4005539'
     wikidata: Q9022
+    wikidata_country: Q96
   names:
   - name: Γουαδαλαχάρα (Μεξικό)
     kind: OFFICIAL_LOCAL
@@ -5738,6 +5836,7 @@ cities:
   ids:
     geonames: '3521081'
     wikidata: Q125293
+    wikidata_country: Q96
   names:
   - name: Heroica Puebla de Zaragoza
     kind: OFFICIAL_LOCAL
@@ -5956,12 +6055,15 @@ cities:
     cctld: nl
     names:
     - The Netherlands
+    - Nederland
+    - Nederlân
     languages:
     - nl
     - fy
   ids:
     geonames: '2759794'
     wikidata: Q727
+    wikidata_country: Q55
   unverified_names:
   - name: Mokum
     lang: en
@@ -6095,12 +6197,15 @@ cities:
     cctld: nl
     names:
     - The Netherlands
+    - Nederland
+    - Nederlân
     languages:
     - nl
     - fy
   ids:
     geonames: '2747891'
     wikidata: Q34370
+    wikidata_country: Q55
   unverified_names:
   - name: R'dam
     lang: en
@@ -6187,6 +6292,9 @@ cities:
     iso2: NG
     iso3: NGA
     cctld: ng
+    names:
+    - Najeriya
+    - Nàìjíríà
     languages:
     - en
     - ha
@@ -6194,6 +6302,7 @@ cities:
   ids:
     geonames: '2335204'
     wikidata: Q182984
+    wikidata_country: Q1033
   unverified_names:
   - name: birnin Kano
     lang: ha
@@ -6272,11 +6381,14 @@ cities:
     iso2: PT
     iso3: PRT
     cctld: pt
+    names:
+    - Pertual
     languages:
     - pt
   ids:
     geonames: '2267057'
     wikidata: Q597
+    wikidata_country: Q45
   names:
   - name: Lisboa
     kind: OFFICIAL_LOCAL
@@ -6430,6 +6542,7 @@ cities:
   ids:
     geonames: '683506'
     wikidata: Q19660
+    wikidata_country: Q218
   names:
   - name: București
     kind: OFFICIAL_LOCAL
@@ -6592,6 +6705,7 @@ cities:
   ids:
     geonames: '202061'
     wikidata: Q3859
+    wikidata_country: Q1037
   names:
   - name: Umujyi wa Kigali
     kind: OFFICIAL_LOCAL
@@ -6703,12 +6817,15 @@ cities:
     iso2: SN
     iso3: SEN
     cctld: sn
+    names:
+    - Senegaal
     languages:
     - fr
     - wo
   ids:
     geonames: '2253354'
     wikidata: Q3718
+    wikidata_country: Q1041
   names:
   - name: Ville de Dakar
     kind: OFFICIAL_LOCAL
@@ -6800,12 +6917,15 @@ cities:
     iso2: KR
     iso3: KOR
     cctld: kr
+    names:
+    - 대한민국
     languages:
     - ko
     - en
   ids:
     geonames: '1838524'
     wikidata: Q16520
+    wikidata_country: Q884
   names:
   - name: 부산
     kind: OFFICIAL_LOCAL
@@ -6982,6 +7102,9 @@ cities:
     iso2: ES
     iso3: ESP
     cctld: es
+    names:
+    - España
+    - Espanya
     languages:
     - es
     - ca
@@ -6989,6 +7112,7 @@ cities:
   ids:
     geonames: '3128760'
     wikidata: Q1492
+    wikidata_country: Q29
   unverified_names:
   - name: B'na
     lang: en
@@ -7219,6 +7343,9 @@ cities:
     iso2: ES
     iso3: ESP
     cctld: es
+    names:
+    - España
+    - Espanya
     languages:
     - es
     - ca
@@ -7226,6 +7353,7 @@ cities:
   ids:
     geonames: '3117735'
     wikidata: Q2807
+    wikidata_country: Q29
   unverified_names:
   - name: Magerit
     sources:
@@ -7349,6 +7477,10 @@ cities:
     iso2: SE
     iso3: SWE
     cctld: se
+    names:
+    - Svöörje
+    - Sverige
+    - Ruoŧŧa
     languages:
     - sv
     - se
@@ -7356,6 +7488,7 @@ cities:
   ids:
     geonames: '2673730'
     wikidata: Q1754
+    wikidata_country: Q34
   names:
   - name: Stockholbma
     lang: se
@@ -7461,6 +7594,10 @@ cities:
     iso2: TR
     iso3: TUR
     cctld: tr
+    names:
+    - Tırkiya
+    - Türkiye
+    - Tirkiye
     languages:
     - tr
     - ku
@@ -7468,6 +7605,7 @@ cities:
   ids:
     geonames: '323786'
     wikidata: Q3640
+    wikidata_country: Q43
   names:
   - name: آنقره
     kind: OFFICIAL_LOCAL
@@ -7538,6 +7676,9 @@ cities:
     iso2: UA
     iso3: UKR
     cctld: ua
+    names:
+    - Україна
+    - Украина
     languages:
     - uk
     - ru
@@ -7545,6 +7686,7 @@ cities:
   ids:
     geonames: '703448'
     wikidata: Q1899
+    wikidata_country: Q212
   names:
   - name: Київ
     kind: OFFICIAL_LOCAL
@@ -7726,6 +7868,9 @@ cities:
     iso2: GB
     iso3: GBR
     cctld: uk
+    names:
+    - Rìoghachd Aonaichte
+    - y Deyrnas Unedig
     languages:
     - en
     - cy
@@ -7733,6 +7878,7 @@ cities:
   ids:
     geonames: '2643743'
     wikidata: Q84
+    wikidata_country: Q145
   names:
   - name: Llundain
     lang: cy
@@ -8007,6 +8153,8 @@ cities:
     cctld: us
     names:
     - United States
+    - Estados Unidos
+    - ‘Amelika Hui Pū ‘ia
     languages:
     - en
     - es
@@ -8014,6 +8162,7 @@ cities:
   ids:
     geonames: '4887398'
     wikidata: Q1297
+    wikidata_country: Q30
   names:
   - name: City of Chicago
     kind: OFFICIAL_LOCAL
@@ -8247,6 +8396,8 @@ cities:
     cctld: us
     names:
     - United States
+    - Estados Unidos
+    - ‘Amelika Hui Pū ‘ia
     languages:
     - en
     - es
@@ -8254,6 +8405,7 @@ cities:
   ids:
     geonames: '4699066'
     wikidata: Q16555
+    wikidata_country: Q30
   unverified_names:
   - name: Space City
     lang: en
@@ -8502,6 +8654,8 @@ cities:
     cctld: us
     names:
     - United States
+    - Estados Unidos
+    - ‘Amelika Hui Pū ‘ia
     languages:
     - en
     - es
@@ -8509,6 +8663,7 @@ cities:
   ids:
     geonames: '5128581'
     wikidata: Q60
+    wikidata_country: Q30
   names:
   - name: New York
     kind: OFFICIAL_LOCAL
@@ -8878,6 +9033,8 @@ cities:
     cctld: us
     names:
     - United States
+    - Estados Unidos
+    - ‘Amelika Hui Pū ‘ia
     languages:
     - en
     - es
@@ -8885,6 +9042,7 @@ cities:
   ids:
     geonames: '5224151'
     wikidata: Q18383
+    wikidata_country: Q30
   unverified_names:
   - name: Providence (Rhode Island)
     lang: es
@@ -8998,6 +9156,8 @@ cities:
     cctld: us
     names:
     - United States
+    - Estados Unidos
+    - ‘Amelika Hui Pū ‘ia
     languages:
     - en
     - es
@@ -9005,6 +9165,7 @@ cities:
   ids:
     geonames: '5389489'
     wikidata: Q18013
+    wikidata_country: Q30
   names:
   - name: Kakalameko
     lang: haw
@@ -9191,6 +9352,7 @@ cities:
   ids:
     geonames: '1566083'
     wikidata: Q1854
+    wikidata_country: Q881
   names:
   - name: Thành phố Hồ Chí Minh
     kind: OFFICIAL_LOCAL
@@ -9417,6 +9579,7 @@ cities:
   ids:
     geonames: '1581130'
     wikidata: Q1858
+    wikidata_country: Q881
   names:
   - name: Hanoi
     lang: en
