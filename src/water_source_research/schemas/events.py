@@ -23,10 +23,12 @@ class EventKind(StrEnum):
     RESOLUTION = "RESOLUTION"  # one field/entity resolution decision (services/resolution.py)
     # A utility candidate's status changed (services/utility_registry.py): discovery provenance.
     UTILITY_STATUS = "UTILITY_STATUS"
+    # A host was suppressed for the run (agents/nodes.py::suppressed_hosts), or released.
+    HOST_SUPPRESSED = "HOST_SUPPRESSED"
 
 # Outcome bookkeeping, not research strategy: not part of distillation trajectories' steps.
 NON_PLANNING_KINDS = frozenset({EventKind.VALIDATION, EventKind.RESOLUTION,
-                                EventKind.UTILITY_STATUS})
+                                EventKind.UTILITY_STATUS, EventKind.HOST_SUPPRESSED})
 
 class EventResult(StrEnum):
     SUCCESS = "SUCCESS"
@@ -51,7 +53,7 @@ ALLOWED_ATTRS = frozenset({
     "validation_override", "reextraction", "new_chunks", "discovery_round",
     "usage_unknown_calls", "cached_tokens", "context_digest", "evidence_items", "skip_reason",
     "items_by_locality", "rule_hits", "persistent_cache_hits",
-    "utility", "roles", "hosts",
+    "utility", "roles", "hosts", "host", "policy",
 })
 MAX_ATTR_CHARS = 300
 

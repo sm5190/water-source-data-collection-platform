@@ -37,13 +37,23 @@ def test_site_query_on_the_known_utility_host():
     # only for fields that live on utility websites
     assert not any(q.startswith("site:") and "utility" in q for q in qs)
 
-def test_utility_hosts_come_from_acquired_utility_documents():
+def test_utility_hosts_come_only_from_verified_utilities():
+    """discovery-2: a host gets site: queries and acquisition priority only when the utility
+    registry verified its utility serves the city; a UTILITY classification alone (the saved
+    Santiago run's almarwater.com) never makes it one."""
     state = {"acquired_documents": [
-        {"status": "OK", "source_type": "UTILITY", "final_url": "https://nairobiwater.co.ke/a"},
-        {"status": "OK", "source_type": "UTILITY", "final_url": "https://nairobiwater.co.ke/b"},
-        {"status": "FAILED", "source_type": "UTILITY", "final_url": "https://down.example/"},
-        {"status": "OK", "source_type": "GOVERNMENT", "final_url": "https://wra.go.ke/x"}]}
+        {"status": "OK", "source_type": "UTILITY", "final_url": "https://almarwater.com/a"}],
+        "utility_registry": {"candidates": [
+            {"name": "Nairobi City Water", "status": "VERIFIED",
+             "verified_roles": ["DRINKING_WATER_OPERATOR"], "bound_hosts": ["nairobiwater.co.ke"]},
+            {"name": "Almar Water Solutions", "status": "NON_SERVING", "verified_roles": [],
+             "bound_hosts": ["almarwater.com"]},
+            {"name": "Sewer Co", "status": "SANITATION_ONLY",
+             "verified_roles": ["SANITATION_ONLY"], "bound_hosts": ["sewerco.example"]}]},
+        "suppressed_hosts": []}
     assert utility_hosts(state) == ["nairobiwater.co.ke"]
+    assert utility_hosts({**state, "suppressed_hosts": ["nairobiwater.co.ke"]}) == []
+    assert utility_hosts({"acquired_documents": state["acquired_documents"]}) == []
 
 def test_acquisition_takes_the_utility_host_first():
     candidates = [{"url": "https://gov.example/a", "source_type": "GOVERNMENT"},

@@ -25,6 +25,9 @@ class GraphState(TypedDict, total=False):
     # Utilities related to the city, by role, with evidence (schemas/utility.py
     # UtilityRegistry), as of the start of the latest discovery round / before validation.
     utility_registry: dict
+    # Hosts not fetched or site-searched again this run (commercial/directory hosts shown
+    # irrelevant; never government, regulatory, academic, technical or database hosts).
+    suppressed_hosts: list[str]
     context_bundle_ids: dict[str, str]  # field_key -> persisted ContextBundle id
     claims: list[dict]
     # Normalization/resolution (services/normalization.py, services/resolution.py).

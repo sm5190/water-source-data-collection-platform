@@ -88,6 +88,7 @@ def make_discover_node(
         if state.get("evidence_chunks"):  # the registry as of this round's start
             state = {**state, **await refresh_utility_registry(state, evidence_store, rounds,
                                                                "discover")}
+            state = {**state, **_record_suppression(state, rounds)}
         if discovery is None:  # no providers configured: nothing to discover
             return {**state, "candidate_urls": state.get("candidate_urls", []),
                     "discovery_rounds": rounds}
@@ -135,6 +136,23 @@ def utility_status_events(events: list[dict], previous: Mapping | None,
                 "reason_code": (c.get("status_reason") or "")[:300]})
     return events
 
+def _record_suppression(state: GraphState, round_no: int) -> GraphState:
+    """Recompute the run's suppressed hosts; HOST_SUPPRESSED events for changes."""
+    now = suppressed_hosts(state)
+    before = set(state.get("suppressed_hosts") or [])
+    events = list(state.get("events", []))
+    for host in sorted(set(now) - before):
+        events = append_event(events, kind=EventKind.HOST_SUPPRESSED, node="discover",
+                              strategy="suppress", attrs={"host": host,
+                                                          "reason_code": now[host][:300],
+                                                          "discovery_round": round_no})
+    for host in sorted(before - set(now)):
+        events = append_event(events, kind=EventKind.HOST_SUPPRESSED, node="discover",
+                              strategy="release", attrs={"host": host,
+                                                         "reason_code": "relevant evidence",
+                                                         "discovery_round": round_no})
+    return {"suppressed_hosts": sorted(now), "events": events}
+
 async def refresh_utility_registry(state: GraphState, evidence_store: EvidenceRepository | None,
                                    round_no: int, node: str) -> GraphState:
     """Rebuild the utility registry from the run's evidence and claims; record changes as
@@ -155,16 +173,97 @@ async def refresh_utility_registry(state: GraphState, evidence_store: EvidenceRe
     return {"utility_registry": data, "events": events}
 
 def utility_hosts(state: GraphState) -> list[str]:
-    """Hosts of successfully acquired documents classified as the city's utility, most
-    documents first (site-restricted queries and acquisition priority)."""
-    counts: dict[str, int] = {}
-    for d in state.get("acquired_documents", []):
-        if d.get("status") == "OK" and (d.get("source_type") or "").upper() == "UTILITY":
-            host = (urlsplit(d.get("final_url") or d.get("requested_url") or "").hostname
-                    or "").removeprefix("www.")
-            if host:
-                counts[host] = counts.get(host, 0) + 1
-    return sorted(counts, key=lambda h: -counts[h])
+    """Hosts of utilities verified to supply the city's drinking water (the utility
+    registry), not suppressed: the only hosts that get site-restricted queries and
+    acquisition priority. A UTILITY classification alone never makes a host one."""
+    registry = state.get("utility_registry") or {}
+    suppressed = set(state.get("suppressed_hosts") or [])
+    out: list[str] = []
+    for c in registry.get("candidates", []):
+        if c.get("status") == "VERIFIED" and set(c.get("verified_roles") or []) & {
+                "DRINKING_WATER_OPERATOR", "WHOLESALE_SUPPLIER"}:
+            out += [h for h in c.get("bound_hosts") or [] if h not in suppressed]
+    return list(dict.fromkeys(out))
+
+# Publisher kinds whose hosts may be suppressed, and those that never are.
+SUPPRESSIBLE_KINDS = frozenset({"COMMERCIAL", "DIRECTORY"})
+PROTECTED_KINDS = frozenset({"GOVERNMENT", "REGULATOR", "ACADEMIC", "TECHNICAL",
+                             "INDEPENDENT_DATABASE", "UTILITY_OPERATOR"})
+PROTECTED_TYPES = frozenset({"GOVERNMENT", "REGULATORY", "ACADEMIC", "TECHNICAL"})
+NOT_SERVING = frozenset({"NON_SERVING", "OTHER_CITY"})
+
+def suppressed_hosts(state: GraphState) -> dict[str, str]:
+    """host -> reason, for this run: a commercial or directory host whose utility the
+    registry found not to serve the city, or with at least two acquired documents that are
+    all irrelevant (not about the city, its verified utility or its known water features).
+    Government, regulatory, academic, technical and database hosts are never suppressed, and
+    a host with any relevant document isn't (so suppression lifts when evidence appears)."""
+    from water_source_research.context_manager.relevance import build_relevance_context
+    docs = [d for d in state.get("acquired_documents", []) if d.get("status") == "OK"]
+    if not docs:
+        return {}
+    research = CityResearchState.model_validate(state["research_state"])
+    chunks = [EvidenceChunk.model_validate(c) for c in state.get("evidence_chunks", [])]
+    ctx = build_relevance_context(research, chunks)
+    by_url: dict[str, list[EvidenceChunk]] = {}
+    for c in chunks:
+        by_url.setdefault(c.url, []).append(c)
+    registry = state.get("utility_registry") or {}
+    status_by_host = {h: c["status"] for c in registry.get("candidates", [])
+                      for h in c.get("bound_hosts") or []}
+    per_host: dict[str, list[dict]] = {}
+    for d in docs:
+        url = d.get("final_url") or d.get("requested_url") or ""
+        host = (urlsplit(url).hostname or "").removeprefix("www.")
+        if host:
+            per_host.setdefault(host, []).append({**d, "_url": url})
+    out: dict[str, str] = {}
+    for host, ds in per_host.items():
+        kinds = {d.get("publisher_kind") for d in ds}
+        types = {(d.get("source_type") or "").upper() for d in ds}
+        if kinds & PROTECTED_KINDS or types & PROTECTED_TYPES or not kinds & SUPPRESSIBLE_KINDS:
+            continue
+
+        def relevant(d: dict, host: str = host) -> bool:
+            if ctx.scope(d["_url"]).elsewhere:
+                return False
+            return (d["_url"] in ctx.city_pages or host in ctx.verified_hosts
+                    or any(ctx.names_feature(c.text) for c in by_url.get(d["_url"], [])))
+        if any(relevant(d) for d in ds):
+            continue
+        if status_by_host.get(host) in NOT_SERVING:
+            out[host] = f"its utility candidate is {status_by_host[host]}"
+        elif len(ds) >= 2:
+            out[host] = f"{len(ds)} acquired documents, none about the city or its water"
+    return out
+
+def discovery_plan(state: GraphState, research: CityResearchState, events: list[dict]):
+    """The DiscoveryPlan for the next round (discovery/queries.py)."""
+    from water_source_research.context_manager.relevance import _claim_values, _feature_key
+    from water_source_research.discovery.queries import (
+        DiscoveryPlan, all_topics, ineffective_topics, place_terms,
+    )
+    from water_source_research.services.geo_match import matcher_for
+    matcher = matcher_for(research.city_name, research.country)
+    registry = state.get("utility_registry") or {}
+    cands = registry.get("candidates", [])
+    suppressed = set(state.get("suppressed_hosts") or [])
+    verified = [c for c in cands if c.get("status") == "VERIFIED"]
+    unverified = sorted((c for c in cands if c.get("status") in ("CANDIDATE",
+                                                                 "AMBIGUOUS_GEOGRAPHY")
+                         and not set(c.get("bound_hosts") or []) & suppressed),
+                        key=lambda c: (0 if "claim" in c.get("origins", []) else 1, c["name"]))
+    features = [v for key in ("water_source", "reservoir_names")
+                for v in _claim_values(research, key) if _feature_key(v)]
+    return DiscoveryPlan(
+        place=place_terms(matcher.identity) if matcher is not None else "",
+        verified_hosts=tuple(utility_hosts(state)),
+        verified_names=tuple(c["name"] for c in verified),
+        candidate_names=tuple(c["name"] for c in unverified),
+        predecessor_names=tuple(c["name"] for c in cands if c.get("status") == "HISTORICAL"),
+        features=tuple(dict.fromkeys(features)),
+        fallback=bool(registry) and not verified,  # once there is evidence
+        skip_topics=frozenset(ineffective_topics(events, all_topics())))
 
 async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefinition],
                     state: GraphState) -> GraphState:
@@ -183,7 +282,7 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
         and utility.status is FieldResolutionStatus.RESOLVED else None,
         field_keys=targets, fields=fields, planned_queries=state.get("planned_queries"),
         already_run=previous_queries(events), max_per_kind=settings.max_queries_per_round,
-        utility_hosts=utility_hosts(state))
+        plan=discovery_plan(state, research, events))
     status = dict(state.get("discovery_provider_status", {}))
     if not queries:
         return {"events": events, "discovery_provider_status": status,
@@ -212,7 +311,7 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
     previous = [SearchResult.from_dict(c) for c in state.get("discovery_candidates", [])]
     candidates = merge_and_rank(previous + outcome.candidates, research.city_name,
                                 max_per_host=settings.max_results_per_host,
-                                limit=settings.max_candidates_total)
+                                limit=settings.max_candidates_total, country=research.country)
     status.update(outcome.provider_status)
     kept = {k for c in outcome.candidates for k in dedupe_keys(c)}
     hits = [{"call_index": i, "result_index": n, "provider": call.provider,
@@ -255,9 +354,15 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
     Individual fetch failures are recorded, never raised; a failure to *persist* evidence
     does raise, so the run is retried rather than recorded without it."""
     previous = list(state.get("acquired_documents", []))
+    research = CityResearchState.model_validate(state["research_state"])
+    from water_source_research.context_manager.relevance import _claim_values
+    features = [v for key in ("water_source", "reservoir_names")
+                for v in _claim_values(research, key)]
     outcome = await acquisition.acquire_round(state.get("discovery_candidates", []), previous,
                                               round_no=state.get("discovery_rounds", 1),
-                                              priority_hosts=utility_hosts(state))
+                                              priority_hosts=utility_hosts(state),
+                                              skip_hosts=state.get("suppressed_hosts") or [],
+                                              features=features)
     chunks = list(state.get("evidence_chunks", []))
     known = {c["chunk_id"] for c in chunks}
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]

@@ -86,7 +86,7 @@ class DiscoveryService:
             found = [r for c in calls for r in c.results]
             with get_tracer().start_as_current_span("discovery.rank_results") as rank_span:
                 ranked = merge_and_rank(found, city, max_per_host=s.max_results_per_host,
-                                        limit=s.max_candidates_per_round)
+                                        limit=s.max_candidates_per_round, country=country)
                 rank_span.set_attribute("discovery.results_in", len(found))
                 rank_span.set_attribute("discovery.candidates_out", len(ranked))
             if self.crossref and s.crossref_verify_top_n > 0:
@@ -95,7 +95,7 @@ class DiscoveryService:
                     calls.append(verify)
                     ranked = merge_and_rank(ranked + verify.results, city,
                                             max_per_host=s.max_results_per_host,
-                                            limit=s.max_candidates_per_round)
+                                            limit=s.max_candidates_per_round, country=country)
             _count_retained(calls, ranked)
             status = _provider_status(calls)
             span.set_attribute("discovery.candidates", len(ranked))

@@ -45,9 +45,23 @@ def dedupe_keys(r: SearchResult) -> set[str]:
 def source_weight(r: SearchResult) -> float:
     return SOURCE_TYPE_WEIGHTS.get((r.source_type or "").upper(), UNKNOWN_SOURCE_WEIGHT)
 
+# Within a tier, results about another place sharing the city's name (approved identity).
+ELSEWHERE_FACTOR = 0.5
+AMBIGUOUS_FACTOR = 0.8
+
+def _place(results: list[SearchResult], city: str | None, country: str | None) -> None:
+    from water_source_research.services.geo_match import matcher_for
+    matcher = matcher_for(city, country)
+    if matcher is None:
+        return
+    for r in results:
+        scope = matcher.host_scope(r.url)
+        r.geo_scope = scope.label()
+        r.geo_status = matcher.match_place(f"{r.title}. {r.snippet or ''}", scope).status
+
 def merge_and_rank(results: Iterable[SearchResult], city: str | None = None, *,
                    max_per_host: int | None = None,
-                   limit: int | None = None) -> list[SearchResult]:
+                   limit: int | None = None, country: str | None = None) -> list[SearchResult]:
     results = list(results)
     for r in results:
         # Adapters classify without the city or the snippet; with them, the city's own site
@@ -61,6 +75,7 @@ def merge_and_rank(results: Iterable[SearchResult], city: str | None = None, *,
         if r.classification_version == CLASSIFICATION_VERSION and r.publisher_kind:
             continue
         set_classification(r, classify(r.url, r.title, r.provider, r.doi, city, r.snippet))
+    _place(results, city, country)
     groups = _group(results)
     merged = [_merge(g) for g in groups]
     city_key = fold(city or "").strip()
@@ -148,6 +163,11 @@ def _score(r: SearchResult, city_key: str) -> float:
         tier *= CITY_NOT_MENTIONED_FACTOR
     if not WATER_TERMS.search(haystack):
         tier *= NO_WATER_FACTOR
+    if r.geo_status in ("HOMONYM", "OTHER_PLACE") or r.geo_scope in ("OTHER_COUNTRY",
+                                                                      "OTHER_REGION"):
+        tier *= ELSEWHERE_FACTOR
+    elif r.geo_status == "AMBIGUOUS":
+        tier *= AMBIGUOUS_FACTOR
     providers = max(1, len(set(r.providers)))
     relevance = (1 / (RRF_K + (r.rank or 50))) * (1 + MULTI_PROVIDER_BONUS * (providers - 1))
     return round(tier + RELEVANCE_SCALE * relevance, 6)

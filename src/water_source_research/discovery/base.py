@@ -23,6 +23,10 @@ class SearchResult:
     publisher_kind: str | None = None
     classification_version: str | None = None
     classification_signals: list[str] = field(default_factory=list)
+    # Approved city identity only (services/geo_match.py): the place the title/snippet is
+    # about and the host's scope; other places sort last within their tier.
+    geo_status: str | None = None
+    geo_scope: str | None = None
     providers: list[str] = field(default_factory=list)
     provider_ids: dict[str, str] = field(default_factory=dict)
     query: str | None = None

@@ -26,3 +26,6 @@ RESOLUTION_POLICY_VERSION = "resolve-5"  # 5: official sources = verified utilit
 # Source classification rules (discovery/normalize.py::classify). Stored with each document and
 # discovery hit; NULL in older rows means classify-1.
 CLASSIFICATION_VERSION = "classify-2"
+# Discovery planning (discovery/queries.py DiscoveryPlan, agents/nodes.py): verified utility
+# hosts and names, verification and fallback searches, identity place terms, host suppression.
+DISCOVERY_POLICY_VERSION = "discovery-2"

@@ -56,20 +56,38 @@ class AcquisitionOutcome:
 def doc_key(url: str | None) -> str:
     return canonical_url(url) or (url or "")
 
+ELSEWHERE_PER_ROUND = 1
+
+def _elsewhere(c: Mapping[str, Any], features: Sequence[str]) -> bool:
+    """About another place sharing the city's name (approved identity; discovery ranking),
+    unless its title/snippet names one of the city's known water features."""
+    if not (c.get("geo_status") in ("HOMONYM", "OTHER_PLACE")
+            or c.get("geo_scope") in ("OTHER_COUNTRY", "OTHER_REGION")):
+        return False
+    text = f"{c.get('title') or ''} {c.get('snippet') or ''}".casefold()
+    return not any(f.casefold() in text for f in features)
+
 def select_candidates(candidates: list[Mapping[str, Any]],
                       attempted: set[str], settings: AcquisitionSettings,
-                      budget: int, priority_hosts: Sequence[str] = ()) -> list[Mapping[str, Any]]:
+                      budget: int, priority_hosts: Sequence[str] = (),
+                      skip_hosts: Sequence[str] = (),
+                      features: Sequence[str] = ()) -> list[Mapping[str, Any]]:
     """Up to ``budget`` (<= per-round cap) unattempted candidates, official tiers first,
     keeping discovery's ranking within a tier, at most ``max_per_host`` per host. Pages on a
-    host already identified as the city's utility (``priority_hosts``) come first."""
+    verified utility's host (``priority_hosts``) come first; pages about another place sharing
+    the city's name come last, at most ELSEWHERE_PER_ROUND per round; ``skip_hosts`` (hosts
+    suppressed for this run) are never fetched."""
     preferred = {h.removeprefix("www.") for h in priority_hosts}
+    skipped = {h.removeprefix("www.") for h in skip_hosts}
 
-    def on_preferred(c: Mapping[str, Any]) -> bool:
-        return (urlsplit(c.get("url") or "").hostname or "").removeprefix("www.") in preferred
+    def host_of(c: Mapping[str, Any]) -> str:
+        return (urlsplit(c.get("url") or "").hostname or "").removeprefix("www.")
 
     ordered = sorted(enumerate(candidates), key=lambda ic: (
-        0 if on_preferred(ic[1]) else 1,
+        1 if _elsewhere(ic[1], features) else 0,
+        0 if host_of(ic[1]) in preferred else 1,
         TIER_ORDER.get((ic[1].get("source_type") or "").upper(), OTHER_TIER), ic[0]))
+    elsewhere_taken = 0
     chosen: list[Mapping[str, Any]] = []
     per_host: dict[str, int] = {}
     keys: set[str] = set()
@@ -87,8 +105,12 @@ def select_candidates(candidates: list[Mapping[str, Any]],
         if parts.path.lower().endswith(SKIP_EXTENSIONS):
             continue
         host = (parts.hostname or "").removeprefix("www.")
-        if per_host.get(host, 0) >= settings.max_per_host:
+        if host in skipped or per_host.get(host, 0) >= settings.max_per_host:
             continue
+        if _elsewhere(c, features):
+            if elsewhere_taken >= ELSEWHERE_PER_ROUND:
+                continue
+            elsewhere_taken += 1
         per_host[host] = per_host.get(host, 0) + 1
         keys.add(key)
         chosen.append(c)
@@ -105,7 +127,9 @@ class AcquisitionService:
     async def acquire_round(self, candidates: list[Mapping[str, Any]],
                             previous: list[Mapping[str, Any]],
                             round_no: int = 1,
-                            priority_hosts: Sequence[str] = ()) -> AcquisitionOutcome:
+                            priority_hosts: Sequence[str] = (),
+                            skip_hosts: Sequence[str] = (),
+                            features: Sequence[str] = ()) -> AcquisitionOutcome:
         """Acquire new documents for one round. ``previous`` are earlier document records
         (any status), used for de-duplication and the per-run budget. Never raises."""
         attempted = set()
@@ -121,7 +145,8 @@ class AcquisitionService:
         outcome = AcquisitionOutcome()
         if budget <= 0:
             return outcome
-        chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts)
+        chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts,
+                                   skip_hosts, features)
         results = await asyncio.gather(*(self._fetch_one(c) for c in chosen))
 
         # Sequential, in selection order: deterministic de-duplication and chunking.
