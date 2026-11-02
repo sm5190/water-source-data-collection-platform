@@ -17,7 +17,7 @@ from water_source_research.context_manager.manager import (
 )
 from .base import SearchResult
 from .normalize import (
-    SCHOLARLY_PROVIDERS, canonical_url, classify_source_type, fold, normalize_doi,
+    CLASSIFICATION_VERSION, SCHOLARLY_PROVIDERS, canonical_url, classify, fold, normalize_doi,
     normalize_title,
 )
 
@@ -50,9 +50,17 @@ def merge_and_rank(results: Iterable[SearchResult], city: str | None = None, *,
                    limit: int | None = None) -> list[SearchResult]:
     results = list(results)
     for r in results:
-        # Adapters classify without the city; with it, the city's own site is municipal.
-        if r.source_type in (None, "OTHER") and r.provider not in SCHOLARLY_PROVIDERS:
-            r.source_type = classify_source_type(r.url, r.title, r.provider, r.doi, city)
+        # Adapters classify without the city or the snippet; with them, the city's own site
+        # is municipal and the snippet can show a commercial company. Results classified
+        # under these rules already are kept as they are.
+        if r.provider in SCHOLARLY_PROVIDERS and r.source_type:
+            if r.classification_version is None:
+                r.publisher_kind = r.publisher_kind or "ACADEMIC"
+                r.classification_version = CLASSIFICATION_VERSION
+            continue
+        if r.classification_version == CLASSIFICATION_VERSION and r.publisher_kind:
+            continue
+        set_classification(r, classify(r.url, r.title, r.provider, r.doi, city, r.snippet))
     groups = _group(results)
     merged = [_merge(g) for g in groups]
     city_key = fold(city or "").strip()
@@ -92,10 +100,15 @@ def _group(results: list[SearchResult]) -> list[list[SearchResult]]:
         groups.setdefault(find(i), []).append(r)
     return list(groups.values())
 
+def set_classification(r: SearchResult, c) -> None:
+    r.source_type, r.publisher_kind = c.source_type, c.publisher_kind
+    r.classification_version, r.classification_signals = c.version, list(c.signals)
+
 def _merge(group: list[SearchResult]) -> SearchResult:
     for r in group:
         if not r.source_type:
-            r.source_type = classify_source_type(r.url, r.title, r.provider, r.doi)
+            set_classification(r, classify(r.url, r.title, r.provider, r.doi,
+                                           snippet=r.snippet))
     # The representative is the most official, best-ranked record (keeps its original URL);
     # a Crossref record only fills in metadata unless it is all we have.
     primary = min(group, key=lambda r: (-source_weight(r), r.provider == "crossref",

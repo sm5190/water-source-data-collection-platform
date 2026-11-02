@@ -12,13 +12,14 @@ run, so the replay gets its own document ids; the original is found again by
 
 from collections.abc import Mapping
 from typing import Any
-from water_source_research.discovery.normalize import reclassify
+from water_source_research.discovery.normalize import reclassified_columns
 from water_source_research.schemas.research import EvidenceChunk
 from water_source_research.services.evidence_store import EvidenceRepository
 from .service import AcquisitionOutcome
 
 # Columns copied from the parent's document records (the rest are recomputed by the run).
 _COPIED = ("requested_url", "canonical_url", "final_url", "title", "source_type",
+           "publisher_kind", "classification_version", "classification_signals",
            "acquisition_method", "media_type", "retrieved_at", "source_date", "content_sha256",
            "byte_size", "page_count", "status", "error_kind", "error_message", "raw_object_key",
            "discovery_provider", "discovery_query", "duration_ms")
@@ -61,12 +62,13 @@ class ReplayAcquisition:
                 continue
             record = {k: doc.get(k) for k in _COPIED}
             if self.city is not None:
-                current = reclassify(record, self.city)
-                if current != record["source_type"]:
+                update = reclassified_columns(record, self.city)
+                if update and update["source_type"] != record["source_type"]:
                     self.reclassified.append({"url": record.get("final_url")
                                               or record.get("requested_url"),
-                                              "from": record["source_type"], "to": current})
-                    record["source_type"] = current
+                                              "from": record["source_type"],
+                                              "to": update["source_type"]})
+                record.update(update)
             record["round"] = round_no
             record["chunks"] = 0
             if doc.get("status") == "OK":

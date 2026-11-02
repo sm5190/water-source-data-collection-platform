@@ -4,8 +4,10 @@ import re
 from collections.abc import Mapping
 from typing import Any
 import unicodedata
+from dataclasses import dataclass
 from datetime import date
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
+from water_source_research.core.versions import CLASSIFICATION_VERSION
 
 _DOI = re.compile(r"10\.\d{4,9}/\S+", re.IGNORECASE)
 _DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/",
@@ -124,89 +126,190 @@ _ACADEMIC_TLD = re.compile(r"\.(edu|ac\.[a-z]{2}|edu\.[a-z]{2})$")
 _TECHNICAL = re.compile(r"\b(technical report|master plan|feasibility|assessment|"
                         r"study|annual report|water quality report|ccr)\b", re.IGNORECASE)
 
-# Directory-style pages (lists, members, profiles) of networks and aggregators.
-_DIRECTORY_PATH = re.compile(r"/(members?|directory|list|lists|profiles?|utilities|conflict|"
-                             r"companies)(/|$)", re.IGNORECASE)
+# Directory-style pages (lists, members, profiles) of networks and aggregators: a path
+# segment naming one, alone or within a slug ("/our-members/x", "/member-profile-12").
+_DIRECTORY_PATH = re.compile(
+    r"/(members?|directory|directories|list|lists|listings?|profiles?|utilities|conflict|"
+    r"companies|rankings?)(/|$)|/(?:[\w-]*-)?(members?|membership|profiles?)(?:-[\w-]*)?(/|$)",
+    re.IGNORECASE)
 # Corporate reporting of companies outside the water sector (energy, oil, banking): never a
 # technical water source, whatever its format.
 _CORPORATE_REPORT = re.compile(r"\b(annual|financial|integrated|sustainability)[\s_-]+report|"
                                r"annual[\s_-]+financial|\b10-?k\b", re.IGNORECASE)
 _WATER_CONTEXT = re.compile(r"water|wasser|agua|água|eau|acqua|vatten|vesi|woda|utilit|sewer|"
                             r"sanita|hydro|municip|city|council|gov", re.IGNORECASE)
+# News outlets: a host label made of a news word ("riotimesonline", "dailynews") or a wire
+# service. Generic vocabulary, not a list of sites.
+_NEWS_HOST = re.compile(r"(news|times|post|tribune|herald|journal|gazette|daily|chronicle|"
+                        r"telegraph|guardian|observer|courier|reuters|bloomberg|apnews|bbc|cnn|"
+                        r"noticias|diario|periodico|jornal|zeitung|nachrichten|journalde|"
+                        r"lemonde|elpais|prensa|tribuna|cronica)", re.IGNORECASE)
+# A company name with a commercial suffix: "<X> Water Solutions", "<X> Water Technologies".
+_COMMERCIAL_ORG = re.compile(
+    r"\b(?:[A-Z][\w.'&]*\s+){1,3}Water\s+(Solutions|Technologies|Technology|Group|Systems|"
+    r"International|Engineering|Consulting|Holdings|Ventures|Partners|Infrastructure|Capital|"
+    r"Projects|Products|Equipment|Treatment\s+Systems)\b")
+# A "...water" host label made of a generic word is an aggregator, campaign or brand, not a
+# utility named after its place or system (thameswater, sydneywater, denverwater).
+_GENERIC_WATER_PREFIX = re.compile(
+    r"^(world|global|international|clean|safe|pure|blue|smart|best|my|your|the|fresh|home|tap|"
+    r"tapp|drinking|save|life|wise|eco|green|aqua|one|all|every|open|true|good|healthy|rain|"
+    r"know|water|hidden|sustainable|future|planet)water$")
+# Independent datasets and statistics portals (not a publisher of the city's own numbers).
+_DATABASE_HOST = re.compile(r"(^|\.)(data|stats|statistics|aquastat|database)\.|"
+                            r"(tapwaterdata|waterdata|opendata)", re.IGNORECASE)
 
 def _non_water_corporate_report(url: str, host: str, title: str) -> bool:
     return bool(_CORPORATE_REPORT.search(f"{title} {url}")) and not (
         _WATER_CONTEXT.search(host) or _WATER_CONTEXT.search(title))
 
-def classify_source_type(url: str | None, title: str | None = None, provider: str = "",
-                         doi: str | None = None, city: str | None = None) -> str:
-    """Heuristic source tier used for ranking discovery candidates.
+@dataclass(frozen=True, slots=True)
+class Classification:
+    """Source authority as classified from the URL, title and snippet (never the city's
+    relevance: that is judged per run, services/geo_match.py and the utility registry).
 
-    Returns one of UTILITY, GOVERNMENT, REGULATORY, TECHNICAL, ACADEMIC, OTHER (the same
-    vocabulary as ``EvidenceChunk.source_type``). With ``city``, the city's own domain
-    (toronto.ca, madrid.es, cityofsydney.nsw.gov.au) counts as municipal government.
-    """
+    ``source_type`` is the tier used everywhere (UTILITY, GOVERNMENT, REGULATORY, TECHNICAL,
+    ACADEMIC, OTHER); ``publisher_kind`` says who published it (UTILITY_OPERATOR, GOVERNMENT,
+    REGULATOR, ACADEMIC, TECHNICAL, INDEPENDENT_DATABASE, NEWS, DIRECTORY, COMMERCIAL, OTHER);
+    ``signals`` are the rules that decided it."""
+    source_type: str
+    publisher_kind: str
+    signals: tuple[str, ...] = ()
+    version: str = CLASSIFICATION_VERSION
+
+def classify(url: str | None, title: str | None = None, provider: str = "",
+             doi: str | None = None, city: str | None = None,
+             snippet: str | None = None) -> Classification:
+    """Classification v2 (CLASSIFICATION_VERSION). Directory, news, aggregator and
+    commercial pages are recognised before any utility rule, and a "...water" host label
+    makes a page a utility only without commercial or generic-brand signals."""
     host = (urlsplit(url).hostname or "").lower() if url else ""
     title = title or ""
+    path = urlsplit(url).path if url else ""
     if host and _ACADEMIC_HOST.search(host):
-        return "ACADEMIC"
+        return Classification("ACADEMIC", "ACADEMIC", ("academic host",))
     if host and _SECONDARY_HOST.search(host):
-        return "OTHER"
+        return Classification("OTHER", "OTHER", ("encyclopedia or social site",))
     if host and _GOV_HOST.search(host):
-        return "REGULATORY" if _REGULATORY.search(title) else "GOVERNMENT"
+        if _REGULATORY.search(title):
+            return Classification("REGULATORY", "REGULATOR", ("government host",
+                                                               "regulatory title"))
+        return Classification("GOVERNMENT", "GOVERNMENT", ("government host",))
     if host and _MUNICIPAL_HOST.search(host):
-        return "GOVERNMENT"
+        return Classification("GOVERNMENT", "GOVERNMENT", ("municipal host",))
     if provider in SCHOLARLY_PROVIDERS or doi:
-        return "ACADEMIC"
+        return Classification("ACADEMIC", "ACADEMIC", ("scholarly provider or DOI",))
     if host and _ACADEMIC_TLD.search(host):
-        return "ACADEMIC"
-    if _is_utility(url or "", host, title, city):
-        return "UTILITY"
+        return Classification("ACADEMIC", "ACADEMIC", ("academic domain",))
+    labels = [label.replace("-", "") for label in host.removeprefix("www.").split(".")[:-1]
+              if label not in _GENERIC_LABELS]
+    if _DIRECTORY_PATH.search(path):
+        return Classification("OTHER", "DIRECTORY", ("directory path",))
+    if any(_NEWS_HOST.search(label) for label in labels):
+        return Classification("OTHER", "NEWS", ("news host",))
+    utility = _utility_signal(url or "", host, labels, title, snippet or "", city)
+    if utility == "commercial":
+        return Classification("OTHER", "COMMERCIAL", ("commercial water company",))
+    if utility == "aggregator":
+        return Classification("OTHER", "DIRECTORY", ("generic water brand host",))
+    if utility:
+        return Classification("UTILITY", "UTILITY_OPERATOR", (utility,))
     if host and city and _is_city_domain(host, city):
-        return "GOVERNMENT"
+        return Classification("GOVERNMENT", "GOVERNMENT", ("city domain",))
     if _REGULATORY.search(title):
-        return "REGULATORY"
+        return Classification("REGULATORY", "REGULATOR", ("regulatory title",))
     if _non_water_corporate_report(url or "", host, title):
-        return "OTHER"
+        return Classification("OTHER", "COMMERCIAL", ("non-water corporate report",))
+    if host and _DATABASE_HOST.search(host):
+        return Classification("TECHNICAL", "INDEPENDENT_DATABASE", ("dataset host",))
     if _TECHNICAL.search(title) or (url or "").lower().split("?")[0].endswith(".pdf"):
-        return "TECHNICAL"
-    return "OTHER"
+        return Classification("TECHNICAL", "TECHNICAL", ("technical title or PDF",))
+    if _EDITORIAL_PATH.search(path) or _EDITORIAL_TITLE.search(title):
+        return Classification("OTHER", "NEWS", ("editorial path or title",))
+    return Classification("OTHER", "OTHER", ())
 
-def reclassify(record: Mapping[str, Any], city: str | None) -> str | None:
-    """The source type a stored document gets under the current rules (replays, reprocessing
-    and revalidation re-check what was stored when it was fetched). Academic labels from a
-    scholarly provider or DOI are kept: the provider is the evidence for them."""
-    old = record.get("source_type")
+def classify_source_type(url: str | None, title: str | None = None, provider: str = "",
+                         doi: str | None = None, city: str | None = None,
+                         snippet: str | None = None) -> str:
+    """The source tier (see ``classify``). With ``city``, the city's own domain (toronto.ca,
+    madrid.es, cityofsydney.nsw.gov.au) counts as municipal government."""
+    return classify(url, title, provider, doi, city, snippet).source_type
+
+def reclassify_record(record: Mapping[str, Any], city: str | None) -> Classification | None:
+    """The classification a stored document gets under the current rules (replays,
+    reprocessing and revalidation re-check what was stored when it was fetched). Academic
+    labels from a scholarly provider or DOI are kept: the provider is the evidence for them."""
     url = record.get("final_url") or record.get("requested_url") or record.get("canonical_url")
     if not url:
-        return old
-    new = classify_source_type(url, record.get("title"),
-                               provider=record.get("discovery_provider") or "", city=city)
-    if old == "ACADEMIC" and new != "ACADEMIC":
-        return old
+        return None
+    new = classify(url, record.get("title"), provider=record.get("discovery_provider") or "",
+                   city=city)
+    if record.get("source_type") == "ACADEMIC" and new.source_type != "ACADEMIC":
+        return Classification("ACADEMIC", "ACADEMIC", ("kept: academic when acquired",))
     return new
 
-def _is_utility(url: str, host: str, title: str, city: str | None) -> bool:
+def reclassify(record: Mapping[str, Any], city: str | None) -> str | None:
+    """The source type under the current rules (see ``reclassify_record``)."""
+    c = reclassify_record(record, city)
+    return record.get("source_type") if c is None else c.source_type
+
+def reclassified_columns(record: Mapping[str, Any], city: str | None) -> dict[str, Any]:
+    """The classification columns of a copied document under the current rules, keeping the
+    classification it was stored with in ``classification_signals['original']``."""
+    c = reclassify_record(record, city)
+    if c is None:
+        return {}
+    original = {"source_type": record.get("source_type"),
+                "publisher_kind": record.get("publisher_kind"),
+                "classification_version": record.get("classification_version") or "classify-1"}
+    return {"source_type": c.source_type, "publisher_kind": c.publisher_kind,
+            "classification_version": c.version,
+            "classification_signals": {"signals": list(c.signals), "original": original}}
+
+_SELF_DESCRIPTION = re.compile(
+    r"\b(water (utility|supplier|provider|company|department|authority|board|services|supply)|"
+    r"(water|wastewater) and (wastewater|sewer\w*|sanitation)|drinking water|tap water|"
+    r"your water|pay (your|my) bill|billing|customers?|agua potable|empresa sanitaria|"
+    r"abastecimiento|clientes|[aá]gua pot[aá]vel|saneamento|eau potable|trinkwasser|"
+    r"wasserversorgung)\b", re.IGNORECASE)
+_COMMERCIAL_WORDS = re.compile(
+    r"\b(solutions|technologies|desalination projects?|epc|investors?|our projects|"
+    r"products|equipment|engineering services|private developer|water infrastructure "
+    r"developer|concessions? portfolio)\b", re.IGNORECASE)
+
+def _utility_signal(url: str, host: str, labels: list[str], title: str, snippet: str,
+                    city: str | None) -> str | None:
+    """Why the page is the utility's own ("named utility on its own host", ...), or
+    "commercial" / "aggregator", or None."""
     path = urlsplit(url).path if url else ""
     page = f"{title} {path.replace('-', ' ').replace('_', ' ')}"
     if _COMMERCIAL.search(page):
-        return False
+        return None
     if city and re.search(rf"\bwater (treatment|filtration|softening)( services?)? (in )?"
                           rf"{re.escape(city)}\b", page, re.IGNORECASE):
-        return False  # local-service landing page ("Water Treatment Toronto | WMC Water")
-    labels = [label.replace("-", "") for label in host.removeprefix("www.").split(".")[:-1]
-              if label not in _GENERIC_LABELS]
+        return None  # local-service landing page ("Water Treatment Toronto | WMC Water")
+    for segment in _TITLE_SEGMENTS.split(title.strip()):
+        if _COMMERCIAL_ORG.search(segment) and _host_names_org(segment, labels):
+            return "commercial"
+    if any(_GENERIC_WATER_PREFIX.match(label) for label in labels):
+        return "aggregator"
     # A named utility in the title, corroborated by its own host.
     for segment in _TITLE_SEGMENTS.split(title.strip()):
         if _UTILITY_ORG.match(segment) and _host_names_org(segment, labels):
-            return True
+            return "named utility on its own host"
     if _EDITORIAL_PATH.search(path) or _EDITORIAL_TITLE.search(title):
-        return False
-    if _DIRECTORY_PATH.search(path):
-        return False  # a list/member/profile page of a network or directory site
-    return (any(_WATER_LABEL.match(label) for label in labels)
-            or bool(host and _UTILITY.search(host.removeprefix("www.")))
-            or bool(_UTILITY_PHRASE.search(title)))
+        return None
+    text = f"{title} {snippet}"
+    water_label = any(_WATER_LABEL.match(label) for label in labels)
+    if water_label and _COMMERCIAL_WORDS.search(text) and not _SELF_DESCRIPTION.search(text):
+        return "commercial"
+    if water_label:
+        return "water utility host label"
+    if host and _UTILITY.search(host.removeprefix("www.")):
+        return "utility word in host"
+    if _UTILITY_PHRASE.search(title):
+        return "utility phrase in title"
+    return None
 
 def host_names_org(org: str, host: str) -> bool:
     """Does ``host`` spell the organisation ``org`` (see ``_host_names_org``)?"""

@@ -179,6 +179,10 @@ class AcquisitionService:
         record: dict[str, Any] = {
             "requested_url": url, "canonical_url": doc_key(url), "final_url": None,
             "title": c.get("title"), "source_type": c.get("source_type"),
+            "publisher_kind": c.get("publisher_kind"),
+            "classification_version": c.get("classification_version"),
+            "classification_signals": ({"signals": list(c.get("classification_signals") or [])}
+                                       if c.get("classification_version") else None),
             "acquisition_method": None, "media_type": None, "retrieved_at": None,
             "source_date": c.get("published_date"), "content_sha256": None, "byte_size": None,
             "page_count": None, "status": DocStatus.FAILED, "error_kind": None,

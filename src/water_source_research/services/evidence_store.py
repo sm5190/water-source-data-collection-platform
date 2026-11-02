@@ -26,6 +26,7 @@ from water_source_research.services.normalization import claim_uid, quote_in
 NO_REVIEW_NEEDED = FINAL_STATUSES
 
 _DOC_COLUMNS = ("round", "requested_url", "canonical_url", "final_url", "title", "source_type",
+                "publisher_kind", "classification_version", "classification_signals",
                 "acquisition_method", "media_type", "retrieved_at", "source_date",
                 "content_sha256", "byte_size", "page_count", "status", "error_kind",
                 "error_message", "raw_object_key", "artifact_error", "discovery_provider",
@@ -99,6 +100,8 @@ class EvidenceRepository:
                 field_key=r.get("field_key"), rank=r.get("rank"), url=r["url"][:2048],
                 canonical_url=_cut(r.get("canonical_url"), 2048),
                 title=_cut(r.get("title"), 1000), source_type=r.get("source_type"),
+                publisher_kind=r.get("publisher_kind"),
+                classification_version=r.get("classification_version"),
                 doi=_cut(r.get("doi"), 255), retained=bool(r.get("retained")))
                 for r in new)
         return len(new)
@@ -258,7 +261,7 @@ class EvidenceRepository:
         number of chunks copied. With ``reclassify_city`` each copied document gets its source
         type under the current rules (discovery/normalize.py::reclassify); every change is
         appended to ``changes`` ({url, from, to}). The source rows are never changed."""
-        from water_source_research.discovery.normalize import reclassify
+        from water_source_research.discovery.normalize import reclassified_columns
         copied = 0
         with Session(self.engine) as session, session.begin():
             sources = session.scalars(select(SourceDocumentRecord).where(
@@ -270,13 +273,13 @@ class EvidenceRepository:
                 if doc is None:
                     columns = {k: getattr(src, k) for k in _DOC_COLUMNS}
                     if reclassify_city is not None:
-                        current = reclassify(columns, reclassify_city)
-                        if current != columns["source_type"]:
-                            if changes is not None:
-                                changes.append({"url": src.final_url or src.requested_url,
-                                                "from": columns["source_type"],
-                                                "to": current})
-                            columns["source_type"] = current
+                        update = reclassified_columns(columns, reclassify_city)
+                        if update and update["source_type"] != columns["source_type"] \
+                                and changes is not None:
+                            changes.append({"url": src.final_url or src.requested_url,
+                                            "from": columns["source_type"],
+                                            "to": update["source_type"]})
+                        columns.update(update)
                     doc = SourceDocumentRecord(run_id=to_run, chunk_count=src.chunk_count,
                                                **columns)
                     session.add(doc)

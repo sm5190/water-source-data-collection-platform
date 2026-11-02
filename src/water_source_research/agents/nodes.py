@@ -219,6 +219,8 @@ async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefin
              "strategy": call.strategy, "query": call.query, "field_key": call.field_key,
              "rank": r.rank, "url": r.url, "canonical_url": canonical_url(r.url),
              "title": r.title, "source_type": r.source_type, "doi": r.doi,
+             "publisher_kind": r.publisher_kind,
+             "classification_version": r.classification_version,
              "retained": bool(dedupe_keys(r) & kept)}
             for i, call in enumerate(outcome.calls) for n, r in enumerate(call.results)
             if r.url]

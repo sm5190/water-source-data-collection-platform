@@ -22,3 +22,6 @@ EMBEDDING_DIMENSIONS = 1536
 # rules (services/resolution.py). Stored with each claim's validation / field resolution.
 NORMALIZATION_VERSION = "normalize-5"  # 5: CITY_NAMED on the city identity (geo_match)
 RESOLUTION_POLICY_VERSION = "resolve-4"
+# Source classification rules (discovery/normalize.py::classify). Stored with each document and
+# discovery hit; NULL in older rows means classify-1.
+CLASSIFICATION_VERSION = "classify-2"

@@ -19,6 +19,10 @@ class SearchResult:
     authors: list[str] = field(default_factory=list)
     venue: str | None = None
     source_type: str | None = None  # UTILITY, GOVERNMENT, REGULATORY, TECHNICAL, ACADEMIC, OTHER
+    # Who published it (discovery/normalize.py::Classification) and under which rules.
+    publisher_kind: str | None = None
+    classification_version: str | None = None
+    classification_signals: list[str] = field(default_factory=list)
     providers: list[str] = field(default_factory=list)
     provider_ids: dict[str, str] = field(default_factory=dict)
     query: str | None = None

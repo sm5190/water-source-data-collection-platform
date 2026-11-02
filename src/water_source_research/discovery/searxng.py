@@ -7,7 +7,7 @@ from water_source_research.core.config import get_settings
 from .base import SearchResult
 from .config import DiscoverySettings
 from .http import ProviderError, ProviderErrorKind, ProviderHttpClient, expect_items, text
-from .normalize import classify_source_type
+from .normalize import classify
 
 class SearXNGDiscovery:
     name = "searxng"
@@ -38,10 +38,14 @@ class SearXNGDiscovery:
             if not url:
                 continue
             title = title or url
+            snippet = text(item.get("content"))
+            c = classify(url, title, self.name, snippet=snippet)
             results.append(SearchResult(
-                title=title, url=url, snippet=text(item.get("content")), provider=self.name,
+                title=title, url=url, snippet=snippet, provider=self.name,
                 rank=len(results) + 1, published_date=_date(item.get("publishedDate")),
-                source_type=classify_source_type(url, title, self.name), query=query,
+                source_type=c.source_type, publisher_kind=c.publisher_kind,
+                classification_version=c.version, classification_signals=list(c.signals),
+                query=query,
             ))
             if len(results) >= limit:
                 break

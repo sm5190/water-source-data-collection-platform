@@ -28,6 +28,12 @@ class SourceDocumentRecord(Base):
     final_url: Mapped[str | None] = mapped_column(String(2048))
     title: Mapped[str | None] = mapped_column(String(1000))
     source_type: Mapped[str | None] = mapped_column(String(32))
+    # Who published it, under which classification rules (NULL = classify-1, before both),
+    # and the signals that decided it; a copy keeps its original classification there.
+    publisher_kind: Mapped[str | None] = mapped_column(String(32))
+    classification_version: Mapped[str | None] = mapped_column(String(32))
+    classification_signals: Mapped[dict[str, Any] | None] = mapped_column(JSONType,
+                                                                         nullable=True)
     acquisition_method: Mapped[str | None] = mapped_column(String(32))
     media_type: Mapped[str | None] = mapped_column(String(255))
     retrieved_at: Mapped[str | None] = mapped_column(String(40))
@@ -189,6 +195,8 @@ class DiscoveryResultRecord(Base):
     canonical_url: Mapped[str | None] = mapped_column(String(2048), index=True)
     title: Mapped[str | None] = mapped_column(String(1000))
     source_type: Mapped[str | None] = mapped_column(String(32))
+    publisher_kind: Mapped[str | None] = mapped_column(String(32))
+    classification_version: Mapped[str | None] = mapped_column(String(32))
     doi: Mapped[str | None] = mapped_column(String(255))
     retained: Mapped[bool] = mapped_column(Boolean, default=False)  # among the round's candidates
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
