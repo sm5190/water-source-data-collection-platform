@@ -173,14 +173,18 @@ PART = re.compile(
     r"areas?\s+of|zona\s+(?:norte|sur|oriente|poniente)|northern|southern|eastern|western|"
     r"some\s+(?:areas|communes|districts|neighbo\w+)|most\s+of|la\s+mayor\s+parte\s+de|"
     r"parte\s+de)\b", re.IGNORECASE)
+# Building for someone else is the contractor role. Investing, financing, contracting or
+# owning stakes are not: utilities do all of these as clients ("a BOT arrangement between
+# <utility> and ..."), so they are neutral mentions.
 CONTRACTOR = re.compile(
-    r"\b(build|built|construct\w*|design(?:ed|s|ing)?|epc|engineering|consult\w*|"
-    r"contract(?:ed|or|ors|s)?|award(?:ed|s)?|tender\w*|financ\w*|invest\w*|"
-    r"acqui(?:re|red|res|ring|sition)\w*|stake|shareholder\w*|consortium|sponsor\w*|"
-    r"equipment|membranes?|handover|transfer\s+of|commission(?:ed|ing)|"
-    r"construcci[oó]n|constru(?:y|i)\w*|dise[ñn]\w*|contrat\w*|adjudic\w*|licitaci[oó]n|"
-    r"financiamiento|inversi[oó]n|adquiri\w*|participaci[oó]n\s+accionaria|consorcio|"
-    r"constru[çc][aã]o|aquisi[çc][aã]o|march[ée]|errichtet)\b", re.IGNORECASE)
+    r"\b(builds?|built|construct(?:s|ed|ing)?|designs?|designed|designing|epc|"
+    r"engineering\s+services|consult(?:s|ed|ing|ancy)|supplies\s+(?:equipment|membranes|"
+    r"pipes|technology)|equipment\s+supplier|commission(?:ed|ing)|"
+    r"constru(?:ye|yen|y[oó]|ido)|dise[ñn](?:a|an|[oó])|constr[oó]i|construiu|"
+    r"errichtet|baut)\b", re.IGNORECASE)
+# Contract types name an arrangement, not who built what.
+_CONTRACT_TYPES = re.compile(r"\b(build[\s-]+operate[\s-]+(?:transfer|own)|design[\s-]+build|"
+                             r"BOT|BOO|BOOT|DBO|EPC\s+contract)\b", re.IGNORECASE)
 PAST = re.compile(
     r"\b(until\s+(?:19|20)\d{2}|was\s+responsible|were\s+responsible|used\s+to|"
     r"hasta\s+(?:19|20)\d{2}|fue\s+(?:la\s+)?(?:empresa|responsable)|era\s+(?:la\s+)?"
@@ -541,6 +545,16 @@ def _acting(sentence: str, pattern: re.Pattern[str] | None, rest: str) -> bool:
 
 VERB_WINDOW = 150
 
+def _builds(sentence: str, pattern: re.Pattern[str] | None) -> bool:
+    """The candidate itself builds, designs or engineers (its name before the verb, within
+    VERB_WINDOW characters); contract-type names (BOT, design-build) don't count."""
+    if pattern is None:
+        return False
+    text = _CONTRACT_TYPES.sub(" ", sentence)
+    starts = [m.end() for m in pattern.finditer(text)]
+    return any(0 <= v.start() - a <= VERB_WINDOW for v in CONTRACTOR.finditer(text)
+               for a in starts)
+
 def _classify(sentence: str, pattern: re.Pattern[str] | None, cand: UtilityCandidate,
               doc: _Doc, chunk_id: str, matcher: GeoMatcher,
               doc_place=None) -> UtilityEvidence | None:
@@ -560,7 +574,7 @@ def _classify(sentence: str, pattern: re.Pattern[str] | None, cand: UtilityCandi
     to_people = re.search(r"\b(residents|inhabitants|population|customers|households|"
                           r"people|habitantes|clientes|hogares|vecinos|usuarios)\b", rest,
                           re.IGNORECASE)
-    if CONTRACTOR.search(rest) and not (potable and to_people):
+    if _builds(sentence, pattern) and not (potable and to_people):
         relationship, role = "NON_SERVING_ROLE", "CONTRACTOR"
     elif serving_words:
         if WHOLESALE.search(rest):

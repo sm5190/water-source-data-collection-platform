@@ -237,3 +237,13 @@ def test_a_statement_without_a_place_takes_the_documents_place():
     reg = registry([wqr], *H)
     ev = [e for e in reg.find("Houston Public Works").evidence if e.relationship == "SERVES"]
     assert ev and ev[0].geo_status in ("CONFIRMED", "PROBABLE")
+
+def test_a_utility_that_invests_or_contracts_is_not_a_contractor():
+    """Seen on a fresh Santiago run: World Bank text on a plant built under a BOT
+    arrangement with the city's utility made the utility NON_SERVING."""
+    wb = chunk("https://documents1.worldbank.org/x.pdf", "The plant was implemented through a "
+               "build-operate-transfer (BOT) arrangement between Aguas Andinas and Degremont. "
+               "Aguas Andinas finances its part with corporate bonds and recovers its "
+               "investment.", source_type="TECHNICAL")
+    assert status(registry([wb]), "Aguas Andinas") in (None, "CANDIDATE")
+    assert status(registry(ALMAR), "Almar Water Solutions") == "NON_SERVING"
