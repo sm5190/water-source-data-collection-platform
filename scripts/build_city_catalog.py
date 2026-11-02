@@ -1,8 +1,13 @@
 """Build config/cities.yaml from the project workbook (Sarina Water Source.xlsx).
 
-The 'Standardization' sheet is the canonical source (city, state/province, country,
-coordinates). Cities that only appear in 'Sheet1'/'Updates' are added when neither their
-name nor an alias (text in parentheses) is already present. Country spellings are normalized.
+The 'Standardization' sheet is the canonical source of which cities are studied (city and
+country). Cities that only appear in 'Sheet1'/'Updates' are added when neither their name nor an
+alias (text in parentheses) is already present. Country spellings are normalized.
+
+Only the city's identity is written: the sheet's state/province and coordinate columns are the
+manual research answers that the evaluation compares against, so they never enter the catalog
+(research must not see them). Regions come from config/city_identity.yaml, which is built from
+independent geographic sources (scripts/build_city_identity.py).
 
 Usage: uv run python scripts/build_city_catalog.py "<path to workbook>" [config/cities.yaml]
 """
@@ -50,16 +55,13 @@ def build(workbook: Path) -> list[dict]:
         city = clean(row[0])
         if not city:
             continue
-        add({"city": city, "jurisdiction": clean(row[1]) or None, "country": country(row[2]),
-             "latitude": row[3] if isinstance(row[3], (int, float)) else None,
-             "longitude": row[4] if isinstance(row[4], (int, float)) else None,
-             "aliases": aliases(city), "source": "Standardization"})
+        add({"city": city, "country": country(row[2]), "aliases": aliases(city),
+             "source": "Standardization"})
     for sheet in ("Sheet1", "Updates"):
         for row in list(wb[sheet].iter_rows(values_only=True))[1:]:
             city = clean(row[0])
             if city:
-                add({"city": city, "jurisdiction": None, "country": country(row[1]),
-                     "latitude": None, "longitude": None, "aliases": aliases(city),
+                add({"city": city, "country": country(row[1]), "aliases": aliases(city),
                      "source": sheet})
     return sorted(catalog, key=lambda c: (c["country"].casefold(), c["city"].casefold()))
 

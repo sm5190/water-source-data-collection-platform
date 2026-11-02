@@ -152,7 +152,8 @@ def test_review_and_fields_endpoints_after_run(setup):
 def test_cities_and_city_filtered_runs(setup):
     _, client = setup
     cities = client.get("/research/cities").json()
-    assert {"label", "city", "country", "jurisdiction"} <= set(cities[0])
+    assert {"label", "city", "country", "region"} <= set(cities[0])
+    assert not {"jurisdiction", "latitude", "longitude"} & set(cities[0])  # workbook answers
     client.post("/research/city", json={"city_name": "Toronto", "country": "Canada"})
     client.post("/research/city", json={"city_name": "Madrid", "country": "Spain"})
     toronto = client.get("/research/runs", params={"city": "toronto", "country": "canada"})

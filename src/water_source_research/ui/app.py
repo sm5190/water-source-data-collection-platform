@@ -78,7 +78,7 @@ def load_cities(url: str) -> list[dict[str, Any]]:
     return client.cities()
 
 cities = load_cities(api_url)
-labels = [c["label"] + (f" — {c['jurisdiction']}" if c.get("jurisdiction") else "")
+labels = [c["label"] + (f" — {c['region']}" if c.get("region") else "")
           for c in cities]
 
 left, right = st.columns([3, 1], vertical_alignment="bottom")

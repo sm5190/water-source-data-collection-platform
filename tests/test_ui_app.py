@@ -11,9 +11,9 @@ APP = str(Path(__file__).resolve().parents[1] / "src" / "water_source_research" 
 
 CITIES = [
     {"label": "Toronto, Canada", "city": "Toronto", "country": "Canada",
-     "jurisdiction": "Ontario"},
+     "region": "Ontario"},
     {"label": "Madrid, Spain", "city": "Madrid", "country": "Spain",
-     "jurisdiction": "Community of Madrid"},
+     "region": "Community of Madrid"},
 ]
 
 class FakeClient:
@@ -169,7 +169,7 @@ def all_text(at) -> str:
     parts += [str(e.value) for e in (*at.success, *at.info, *at.error)]
     return "\n".join(parts)
 
-def test_city_dropdown_lists_catalog_with_jurisdiction():
+def test_city_dropdown_lists_catalog_with_region():
     at = app(FakeClient())
     city_box = at.selectbox[0]
     assert len(city_box.options) == 2

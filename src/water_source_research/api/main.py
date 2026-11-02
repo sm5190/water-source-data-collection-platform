@@ -10,6 +10,7 @@ from water_source_research.research_queue.queue import JobStatus, ResearchQueue
 from water_source_research.schemas.procedures import ProcedureStatus
 from water_source_research.research_queue.steps import NODE_ORDER
 from water_source_research.services.city_catalog import load_city_catalog
+from water_source_research.services.city_identity import identity_for
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.field_state import load_field_definitions, select_fields
 from water_source_research.schemas.records import QualityCheck, RecordSet
@@ -94,7 +95,15 @@ def create_app(queue: ResearchQueue | None = None,
 
     @app.get("/research/cities")
     async def cities():
-        return [{"label": c.label, **c.model_dump()} for c in load_city_catalog()]
+        # The region shown is from the independent identity file (drafts included: display
+        # only), never from the workbook.
+        out = []
+        for c in load_city_catalog():
+            ident = identity_for(c.city, c.country, allow_draft=True)
+            out.append({"label": c.label, **c.model_dump(),
+                        "region": ident.region.name if ident.region else None,
+                        "identity_status": ident.status})
+        return out
 
     @app.get("/research/runs")
     async def list_runs(status: JobStatus | None = None, limit: int = 100,

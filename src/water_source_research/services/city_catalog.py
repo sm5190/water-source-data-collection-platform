@@ -1,5 +1,7 @@
 """City catalog (config/cities.yaml), generated from the project workbook by
-scripts/build_city_catalog.py. Used by the UI dropdown and the API."""
+scripts/build_city_catalog.py: which cities are studied (city, country, catalog aliases). It
+holds no region or coordinates: those are manual research answers in the workbook. The city's
+region and other names come from config/city_identity.yaml (services/city_identity.py)."""
 
 from functools import lru_cache
 from pathlib import Path
@@ -10,11 +12,10 @@ from pydantic import BaseModel, Field
 DEFAULT_CATALOG_PATH = CONFIG_DIR / "cities.yaml"
 
 class CatalogCity(BaseModel):
+    model_config = {"extra": "forbid"}  # identity only: no workbook answers can creep in
+
     city: str
     country: str
-    jurisdiction: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
     aliases: list[str] = Field(default_factory=list)
     source: str | None = None
 
