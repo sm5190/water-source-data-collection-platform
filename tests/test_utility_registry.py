@@ -247,3 +247,22 @@ def test_a_utility_that_invests_or_contracts_is_not_a_contractor():
                "investment.", source_type="TECHNICAL")
     assert status(registry([wb]), "Aguas Andinas") in (None, "CANDIDATE")
     assert status(registry(ALMAR), "Almar Water Solutions") == "NON_SERVING"
+
+def test_fresh_run_false_verifications_stay_unverified():
+    """Seen on the fresh Houston and Nairobi runs (Milestone 3 new runs)."""
+    nfbwa = chunk("https://www.nfbwa.com/our-projects", "Water is pumped several miles across "
+                  "the City of Houston into Fort Bend County. We are currently planning the "
+                  "construction of 30 miles of water lines to distribute water to additional "
+                  "customers.", source_type="UTILITY",
+                  title="Our Projects | North Fort Bend Water Authority (NFBWA)")
+    reg = registry([nfbwa], *H)
+    assert reg.verified() == [] and reg.verified_hosts() == []
+    assembly = chunk("https://nairobiassembly.go.ke/report.pdf", "Nairobi City Water & "
+                     "Sewerage Company (NCWSC) is mandated to provide clean water and sewerage "
+                     "services within Nairobi, Kenya. Non-Revenue Water reduction improves water "
+                     "supply reliability in Nairobi, Kenya.", source_type="GOVERNMENT")
+    reg = registry([assembly], "Nairobi", "Kenya")
+    assert reg.find("Non-Revenue Water") is None
+    ncw = reg.find("Nairobi City Water & Sewerage Company")
+    assert ncw is not None and ncw.status == "VERIFIED"  # the Assembly states its mandate
+    assert "nairobiassembly.go.ke" not in ncw.bound_hosts  # but it isn't the utility's site

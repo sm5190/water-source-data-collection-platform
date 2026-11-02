@@ -43,7 +43,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 from dataclasses import dataclass
 from urllib.parse import urlsplit
-from water_source_research.discovery.normalize import host_names_org
+from water_source_research.discovery.normalize import host_names_org, is_city_domain
 from water_source_research.schemas.research import CityResearchState, EvidenceChunk
 from water_source_research.schemas.utility import (
     POTABLE_ROLES, UtilityCandidate, UtilityEvidence, UtilityRegistry,
@@ -101,7 +101,8 @@ _DESCRIPTORS = frozenset({
     "sanitario", "sanitaria", "sanitarios", "servicios", "abastecimiento", "urbano", "urbana",
     "reclaimed", "recycled", "hot", "cold", "grey", "gray", "emergency", "integrated",
     "sustainable", "smart", "future", "virtual", "blue", "green", "mineral", "spring", "river",
-    "lake", "bulk", "production", "resources", "resource", "management", "security", "scarcity",
+    "lake", "bulk", "production", "internal", "distribution", "non", "revenue", "nrw",
+    "supply", "untreated", "transmission", "resources", "resource", "management", "security", "scarcity",
     "directive", "framework", "partnership", "program", "programme", "project", "fund", "day",
     "week", "report", "plan", "monitoring", "research", "institute", "association",
     "network", "forum", "council", "agency", "development", "commission", "standards",
@@ -358,7 +359,8 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
 
     _predecessors(found, chunks, add)
     patterns = {k: _name_re(c.all_names()) for k, c in found.items()}
-    _bind_hosts(found, patterns, docs, chunks, places)
+    city_words = frozenset(w for n in matcher.city_names for w in utility_key(n).split())
+    _bind_hosts(found, patterns, docs, chunks, places, city_words, city)
     owner: dict[str, list[str]] = {}
     for k, cand in found.items():
         for h in cand.bound_hosts:
@@ -491,7 +493,11 @@ def _predecessors(found: dict[str, UtilityCandidate], chunks: Sequence[EvidenceC
                         host=_host(c.url), chunk_id=c.chunk_id, quote=quote,
                         source_type=c.source_type, other=p.name))
 
-def _spells(cand: UtilityCandidate, host: str, places: frozenset[str]) -> bool:
+_UTILITY_LABEL = re.compile(r"water|agua|wasser|eau|publicworks|utilit|sanea|acueducto|"
+                            r"sewer|sanitar", re.IGNORECASE)
+
+def _spells(cand: UtilityCandidate, host: str, places: frozenset[str],
+            city_words: frozenset[str] = frozenset(), city: str = "") -> bool:
     """The host spells the candidate itself: one of its distinctive words (4+ letters) or an
     acronym alias is in a host label, and discovery's org/host check agrees. A generic label
     ("water.igad.int") never counts."""
@@ -500,14 +506,24 @@ def _spells(cand: UtilityCandidate, host: str, places: frozenset[str]) -> bool:
     words = {w for n in cand.all_names() for w in utility_key(n).split()
              if len(w) >= 4 and w not in _GENERIC and w not in _DESCRIPTORS and w not in places}
     acronyms = {utility_key(a).replace(" ", "") for a in cand.aliases if a.isupper()}
-    hit = any(w in lab.replace("-", "") for lab in labels for w in words) or any(
+    def word_hit(lab: str) -> bool:
+        matched = [w for w in words if w in lab]
+        if not matched:
+            return False
+        # Only the city's name links them: the label must also be a water/utility label
+        # ("<city>water", "<city>publicworks") or the city's own domain (a city department's
+        # utility), not the city's assembly or tourism site.
+        return (any(w not in city_words for w in matched) or bool(_UTILITY_LABEL.search(lab))
+                or (bool(city) and is_city_domain(host, city)))
+    hit = any(word_hit(lab.replace("-", "")) for lab in labels) or any(
         lab.startswith(a) for lab in labels for a in acronyms if len(a) >= 3)
     return hit and any(host_names_org(n, host) for n in cand.all_names()) or (
         hit and bool(acronyms))
 
 def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pattern | None],
                 docs: Mapping[str, _Doc], chunks: Sequence[EvidenceChunk],
-                places: frozenset[str] = frozenset()) -> None:
+                places: frozenset[str] = frozenset(),
+                city_words: frozenset[str] = frozenset(), city: str = "") -> None:
     """A host is the candidate's own when it spells the candidate's name and its pages name
     the candidate (title or text), and it isn't about another country or region."""
     text_by_host: dict[str, list[str]] = {}
@@ -524,7 +540,7 @@ def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pa
         for host, texts in text_by_host.items():
             if not host or host in elsewhere:
                 continue
-            if (host not in cand.bound_hosts and _spells(cand, host, places)
+            if (host not in cand.bound_hosts and _spells(cand, host, places, city_words, city)
                     and any(p.search(t) for t in texts)):
                 cand.bound_hosts.append(host)
 
@@ -604,6 +620,10 @@ def _strength(ev: UtilityEvidence, cand: UtilityCandidate, doc: _Doc) -> str:
         return "NONE"
     own = doc.host in cand.bound_hosts
     official = (doc.source_type or "").upper() in GOVERNMENT_TYPES
+    # The sentence itself must place the service: a place taken from the document as a whole
+    # ("the document is about the city") only supports.
+    if ev.geo_reason.startswith("the document is about the city"):
+        return "SUPPORTING"
     placed = ev.geo_status == "CONFIRMED" or doc.scope.country == "TARGET"
     if placed and (own or official):
         return "AUTHORITATIVE"
