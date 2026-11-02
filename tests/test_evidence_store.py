@@ -25,6 +25,11 @@ from water_source_research.db.research_models import (
 from water_source_research.services.evidence_store import EvidenceRepository
 from water_source_research.services.run_recorder import RunRecorder
 
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
+
+
 def persisted_graph(engine, artifacts=None, evidence=None, script=None, checkpointer=None):
     gateway, _ = make_gateway(script or ModelScript(), structured_max_attempts=1)
     return build_graph(

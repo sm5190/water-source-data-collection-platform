@@ -16,6 +16,11 @@ from water_source_research.evaluation.evaluate import run_evaluation
 from water_source_research.evaluation.store import EvaluationStore
 from water_source_research.schemas.standardized import COLUMNS
 
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
+
+
 @pytest.fixture
 def engine(tmp_path):
     return make_engine(tmp_path, "evaluate.db")

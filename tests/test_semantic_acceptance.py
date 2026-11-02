@@ -109,7 +109,11 @@ def test_a_utility_accepted_for_one_source_waits_for_its_unsettled_sibling():
               (FLIER, "The Water Utility System delivers water to Houston")))
     entities = {e.entity_key: e for e in state.fields["utility_name"].resolution.entities}
     assert all(e.status is not S.RESOLVED for e in entities.values())
-    assert any("SIBLING_UNSETTLED" in e.reason_codes for e in entities.values())
+    # Since normalize-6 neither name is verified (a member page and a flier don't establish
+    # service), so none is accepted even for one source; before, one was and waited for its
+    # unsettled sibling.
+    assert any({"SIBLING_UNSETTLED", "NOT_ESTABLISHED_UTILITY_SERVES_CITY"}
+               & set(e.reason_codes) for e in entities.values())
 
 # --- positive controls: still accepted ---------------------------------------------------------
 
@@ -140,7 +144,7 @@ def test_a_county_is_first_level_in_kenya():
 def test_a_utility_stated_to_serve_the_city_is_accepted():
     world = World()
     url = world.doc("https://www.toronto.ca/services/water", "Toronto Water provides drinking "
-                    "water to Toronto.", source_type="GOVERNMENT")
+                    "water to Toronto, Canada.", source_type="GOVERNMENT")
     state = resolve_city(world, "Toronto", "Canada", claim("utility_name", "Toronto Water", (
         url, "Toronto Water provides drinking water")))
     assert state.fields["utility_name"].status is S.RESOLVED
@@ -165,12 +169,13 @@ def test_a_current_withdrawal_with_its_year_in_a_table_header_is_accepted():
 
 def test_a_utility_reported_population_and_its_year_are_accepted():
     world = World()
-    url = world.doc("https://www.torontowater.example/about", "Toronto Water serves Toronto. "
-                    "In 2025 Toronto Water reported a population of 2,900,000 residents in "
-                    "Toronto.", source_type="UTILITY")
+    url = world.doc("https://www.torontowater.example/about", "Toronto Water supplies drinking "
+                    "water to Toronto, Canada. In 2025 Toronto Water reported a population of "
+                    "2,900,000 residents in Toronto.", source_type="UTILITY")
     state = resolve_city(
         world, "Toronto", "Canada",
-        claim("utility_name", "Toronto Water", (url, "Toronto Water serves Toronto")),
+        claim("utility_name", "Toronto Water", (
+            url, "Toronto Water supplies drinking water to Toronto, Canada")),
         claim("utility_reported_city_population_millions", 2.9, (
             url, "In 2025 Toronto Water reported a population of 2,900,000 residents")),
         claim("utility_reported_city_population_reference_year", 2025, (

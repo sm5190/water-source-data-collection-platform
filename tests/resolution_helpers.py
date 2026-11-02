@@ -30,6 +30,14 @@ class World:
                                "source_type": source_type, "source_date": source_date})
         return url
 
+    def serving_utility(self, url: str, name: str = "Toronto Water", city: str = "Toronto",
+                        country: str = "Canada") -> str:
+        """An explicit statement on the utility's own site that it serves the city (with the
+        country, so it holds without an approved city identity): since normalize-6 a UTILITY
+        page is an official source only for a utility verified this way."""
+        page = url.rstrip("/") + "/about-us"
+        return self.doc(page, f"{name} supplies drinking water to {city}, {country}.")
+
     @property
     def index(self) -> EvidenceIndex:
         return EvidenceIndex(self.chunks, self.documents)

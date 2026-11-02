@@ -15,6 +15,7 @@ BOTH = "https://www.toronto.ca/water/both"
 
 def two_sources_and_an_ambiguous_volume():
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario and the Oak Ridges "
                     "Aquifer.")
     world.doc(BOTH, "Lake Ontario and the Oak Ridges Aquifer: the intakes withdrew "

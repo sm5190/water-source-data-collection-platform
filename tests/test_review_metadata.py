@@ -9,6 +9,10 @@ from procedure_helpers import make_engine
 from review_helpers import W, World, decision, withdrawal_quote_evidence
 from water_source_research.research_queue.queue import JobStatus
 
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
+
 @pytest.fixture
 def engine(tmp_path):
     return make_engine(tmp_path, "meta.db")

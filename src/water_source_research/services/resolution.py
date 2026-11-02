@@ -458,7 +458,10 @@ def _claim_failures(c: FieldClaim, d: FieldDefinition, policy: ResolutionPolicy)
 def _official(c: FieldClaim, d: FieldDefinition, policy: ResolutionPolicy) -> bool:
     """Cited from a source type authoritative for this field (e.g. city population from a
     statistics agency, not from the utility)."""
-    types = set(c.qualifiers.source_types) if c.qualifiers else set()
+    q = c.qualifiers
+    if q is None:
+        return False
+    types = set(q.official_types if q.official_types is not None else q.source_types)
     return bool(types & (set(d.official_sources) or policy.official_source_types))
 
 def _representative(group: Group, d: FieldDefinition, policy: ResolutionPolicy) -> FieldClaim:

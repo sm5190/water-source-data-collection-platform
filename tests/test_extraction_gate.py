@@ -91,7 +91,7 @@ def test_city_website_counts_without_naming_the_city():
 
 # --- verified utility -------------------------------------------------------------------------
 
-SERVICE = chunk("svc", "Aguas Andinas supplies drinking water to Santiago.",
+SERVICE = chunk("svc", "Aguas Andinas supplies drinking water to Santiago, Chile.",
                 "https://www.aguasandinas.cl/about")
 SOURCES = chunk("src", "Our main raw water source is the river, with storage at the reservoir.",
                 "https://www.aguasandinas.cl/sources")

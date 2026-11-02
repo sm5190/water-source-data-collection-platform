@@ -56,3 +56,14 @@ def _no_live_semantic_judge(monkeypatch):
     from water_source_research.evaluation import judge
     monkeypatch.setattr(judge, "build_judge", lambda engine, settings=None: judge.SemanticJudge(
         None, judge.JudgmentStore(engine), descriptions={}, unavailable="disabled in tests"))
+
+@pytest.fixture
+def identity_approved(monkeypatch):
+    """Run as if the drafted city identities were approved (CITY_IDENTITY_ALLOW_DRAFT): the
+    production state once a person approves config/city_identity.yaml. Without it, tests run
+    as production does today (no approved identity: catalog city and country only)."""
+    from water_source_research.services import geo_match
+    monkeypatch.setenv("CITY_IDENTITY_ALLOW_DRAFT", "1")
+    geo_match._matcher.cache_clear()
+    yield
+    geo_match._matcher.cache_clear()

@@ -127,7 +127,14 @@ class ClaimQualifiers(BaseModel):
     reported_value: float | None = None  # the number as the source states it
     reported_unit: str | None = None
     measurement_basis: str | None = None  # average | maximum | capacity | annual
-    source_types: list[str] = Field(default_factory=list)
+    source_types: list[str] = Field(default_factory=list)  # as classified (provenance)
+    # Authority per cited source for this field (Milestone 3): VERIFIED_SERVING_UTILITY,
+    # UNVERIFIED_UTILITY, or the source type. ``official_types`` = the source types that count
+    # for the field's official-source rule: a UTILITY page only when its utility is verified
+    # to serve the city in a role the field accepts (config/authority_roles.yaml). None on
+    # claims validated before normalize-6 (the rule then reads ``source_types``).
+    authority: list[str] = Field(default_factory=list)
+    official_types: list[str] | None = None
     source_dates: list[str] = Field(default_factory=list)
     # Discovery round whose extraction produced the claim (1 = first pass; later rounds are
     # re-extractions on new evidence). Provenance only: never part of the claim's identity.

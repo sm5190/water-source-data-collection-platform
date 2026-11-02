@@ -22,8 +22,10 @@ Each sentence naming a candidate is classified (the candidate's name removed fir
   country alone when no identity is approved).
 
 Verification strength:
-- AUTHORITATIVE: CONFIRMED place (city + region/country, or a verified name) and published
-  by the utility itself (a host bound to it) or a government/regulatory body. Verifies alone.
+- AUTHORITATIVE: published by the utility itself (a host bound to it) or a government/
+  regulatory body, and the place is CONFIRMED (city + region/country, or a verified name) or
+  PROBABLE in a document established as about the target country (its host or its text).
+  Verifies alone.
 - SUPPORTING: CONFIRMED or PROBABLE place in a document not about another country/region.
   Verifies only with an independent second supporting statement from another host, one of
   them in a document about the target country.
@@ -289,6 +291,25 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
     return UtilityRegistry(policy_version=UTILITY_POLICY_VERSION, city=city, country=country,
                            identity=identity_signature(city, country), candidates=kept)
 
+def registry_for_index(research: CityResearchState, index) -> UtilityRegistry:
+    """The registry for a validation EvidenceIndex (services/normalization.py), cached on the
+    index per set of utility_name candidates."""
+    fs = research.fields.get("utility_name")
+    names = tuple(sorted({str(c.value) for c in (fs.candidate_claims if fs else [])
+                          if c.value is not None and c.review_status != "REJECTED"}))
+    cache = index.__dict__.setdefault("_utility_registry", {})
+    if names not in cache:
+        chunks = []
+        for (url, page), items in index.by_key.items():
+            doc = index.documents.get(url) or {}
+            for c in items:
+                chunks.append(EvidenceChunk(chunk_id=c.chunk_id, url=url, text=c.text,
+                                            title=doc.get("title"), page_number=page,
+                                            source_type=c.source_type
+                                            or doc.get("source_type")))
+        cache[names] = build_registry(research, chunks, index.documents, names)
+    return cache[names]
+
 def _predecessors(found: dict[str, UtilityCandidate], chunks: Sequence[EvidenceChunk],
                   add) -> None:
     """Predecessor links stated in one sentence ("X, formerly ABC"). An acronym
@@ -409,7 +430,8 @@ def _strength(ev: UtilityEvidence, cand: UtilityCandidate, doc: _Doc) -> str:
         return "NONE"
     own = doc.host in cand.bound_hosts
     official = (doc.source_type or "").upper() in GOVERNMENT_TYPES
-    if ev.geo_status == "CONFIRMED" and (own or official):
+    placed = ev.geo_status == "CONFIRMED" or doc.scope.country == "TARGET"
+    if placed and (own or official):
         return "AUTHORITATIVE"
     return "SUPPORTING"
 

@@ -198,8 +198,7 @@ def semantic_checks(claim: FieldClaim, d: FieldDefinition, normalized: Any, loca
     elif d.year_required or d.freshness:
         _check_measurement_year(d, q, add, current_year)
     if d.key == "utility_name":
-        url = utility_service_evidence(index, str(normalized), research)
-        _service_result(url, str(normalized), add)
+        _check_serving_utility(str(normalized), index, research, add)
     elif d.key.startswith("utility_reported_city_population") and not is_year:
         _check_reported_by_serving_utility(located, index, research, add)
 
@@ -394,25 +393,38 @@ def _service_result(url: str | None, name: str, add: Add) -> None:
         add("UTILITY_SERVICE_NOT_STATED", CheckResult.WARN,
             f"no evidence in the run states that {name} serves the city")
 
+def _check_serving_utility(name: str, index: Any, research: CityResearchState,
+                           add: Add) -> None:
+    """UTILITY_SERVES_CITY from the utility registry (services/utility_registry.py): the
+    utility is verified, from explicit statements in the run's evidence, as a drinking-water
+    operator of the city. A UTILITY classification is never evidence of it."""
+    from water_source_research.services.utility_registry import registry_for_index
+    cand = registry_for_index(research, index).find(name)
+    if cand is not None and cand.status == "HISTORICAL":
+        add("UTILITY_HISTORICAL_NAME", CheckResult.WARN,
+            f"{name} is a historical name: {cand.status_reason}")
+    if cand is not None and "DRINKING_WATER_OPERATOR" in cand.verified_roles:
+        add("UTILITY_SERVES_CITY", CheckResult.PASS, cand.status_reason[:200])
+        return
+    why = (cand.status_reason if cand is not None and cand.status_reason
+           else "no statement in the run's evidence that it serves the city")
+    if cand is not None and cand.status in ("SANITATION_ONLY", "NON_SERVING", "OTHER_CITY",
+                                            "AMBIGUOUS_GEOGRAPHY"):
+        why = f"{cand.status.lower().replace('_', ' ')}: {why}"
+    add("UTILITY_SERVICE_NOT_STATED", CheckResult.WARN, f"{name}: {why}"[:300])
+
 def _check_reported_by_serving_utility(located: list, index: Any, research: CityResearchState,
                                        add: Add) -> None:
-    """A utility-reported population counts when it comes from a utility shown to serve the
-    city: one of the run's utility names with service evidence, cited from the same host."""
-    hosts = {(urlsplit(ref.url).hostname or "").casefold() for ref, _ in located}
-    fs = research.fields.get("utility_name")
-    names = []
-    for c in (fs.candidate_claims if fs else []):
-        if c.value_status is ValueStatus.KNOWN and c.value and str(c.value) not in names:
-            names.append(str(c.value))
-    for name in names:
-        url = utility_service_evidence(index, name, research)
-        if url is None:
-            continue
-        name_hosts = {(urlsplit(e.url).hostname or "").casefold()
-                      for c in fs.candidate_claims if str(c.value) == name for e in c.evidence}
-        if hosts & name_hosts:
+    """A utility-reported population counts when it is cited from the own website of a
+    utility verified to supply the city's drinking water (the utility registry)."""
+    from water_source_research.services.utility_registry import registry_for_index
+    registry = registry_for_index(research, index)
+    for ref, _ in located:
+        host = (urlsplit(ref.url).hostname or "").casefold().removeprefix("www.")
+        if "DRINKING_WATER_OPERATOR" in registry.host_roles(host):
+            cand = next(c for c in registry.candidates if host in c.bound_hosts)
             add("UTILITY_SERVES_CITY", CheckResult.PASS,
-                f"reported by {name}, which serves the city ({url})")
+                f"reported by {cand.name}, which serves the city ({host})")
             return
     add("UTILITY_SERVICE_NOT_STATED", CheckResult.WARN,
         "the figure isn't cited from a utility shown to serve the city")

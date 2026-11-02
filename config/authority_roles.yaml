@@ -1,0 +1,20 @@
+# Which utility roles make a utility's own website an authoritative (official) source for a
+# field (services/normalization.py, Milestone 3). A page classified UTILITY counts as official
+# only when the utility registry (services/utility_registry.py) has verified, from explicit
+# statements in the run's evidence, that the publishing utility serves the city in one of
+# these roles. Government, regulatory and academic sources keep their own rules.
+#
+# Kept apart from field_definitions.yaml so extraction and retrieval caches (keyed on the field
+# definitions) are not invalidated by acceptance rules.
+version: 1
+default: [DRINKING_WATER_OPERATOR, WHOLESALE_SUPPLIER]
+fields:
+  utility_name: [DRINKING_WATER_OPERATOR]
+  utility_reported_city_population_millions: [DRINKING_WATER_OPERATOR]
+  utility_reported_city_population_reference_year: [DRINKING_WATER_OPERATOR]
+  population_served_millions: [DRINKING_WATER_OPERATOR]
+  water_quality_notes: [DRINKING_WATER_OPERATOR]
+  water_quality_year: [DRINKING_WATER_OPERATOR]
+  # Dated historical withdrawals may come from a predecessor's own reports.
+  past_total_city_water_withdrawals: [DRINKING_WATER_OPERATOR, WHOLESALE_SUPPLIER,
+                                      HISTORICAL_OPERATOR]

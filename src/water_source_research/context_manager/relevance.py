@@ -36,7 +36,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
-from water_source_research.discovery.normalize import host_names_org, is_city_domain
+from water_source_research.discovery.normalize import is_city_domain
 from water_source_research.schemas.research import CityResearchState, EvidenceChunk, FieldDefinition
 from water_source_research.services.geo_match import (
     UNKNOWN_SCOPE, DocumentScope, GeoMatcher, document_scopes, identity_signature, matcher_for,
@@ -188,17 +188,12 @@ def build_relevance_context(state: CityResearchState,
                                           for v in _claim_values(state, f)),
                             *_relation_targets(state), *_claim_values(state, "jurisdiction"))
                 if (k := _feature_key(v)) and k not in excluded}
-    from water_source_research.services.semantics import service_statement_url
     hosts = {h for c in chunks if (h := _host(c.url))}
     elsewhere = {h for h in hosts if scopes and all(
         s.elsewhere for u, s in scopes.items() if _host(u) == h)}
-    texts = [(c.text if matcher is None else matcher.neutralize(
-        c.text, scopes.get(c.url, UNKNOWN_SCOPE)).text, c.url) for c in chunks]
-    verified: set[str] = set()
-    for name in dict.fromkeys(_claim_values(state, "utility_name")):
-        corroborating = {h for h in hosts if host_names_org(name, h)} - elsewhere
-        if corroborating and service_statement_url(iter(texts), name, city):
-            verified |= corroborating
+    # Hosts of utilities verified (from explicit statements) to supply the city's water.
+    from water_source_research.services.utility_registry import build_registry
+    verified = set(build_registry(state, list(chunks)).verified_hosts()) - elsewhere
     return RelevanceContext({u: frozenset(p) for u, p in pages.items()},
                             frozenset(h for h in hosts if is_city_domain(h, city)
                                       and h not in elsewhere),

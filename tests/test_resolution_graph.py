@@ -13,6 +13,10 @@ from water_source_research.db.evidence_models import FieldClaimRecord
 from water_source_research.db.session import init_db
 from water_source_research.services.evidence_store import EvidenceRepository
 
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
+
 @pytest.fixture
 def engine(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'resolution.db'}")

@@ -17,8 +17,13 @@ from water_source_research.llm.extraction import build_extraction_gateway
 from water_source_research.llm.gateway import UnconfiguredGateway
 from water_source_research.reporting.run_views import field_provenance
 from water_source_research.services.field_state import (
+
     load_field_definitions, select_fields, unresolved_fields,
 )
+
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
 
 def run(graph, state):
     return asyncio.run(graph.ainvoke(state))

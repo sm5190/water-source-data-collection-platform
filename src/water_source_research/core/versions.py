@@ -20,8 +20,9 @@ EMBEDDING_VERSION = "1"
 EMBEDDING_DIMENSIONS = 1536
 # Deterministic claim normalization/validation (services/normalization.py) and resolution
 # rules (services/resolution.py). Stored with each claim's validation / field resolution.
-NORMALIZATION_VERSION = "normalize-5"  # 5: CITY_NAMED on the city identity (geo_match)
-RESOLUTION_POLICY_VERSION = "resolve-4"
+# 5: CITY_NAMED on the city identity (geo_match); 6: utility authority from the registry
+NORMALIZATION_VERSION = "normalize-6"
+RESOLUTION_POLICY_VERSION = "resolve-5"  # 5: official sources = verified utility roles
 # Source classification rules (discovery/normalize.py::classify). Stored with each document and
 # discovery hit; NULL in older rows means classify-1.
 CLASSIFICATION_VERSION = "classify-2"

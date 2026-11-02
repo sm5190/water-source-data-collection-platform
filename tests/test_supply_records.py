@@ -36,6 +36,7 @@ def rows(rs):
 
 def toronto() -> World:
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario.")
     world.doc(REPORT, "In 2025 Toronto's intakes withdrew an average of 980,000 cubic metres of "
                       "raw water per day.", source_type="GOVERNMENT")

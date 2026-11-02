@@ -11,6 +11,10 @@ from water_source_research.context_manager import (
 )
 from water_source_research.services.field_state import initialize_city_state
 
+# The mocked worlds model production with an approved city identity (Milestone 3):
+# without one, a utility's own statement naming only the city isn't authoritative.
+pytestmark = pytest.mark.usefixtures("identity_approved")
+
 UTILITY_CHUNK = EvidenceChunk(
     chunk_id="util", url="https://toronto.ca/water", title="Toronto Water",
     source_type="UTILITY",

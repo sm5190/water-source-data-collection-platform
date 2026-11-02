@@ -73,5 +73,8 @@ class UtilityRegistry(BaseModel):
         """Verified roles of the utility whose own host this is (empty: not a verified
         utility's host)."""
         host = host.casefold().removeprefix("www.")
-        return [r for c in self.candidates if c.status in ("VERIFIED", "SANITATION_ONLY")
-                and host in c.bound_hosts for r in c.verified_roles]
+        out = [r for c in self.candidates if c.status in ("VERIFIED", "SANITATION_ONLY")
+               and host in c.bound_hosts for r in c.verified_roles]
+        if any(c.status == "HISTORICAL" and host in c.bound_hosts for c in self.candidates):
+            out.append("HISTORICAL_OPERATOR")
+        return out

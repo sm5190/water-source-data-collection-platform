@@ -20,7 +20,7 @@ def entities(state, key):
 
 def test_single_official_verified_claim_is_resolved_automatically():
     world = World()
-    world.doc(UTIL, "Toronto Water provides drinking water to Toronto.")
+    world.doc(UTIL, "Toronto Water provides drinking water to Toronto, Canada.")
     state, log = resolve(world, claim("utility_name", "Toronto Water",
                                       (UTIL, "Toronto Water provides drinking water")))
     fs = state.fields["utility_name"]
@@ -33,6 +33,7 @@ def test_single_official_verified_claim_is_resolved_automatically():
 
 def test_equivalent_claims_from_two_documents_form_one_group():
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "In 2025 Toronto withdrew 980,000 m3/d of raw water.")
     world.doc(REPORT, "Average withdrawal in 2025: 980 ML/d.", source_type="GOVERNMENT")
     state, _ = resolve(world,
@@ -46,7 +47,7 @@ def test_equivalent_claims_from_two_documents_form_one_group():
 
 def test_confidence_never_decides_acceptance():
     world = World()
-    world.doc(UTIL, "Toronto Water provides drinking water to Toronto.")
+    world.doc(UTIL, "Toronto Water provides drinking water to Toronto, Canada.")
     world.doc(NEWS, "Toronto Water provides drinking water, a blogger says.", source_type="OTHER")
     low_official, _ = resolve(world, claim("utility_name", "Toronto Water", (
         UTIL, "Toronto Water provides drinking water"), confidence=0.2))
@@ -89,6 +90,7 @@ def test_undated_disagreement_is_a_conflict():
 
 def test_different_years_are_history_not_conflict():
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "In 2025 Toronto withdrew 980,000 m3/d.")
     world.doc(REPORT, "In 2019 Toronto withdrew 1,050,000 m3/d.", source_type="GOVERNMENT")
     old = claim(W, 1050000, (REPORT, "In 2019 Toronto withdrew 1,050,000 m3/d"))
@@ -131,6 +133,7 @@ def test_names_that_may_be_the_same_need_review():
 
 def two_source_world() -> tuple[World, list]:
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario, and the Toronto "
                     "Island community is also served by the Oak Ridges Aquifer.")
     world.doc(REPORT, "The Lake Ontario intakes withdrew 950,000 m3/d in 2025. The Oak Ridges "
@@ -177,6 +180,7 @@ def test_ambiguous_attribution_goes_to_review():
 
 def test_single_source_city_attributes_everything_to_it():
     world = World()
+    world.serving_utility(UTIL)
     world.doc(UTIL, "Toronto draws its drinking water from Lake Ontario. The intake is at "
                     "43.6678 N.")
     state, _ = resolve(world,

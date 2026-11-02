@@ -48,6 +48,7 @@ US_STATE_CODES = frozenset({"al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl"
     "id", "il", "in", "ia", "ks", "ky", "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt",
     "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd",
     "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc"})
+_US_NAMES = frozenset({"united states", "united states of america", "usa", "us", "u.s."})
 _QUALIFIER = r"(?:de|del|de la|de los|de las|do|da|dos|das|di|of)"
 _CAP_WORD = r"[A-ZÀ-ÖØ-Þ][\w'’\-]+"
 _ACCENTS = {"a": "aáàâãäåā", "e": "eéèêëē", "i": "iíìîïī", "o": "oóòôõöøō", "u": "uúùûüū",
@@ -217,7 +218,7 @@ class GeoMatcher:
             return UNKNOWN_SCOPE
         tld = labels[-1]
         second = labels[-2] if len(labels) >= 2 else ""
-        us = "us" == self.cctld
+        us = self.cctld == "us" or fold(self.identity.country) in _US_NAMES
         if tld in ("gov", "mil") or (tld == "us" and second in US_STATE_CODES | {"fed"}):
             country: Scope = "TARGET" if us else "OTHER"
             region: Scope = "UNKNOWN"
@@ -232,6 +233,8 @@ class GeoMatcher:
                         fold(r).replace(" ", "") for r in self.other_region_names}:
                     region = "OTHER"
             return DocumentScope(country, region, (f"host {host}",))
+        if not self.cctld:  # country code unknown (no approved identity): no host signal
+            return UNKNOWN_SCOPE
         if len(tld) == 2 and second in GOV_SECOND_LEVEL:  # gov.co, gob.cl, go.ke
             return DocumentScope("TARGET" if tld == self.cctld else "OTHER", "UNKNOWN",
                                  (f"government host {host}",))

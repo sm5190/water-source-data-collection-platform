@@ -325,7 +325,7 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
                    "the References column is generated from the citations")
 
     status_ok = _check_value_status(claim, checks)
-    located = _check_citations(claim, index, checks, qualifiers)
+    located = _check_citations(claim, index, checks, qualifiers, definition, research)
     quotes = [e.passage for e in claim.evidence]
     if claim.value_status is ValueStatus.KNOWN and status_ok:
         normalized = _check_type(claim.value, definition, checks)
@@ -493,8 +493,58 @@ def _check_value_status(claim: FieldClaim, checks: _Checks) -> bool:
     checks.add("VALUE_STATUS", CheckResult.PASS)
     return True
 
+@lru_cache
+def authority_roles() -> tuple[tuple[str, ...], dict[str, tuple[str, ...]]]:
+    """(default roles, field -> roles) from config/authority_roles.yaml."""
+    import yaml
+    from water_source_research.core.paths import CONFIG_DIR
+    data = yaml.safe_load((CONFIG_DIR / "authority_roles.yaml").read_text(encoding="utf-8"))
+    return (tuple(data.get("default") or ()),
+            {k: tuple(v) for k, v in (data.get("fields") or {}).items()})
+
+def _authority(located: list[tuple[EvidenceRef, Located]], index: EvidenceIndex,
+               definition: FieldDefinition | None, research: CityResearchState | None,
+               qualifiers: ClaimQualifiers, checks: _Checks) -> None:
+    """Authority of each cited source for this field. A UTILITY page (or any page on a host
+    the registry binds to a utility) is a verified serving utility's only when the utility
+    registry verified, from explicit statements, a role the field accepts; otherwise it is
+    UNVERIFIED_UTILITY and doesn't count as official."""
+    from water_source_research.services.utility_registry import registry_for_index
+    default, by_field = authority_roles()
+    allowed = set(by_field.get(definition.key, default) if definition else default)
+    registry = None
+    authority: list[str] = []
+    official: list[str] = []
+    unverified: list[str] = []
+    for ref, loc in located:
+        st = index.source_type(ref, loc)
+        host = (urlsplit(ref.url).hostname or "").casefold().removeprefix("www.")
+        if research is not None and registry is None:  # cached on the index
+            registry = registry_for_index(research, index)
+        roles = set(registry.host_roles(host)) if registry is not None else set()
+        bound = registry is not None and any(host in c.bound_hosts for c in registry.candidates)
+        if st == "UTILITY" or (bound and roles):
+            if roles & allowed:
+                label, effective = "VERIFIED_SERVING_UTILITY", "UTILITY"
+            else:
+                label, effective = "UNVERIFIED_UTILITY", None
+                unverified.append(host)
+        else:
+            label, effective = st or "UNKNOWN", st
+        if label not in authority:
+            authority.append(label)
+        if effective and effective not in official:
+            official.append(effective)
+    qualifiers.authority, qualifiers.official_types = authority, official
+    if unverified and not set(official) & OFFICIAL_SOURCE_TYPES:
+        checks.add("UTILITY_RELATIONSHIP_UNVERIFIED", CheckResult.WARN,
+                   f"{', '.join(dict.fromkeys(unverified))}: not shown to be a utility serving "
+                   f"the city in a role this field needs ({', '.join(sorted(allowed))})")
+
 def _check_citations(claim: FieldClaim, index: EvidenceIndex, checks: _Checks,
-                     qualifiers: ClaimQualifiers) -> list[tuple[EvidenceRef, Located]]:
+                     qualifiers: ClaimQualifiers, definition: FieldDefinition | None = None,
+                     research: CityResearchState | None = None
+                     ) -> list[tuple[EvidenceRef, Located]]:
     if not claim.evidence:
         checks.add("EVIDENCE_PRESENT", CheckResult.FAIL, "no citation")
         checks.add("CITATION_LINKED", CheckResult.FAIL, "no citation")
@@ -529,10 +579,11 @@ def _check_citations(claim: FieldClaim, index: EvidenceIndex, checks: _Checks,
             dates.append(date)
     qualifiers.source_types = types
     qualifiers.source_dates = dates
-    official = [t for t in types if t in OFFICIAL_SOURCE_TYPES]
+    _authority(located, index, definition, research, qualifiers, checks)
+    official = [t for t in qualifiers.official_types or [] if t in OFFICIAL_SOURCE_TYPES]
     checks.add("SOURCE_TIER", CheckResult.PASS,
                ("official: " + ", ".join(official)) if official
-               else "no utility, government or regulatory source")
+               else "no verified utility, government or regulatory source")
     return located
 
 def _check_type(value: Any, d: FieldDefinition, checks: _Checks) -> Any:
@@ -834,7 +885,8 @@ def _check_dependencies(claim: FieldClaim, d: FieldDefinition | None, normalized
         else:
             checks.add("DEPENDENCY", CheckResult.PASS)
     if d.key == "pod_coordinate_method" and normalized == "Utility Source" and not (
-            set(q.source_types) & OFFICIAL_SOURCE_TYPES):
+            set(q.official_types if q.official_types is not None else q.source_types)
+            & OFFICIAL_SOURCE_TYPES):
         checks.add("DEPENDENCY", CheckResult.WARN,
                    "'Utility Source' requires coordinates from an official document")
     if d.key == "source_withdrawal_contribution_method" and normalized == "Remainder Allocated":
