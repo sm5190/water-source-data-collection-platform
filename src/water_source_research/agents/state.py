@@ -22,6 +22,9 @@ class GraphState(TypedDict, total=False):
     reextractions: dict[str, int]
     fields_needing_evidence: list[str]  # set by extract; non-empty routes back to discover
     discovery_rounds: int
+    # Utilities related to the city, by role, with evidence (schemas/utility.py
+    # UtilityRegistry), as of the start of the latest discovery round / before validation.
+    utility_registry: dict
     context_bundle_ids: dict[str, str]  # field_key -> persisted ContextBundle id
     claims: list[dict]
     # Normalization/resolution (services/normalization.py, services/resolution.py).

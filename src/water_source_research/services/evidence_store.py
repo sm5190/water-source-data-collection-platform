@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.db.evidence_models import (
     ClaimCitationRecord, DiscoveryResultRecord, EvidenceChunkRecord, FieldClaimRecord,
-    FieldResolutionRecord, RunFieldStateRecord, SourceDocumentRecord,
+    FieldResolutionRecord, RunFieldStateRecord, RunUtilityCandidateRecord, SourceDocumentRecord,
 )
 from water_source_research.llm.extraction import normalize_quote
 from water_source_research.schemas.common import FINAL_STATUSES
@@ -102,6 +102,44 @@ class EvidenceRepository:
                 doi=_cut(r.get("doi"), 255), retained=bool(r.get("retained")))
                 for r in new)
         return len(new)
+
+    def save_utility_registry(self, run_id: str, round_no: int,
+                              registry: Mapping[str, Any]) -> int:
+        """The run's utility registry at the start of a round (insert-or-skip by candidate,
+        so a resumed round doesn't duplicate it). Returns the number of new rows."""
+        candidates = registry.get("candidates") or []
+        if not candidates:
+            return 0
+        with Session(self.engine) as session, session.begin():
+            existing = set(session.scalars(select(RunUtilityCandidateRecord.candidate_key).where(
+                RunUtilityCandidateRecord.run_id == run_id,
+                RunUtilityCandidateRecord.round == round_no)))
+            new = [c for c in candidates if c["key"][:255] not in existing]
+            session.add_all(RunUtilityCandidateRecord(
+                run_id=run_id, round=round_no, candidate_key=c["key"][:255],
+                name=c["name"][:500], status=c["status"],
+                status_reason=_cut(c.get("status_reason"), 1000),
+                verified_roles=c.get("verified_roles") or [], aliases=c.get("aliases") or [],
+                bound_hosts=c.get("bound_hosts") or [],
+                predecessor_of=c.get("predecessor_of") or [],
+                successor_of=c.get("successor_of") or [], origins=c.get("origins") or [],
+                evidence=c.get("evidence") or [],
+                policy_version=str(registry.get("policy_version"))[:32],
+                identity=str(registry.get("identity"))[:32]) for c in new)
+        return len(new)
+
+    def utility_candidates(self, run_id: str) -> list[dict[str, Any]]:
+        with Session(self.engine) as session:
+            rows = session.scalars(select(RunUtilityCandidateRecord).where(
+                RunUtilityCandidateRecord.run_id == run_id).order_by(
+                RunUtilityCandidateRecord.round, RunUtilityCandidateRecord.id)).all()
+            return [{"round": r.round, "key": r.candidate_key, "name": r.name,
+                     "status": r.status, "status_reason": r.status_reason,
+                     "verified_roles": r.verified_roles, "aliases": r.aliases,
+                     "bound_hosts": r.bound_hosts, "predecessor_of": r.predecessor_of,
+                     "successor_of": r.successor_of, "origins": r.origins,
+                     "evidence": r.evidence, "policy_version": r.policy_version,
+                     "identity": r.identity} for r in rows]
 
     def discovery_results(self, run_id: str) -> list[dict[str, Any]]:
         with Session(self.engine) as session:

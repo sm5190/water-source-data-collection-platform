@@ -98,7 +98,7 @@ def build_graph(
         context_service or ContextService(), gateway or UnconfiguredGateway(),
         skip_no_new_entity=settings.extraction.skip_no_new_entity,
     ))
-    g.add_node("validate", make_validate_node(fields))
+    g.add_node("validate", make_validate_node(fields, evidence_store))
     g.add_node("resolve", make_resolve_node(fields))
     g.add_node("human_review", make_human_review_node(fields, review_store, evidence_store))
     g.add_node("assemble", make_assemble_node(fields))

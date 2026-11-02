@@ -1,0 +1,198 @@
+"""The utility registry: role-aware, evidence-based city-to-utility relationships. Utility
+names below are test expectations only (synthetic sentences modelled on the saved runs); the
+registry has no list of utilities."""
+
+import pytest
+from water_source_research.schemas.research import EvidenceChunk, EvidenceRef, FieldClaim
+from water_source_research.services import geo_match
+from water_source_research.services.field_state import initialize_city_state
+from water_source_research.services.utility_registry import build_registry, utility_key
+
+@pytest.fixture(autouse=True)
+def identity_on(monkeypatch):
+    monkeypatch.setenv("CITY_IDENTITY_ALLOW_DRAFT", "1")
+    geo_match._matcher.cache_clear()
+    yield
+    geo_match._matcher.cache_clear()
+
+def chunk(url, text, source_type="OTHER", title=None, cid=None):
+    return EvidenceChunk(chunk_id=cid or str(abs(hash((url, text))) % 10**8), url=url,
+                         text=text, title=title or "", source_type=source_type)
+
+def registry(chunks, city="Santiago", country="Chile", claims=()):
+    s = initialize_city_state(city, country)
+    for v in claims:
+        s.fields["utility_name"].candidate_claims.append(FieldClaim(
+            field_key="utility_name", value=v, confidence=0.8,
+            evidence=[EvidenceRef(url="https://x.example", passage=v)]))
+    return build_registry(s, chunks)
+
+def status(reg, name):
+    c = reg.find(name)
+    return c.status if c else None
+
+OWN = chunk("https://www.aguasandinas.cl/nosotros",
+            "Aguas Andinas supplies drinking water to Santiago, Chile, and its communes.",
+            source_type="UTILITY", title="Aguas Andinas | Nosotros")
+ALMAR = [
+    chunk("https://almarwater.com/news-centinela/",
+          "Almar Water Solutions and Transelec receive the transfer of Centinela's first water "
+          "pipeline at an event in Santiago.", source_type="UTILITY",
+          title="Almar Water Solutions"),
+    chunk("https://almarwater.com/water-infrastructure/",
+          "Almar Water Solutions designs, builds and operates desalination plants for mining "
+          "and industry in Chile.", source_type="UTILITY", title="Almar Water Solutions"),
+]
+
+# --- misleading official websites and circularity ------------------------------------------
+
+def test_a_commercial_water_company_is_not_the_citys_utility():
+    reg = registry(ALMAR)
+    assert status(reg, "Almar Water Solutions") in ("NON_SERVING", "CANDIDATE")
+    assert reg.verified_hosts() == []
+
+def test_a_utility_classified_page_without_a_statement_is_not_verified():
+    home = chunk("https://www.aguasandinas.cl/", "Bienvenido a Aguas Andinas. Paga tu cuenta.",
+                 source_type="UTILITY", title="Aguas Andinas")
+    reg = registry([home])
+    cand = reg.find("Aguas Andinas")
+    assert cand.status == "CANDIDATE" and cand.bound_hosts == ["aguasandinas.cl"]
+    assert reg.verified_hosts() == []
+
+def test_the_utilitys_own_explicit_statement_verifies_it():
+    reg = registry([OWN, *ALMAR])
+    cand = reg.find("Aguas Andinas")
+    assert cand.status == "VERIFIED" and "DRINKING_WATER_OPERATOR" in cand.verified_roles
+    assert "own site" in cand.status_reason
+    assert reg.verified_hosts() == ["aguasandinas.cl"]
+
+# --- verification strength --------------------------------------------------------------
+
+NEWS = chunk("https://www.riotimesonline.com/aguas-andinas/",
+             "Aguas Andinas provides drinking water in Santiago. Chile's regulator fined it.",
+             title="Water cuts in Chile")
+
+def test_one_supporting_news_statement_does_not_verify():
+    reg = registry([NEWS])
+    cand = reg.find("Aguas Andinas")
+    assert cand.status == "CANDIDATE"
+    assert [e.strength for e in cand.evidence if e.relationship == "SERVES"] == ["SUPPORTING"]
+
+def test_two_independent_supporting_statements_verify():
+    other = chunk("https://www.biobiochile.cl/noticias/1", "Aguas Andinas provides drinking "
+                  "water to most Santiago households.")
+    reg = registry([NEWS, other])
+    assert status(reg, "Aguas Andinas") == "VERIFIED"
+    assert "two independent statements" in reg.find("Aguas Andinas").status_reason
+
+def test_a_government_statement_with_the_country_verifies_alone():
+    gov = chunk("https://www.siss.gob.cl/586/w3-article.html", "Aguas Andinas presta el "
+                "servicio de agua potable en Santiago, Chile.", source_type="GOVERNMENT")
+    assert status(registry([gov]), "Aguas Andinas") == "VERIFIED"
+
+def test_ambiguous_geography_never_verifies():
+    a = chunk("https://example.com/a", "Aguas Andinas supplies drinking water to Santiago.")
+    b = chunk("https://example.net/b", "Aguas Andinas provides drinking water in Santiago.")
+    reg = registry([a, b])
+    assert status(reg, "Aguas Andinas") == "AMBIGUOUS_GEOGRAPHY"
+
+# --- roles --------------------------------------------------------------------------------
+
+def test_sanitation_only_is_not_a_drinking_water_utility():
+    gov = chunk("https://www.siss.gob.cl/x", "Biofiltro Water Services treats the wastewater "
+                "of Santiago, Chile.", source_type="GOVERNMENT")
+    reg = registry([gov])
+    assert status(reg, "Biofiltro Water Services") == "SANITATION_ONLY"
+    assert reg.verified_hosts() == [] and reg.verified() == []
+
+def test_water_and_sanitation_services_are_the_drinking_water_role():
+    gov = chunk("https://www.siss.gob.cl/y", "Aguas Andinas provides water and sanitation "
+                "services to Santiago, Chile.", source_type="GOVERNMENT")
+    assert registry([gov]).find("Aguas Andinas").verified_roles == ["DRINKING_WATER_OPERATOR"]
+
+def test_a_bulk_supplier_is_a_wholesaler():
+    gov = chunk("https://www.dga.mop.gob.cl/z", "Maipo Water Authority supplies raw water in "
+                "bulk to the utilities of Santiago, Chile.", source_type="GOVERNMENT")
+    cand = registry([gov]).find("Maipo Water Authority")
+    assert cand.status == "VERIFIED" and cand.verified_roles == ["WHOLESALE_SUPPLIER"]
+
+# --- several utilities, historical names --------------------------------------------------
+
+def test_several_utilities_serving_parts_of_the_city_are_all_kept():
+    gov = chunk("https://www.siss.gob.cl/m", "Servicio Municipal de Agua Potable y "
+                "Alcantarillado (SMAPA) supplies drinking water to the commune of Maipú in "
+                "Santiago, Chile.", source_type="GOVERNMENT")
+    reg = registry([OWN, gov])
+    smapa = reg.find("SMAPA")
+    assert smapa is not None and smapa.status == "VERIFIED"
+    assert any(e.relationship == "SERVES_PART" for e in smapa.evidence)
+    assert {c.key for c in reg.verified()} >= {utility_key("Aguas Andinas"), smapa.key}
+
+def test_a_predecessor_is_historical_and_not_merged():
+    gov = chunk("https://www.siss.gob.cl/h", "Aguas Andinas, formerly EMOS, supplies drinking "
+                "water to Santiago, Chile.", source_type="GOVERNMENT")
+    reg = registry([gov])
+    current, emos = reg.find("Aguas Andinas"), reg.find("EMOS")
+    assert current.status == "VERIFIED" and emos.status == "HISTORICAL"
+    assert current.key in emos.predecessor_of and emos.key in current.successor_of
+    assert "EMOS" not in current.aliases and emos.verified_roles == []
+
+def test_now_inside_a_sentence_is_not_a_renaming():
+    gov = chunk("https://www.siss.gob.cl/n", "Aguas Andinas now operates the Maipo Water "
+                "Works (MWW) for Santiago, Chile.", source_type="GOVERNMENT")
+    reg = registry([gov])
+    assert not reg.find("Aguas Andinas").predecessor_of
+
+# --- Houston ------------------------------------------------------------------------------
+
+H = ("Houston", "United States of America")
+
+def test_houston_department_verified_by_the_city_site():
+    gov = chunk("https://www.houstontx.gov/water/", "Houston Public Works provides drinking "
+                "water to the City of Houston, Texas.", source_type="GOVERNMENT")
+    reg = registry([gov], *H)
+    assert status(reg, "Houston Public Works") == "VERIFIED"
+
+def test_a_directory_page_and_another_houston_do_not_verify():
+    directory = chunk("https://www.leadingutilities.org/members/houston-water",
+                      "Houston Water. Population served: 2,100,000.", source_type="OTHER",
+                      title="Houston Water | Leading Utilities of the World")
+    mississippi = chunk("https://msdh.ms.gov/page/30,0,76.html",
+                        "Houston Water Works supplies drinking water to Houston, Chickasaw "
+                        "County.", source_type="GOVERNMENT",
+                        title="Mississippi public water systems")
+    reg = registry([directory, mississippi], *H)
+    assert reg.verified() == []
+    assert status(reg, "Houston Water Works") != "VERIFIED"
+
+def test_claim_names_are_kept_even_without_evidence():
+    reg = registry([], *H, claims=["Houston Water"])
+    assert status(reg, "Houston Water") == "CANDIDATE"
+
+# --- the graph hook: state, events, persistence --------------------------------------------
+
+def test_refresh_records_status_changes_once_and_persists(tmp_path):
+    import asyncio
+    from procedure_helpers import make_engine
+    from water_source_research.agents.nodes import refresh_utility_registry
+    from water_source_research.services.evidence_store import EvidenceRepository
+    store = EvidenceRepository(make_engine(tmp_path, "reg.db"))
+    s = initialize_city_state("Santiago", "Chile")
+    state = {"run_id": "run-r", "research_state": s.model_dump(mode="json"),
+             "evidence_chunks": [NEWS.model_dump(mode="json")], "events": []}
+    first = asyncio.run(refresh_utility_registry(state, store, 2, "discover"))
+    kinds = [(e["kind"], e["attrs"]["utility"], e["attrs"]["to_status"])
+             for e in first["events"]]
+    assert ("UTILITY_STATUS", "Aguas Andinas", "CANDIDATE") in kinds
+    state = {**state, **first, "evidence_chunks": [NEWS.model_dump(mode="json"),
+                                                   OWN.model_dump(mode="json")]}
+    second = asyncio.run(refresh_utility_registry(state, store, 3, "discover"))
+    new = second["events"][len(first["events"]):]
+    assert [(e["attrs"]["from_status"], e["attrs"]["to_status"]) for e in new
+            if e["attrs"]["utility"] == "Aguas Andinas"] == [("CANDIDATE", "VERIFIED")]
+    again = asyncio.run(refresh_utility_registry({**state, **second}, store, 3, "discover"))
+    assert len(again["events"]) == len(second["events"])  # nothing changed, nothing recorded
+    rows = store.utility_candidates("run-r")
+    assert {(r["round"], r["status"]) for r in rows if r["name"] == "Aguas Andinas"} == {
+        (2, "CANDIDATE"), (3, "VERIFIED")}
+    assert all(r["identity"] != "catalog-only" for r in rows)

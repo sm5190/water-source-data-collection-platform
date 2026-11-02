@@ -139,6 +139,33 @@ class FieldResolutionRecord(Base):
     review_decision_id: Mapped[int | None] = mapped_column(Integer)  # REVIEWER rows
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+class RunUtilityCandidateRecord(Base):
+    """A utility candidate of a run's utility registry (services/utility_registry.py) as of the
+    start of a discovery round (``round`` = rounds + 1: after the last round, before
+    validation). Discovery provenance only; never a claim decision."""
+
+    __tablename__ = "run_utility_candidates"
+    __table_args__ = (UniqueConstraint("run_id", "round", "candidate_key",
+                                       name="uq_run_utility_candidates"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    round: Mapped[int] = mapped_column(Integer)
+    candidate_key: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(32))
+    status_reason: Mapped[str | None] = mapped_column(String(1000))
+    verified_roles: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    aliases: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    bound_hosts: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    predecessor_of: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    successor_of: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    origins: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    identity: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 class DiscoveryResultRecord(Base):
     """One search hit as a provider returned it (before merging and ranking), so a later
     diagnosis can tell which URLs the recorded searches returned. Proves only what the

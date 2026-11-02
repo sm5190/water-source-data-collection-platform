@@ -64,8 +64,8 @@ class Probe:
                 probe.in_flight -= 1
             return await original_acquire(state)
 
-        def make_validate(fields):
-            original_validate = original_make_validate(fields)
+        def make_validate(fields, *args, **kwargs):
+            original_validate = original_make_validate(fields, *args, **kwargs)
 
             async def validate(state):
                 run_id = state["run_id"]

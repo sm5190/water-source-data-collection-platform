@@ -26,12 +26,13 @@ from water_source_research.schemas.events import (
 )
 from water_source_research.schemas.records import RecordSet
 from water_source_research.schemas.research import (
-    CityResearchState, ClaimQualifiers, FieldClaim, FieldDefinition,
+    CityResearchState, ClaimQualifiers, EvidenceChunk, FieldClaim, FieldDefinition,
 )
 from water_source_research.context_manager import (
     ContextBundle, ContextPurpose, ContextService, ContextStatus,
 )
 from water_source_research.services.evidence_store import EvidenceRepository
+from water_source_research.services.utility_registry import build_registry
 from water_source_research.services.field_state import initialize_city_state
 from water_source_research.services.normalization import EvidenceIndex, normalize_research
 from water_source_research.services.record_store import RecordRepository
@@ -84,6 +85,9 @@ def make_discover_node(
     async def discover_node(state: GraphState) -> GraphState:
         state = {**state, **apply_selected_procedures(state, usage_tracker)}
         rounds = state.get("discovery_rounds", 0) + 1
+        if state.get("evidence_chunks"):  # the registry as of this round's start
+            state = {**state, **await refresh_utility_registry(state, evidence_store, rounds,
+                                                               "discover")}
         if discovery is None:  # no providers configured: nothing to discover
             return {**state, "candidate_urls": state.get("candidate_urls", []),
                     "discovery_rounds": rounds}
@@ -102,6 +106,53 @@ def make_discover_node(
                     log.warning("could not store raw discovery results", exc_info=True)
         return {**state, **updates, "discovery_rounds": rounds}
     return discover_node
+
+def _documents_by_url(state: GraphState) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for d in state.get("acquired_documents", []):
+        for u in (d.get("final_url"), d.get("requested_url"), d.get("canonical_url")):
+            if u:
+                out.setdefault(u, d)
+    return out
+
+def utility_status_events(events: list[dict], previous: Mapping | None,
+                          registry: Mapping, node: str) -> list[dict]:
+    """One UTILITY_STATUS event per candidate whose status, roles or hosts changed."""
+    before = {c["key"]: c for c in (previous or {}).get("candidates", [])}
+    for c in registry.get("candidates", []):
+        old = before.get(c["key"])
+        same = old is not None and (old["status"], old.get("verified_roles"),
+                                    old.get("bound_hosts")) == (
+            c["status"], c.get("verified_roles"), c.get("bound_hosts"))
+        if same:
+            continue
+        events = append_event(
+            events, kind=EventKind.UTILITY_STATUS, node=node, field_key="utility_name",
+            strategy=c["status"], attrs={
+                "utility": c["name"], "from_status": old["status"] if old else None,
+                "to_status": c["status"], "roles": ",".join(c.get("verified_roles") or []),
+                "hosts": ",".join(c.get("bound_hosts") or []),
+                "reason_code": (c.get("status_reason") or "")[:300]})
+    return events
+
+async def refresh_utility_registry(state: GraphState, evidence_store: EvidenceRepository | None,
+                                   round_no: int, node: str) -> GraphState:
+    """Rebuild the utility registry from the run's evidence and claims; record changes as
+    events and persist it (soft: a failure is logged, never fails the run)."""
+    chunks = [EvidenceChunk.model_validate(c) for c in state.get("evidence_chunks", [])]
+    research = CityResearchState.model_validate(state["research_state"])
+    registry = await asyncio.to_thread(build_registry, research, chunks,
+                                       _documents_by_url(state))
+    data = registry.model_dump(mode="json")
+    events = utility_status_events(list(state.get("events", [])),
+                                   state.get("utility_registry"), data, node)
+    if evidence_store is not None and state.get("run_id") and data["candidates"]:
+        try:
+            await asyncio.to_thread(evidence_store.save_utility_registry, state["run_id"],
+                                    round_no, data)
+        except Exception:
+            log.warning("could not store the utility registry", exc_info=True)
+    return {"utility_registry": data, "events": events}
 
 def utility_hosts(state: GraphState) -> list[str]:
     """Hosts of successfully acquired documents classified as the city's utility, most
@@ -534,12 +585,16 @@ def llm_usage(calls: list[dict]) -> dict[str, object]:
         usage["cached_tokens"] = sum(cached)
     return usage
 
-def make_validate_node(fields: Mapping[str, FieldDefinition]):
+def make_validate_node(fields: Mapping[str, FieldDefinition],
+                       evidence_store: EvidenceRepository | None = None):
     """Normalize and validate every candidate claim (deterministic; no model calls).
 
     Claims are never dropped: each gets a stable claim_uid and a ClaimValidation, and INVALID
     claims stay visible candidates that resolution never selects."""
     async def validate_node(state: GraphState) -> GraphState:
+        if state.get("evidence_chunks"):  # the registry after the last round
+            state = {**state, **await refresh_utility_registry(
+                state, evidence_store, state.get("discovery_rounds", 0) + 1, "validate")}
         research = CityResearchState.model_validate(state["research_state"])
         with get_tracer().start_as_current_span("graph.validate") as span:
             span.set_attribute("graph.run_id", state.get("run_id", ""))
