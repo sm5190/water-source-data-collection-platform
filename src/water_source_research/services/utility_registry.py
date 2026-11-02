@@ -40,6 +40,7 @@ never merged with its successor, and one's verification never verifies the other
 import re
 from itertools import pairwise
 from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 from water_source_research.discovery.normalize import host_names_org
@@ -66,7 +67,8 @@ _ORG_PATTERNS = [
                rf"Utility\s+District|Water\s+Authority)\b"),
     re.compile(rf"\b(?:Aguas|Agua|Empresa|Compañía|Compania|Companhia|Sociedad|Corporación|"
                rf"Servicio|Serviço|Acueducto|Obras\s+Sanitarias)(?:\s+(?:de|del|de\s+la|"
-               rf"de\s+los|das|dos|da|do|y|e)?\s*{_CAP}){{1,6}}(?:\s+S\.?\s?A\.?)?"),
+               rf"de\s+los|das|dos|da|do|(?:y|e)(?=\s+(?:Alcantarillado|Saneamiento|Sanitari|"
+               rf"Aseo)))?\s*{_CAP}){{1,6}}(?:\s+S\.?\s?A\.?)?"),
     re.compile(rf"\b(?:Société|Régie|Compagnie|Office)\s+(?:{_CAP}\s+|des\s+|de\s+)*Eaux"
                rf"(?:\s+(?:de|du|d['’])\s*{_CAP})?"),
     re.compile(rf"\b{_CAP}\s+Wasser\b|\bWasserwerke?\s+{_CAP}|\b{_CAP}\s+Wasserwerke?\b|"
@@ -89,7 +91,55 @@ _GENERIC = frozenset({"the", "water", "public", "works", "utility", "utilities",
     "wasserwerk", "wasserwerke", "stadtwerke", "municipal", "metropolitana", "national",
     "city"})
 
+# Words that describe water rather than name an organisation ("Surface Water", "Bottled
+# Water", "Agua Potable y Saneamiento"): a name made only of these and generic words isn't one.
+_DESCRIPTORS = frozenset({
+    "surface", "waste", "ground", "rain", "storm", "bottled", "clean", "drinking", "potable",
+    "raw", "treated", "fresh", "sea", "tap", "annual", "additional", "safe", "quality", "urban",
+    "rural", "global", "world", "regional", "private", "new", "total", "basic", "sanitation",
+    "sewer", "wastewater", "groundwater", "alcantarillado", "saneamiento", "aseo", "basico",
+    "sanitario", "sanitaria", "sanitarios", "servicios", "abastecimiento", "urbano", "urbana",
+    "reclaimed", "recycled", "hot", "cold", "grey", "gray", "emergency", "integrated",
+    "sustainable", "smart", "future", "virtual", "blue", "green", "mineral", "spring", "river",
+    "lake", "bulk", "production", "resources", "resource", "management", "security", "scarcity",
+    "directive", "framework", "partnership", "program", "programme", "project", "fund", "day",
+    "week", "report", "plan", "monitoring", "research", "institute", "association",
+    "network", "forum", "council", "agency", "development", "commission", "standards",
+    "american", "african", "european", "asian", "africa", "europe", "asia", "america", "eu",
+    "un", "us", "uk"})
+# Sentence fragments the patterns can catch before a name ("About <City> Water", "Although
+# ...", "At ..."): stripped from the start; a name that is only these is dropped.
+_LEADING_STOP = frozenset({
+    "about", "contact", "although", "at", "the", "la", "el", "los", "las", "our", "your", "a",
+    "an", "and", "in", "on", "from", "for", "by", "with", "as", "if", "when", "while", "us",
+    "this", "that", "these", "those", "all", "each", "every", "more", "most", "some", "other",
+    "such", "into", "over", "under", "through", "between", "per", "via", "since", "review",
+    "figure", "table", "chapter", "section", "see", "note", "source", "sources", "en", "de",
+    "del", "y", "o", "ou", "et", "und", "der", "die", "das"})
+# "<X> Water Tower", "<X> Water Treatment Plant", "<X> Water Report": not organisations.
+_AFTER_FRAGMENT = frozenset({
+    "tower", "towers", "tank", "tanks", "treatment", "plant", "plants", "main", "mains",
+    "pipeline", "pipelines", "reservoir", "reservoirs", "quality", "supply", "resources",
+    "management", "report", "reports", "directive", "framework", "fund", "act", "law", "day",
+    "week", "museum", "park", "crisis", "conflict", "sector", "sources", "source", "use",
+    "users", "rights", "bill", "bills", "tariff", "tariffs", "meter", "meters", "sampling",
+    "policy", "strategy", "project", "projects", "program", "programme", "system", "systems",
+    "network", "scheme", "station", "stations", "intake", "intakes", "dam", "basin",
+    "security", "demand", "levels", "level", "footprint", "cycle", "infrastructure"})
+# Government, research and finance bodies: named in the evidence, but not utilities.
+_NON_UTILITY_HEADS = frozenset({
+    "direccion", "dirección", "ministerio", "ministry", "superintendencia", "secretaria",
+    "secretaría", "instituto", "institute", "directorate", "agencia", "agency", "comision",
+    "comisión", "consejo", "bank", "banco", "fondo", "fund", "programa", "program",
+    "university", "universidad", "universidade",
+    "bureau", "association", "asociación", "federation", "network", "forum"})
+# Service nouns: "el suministro de agua potable" names a service, not who provides it.
+_NOMINAL = re.compile(r"^(suministro|suministros|distribuci[oó]n|abastecimiento|prestaci[oó]n|"
+                      r"gesti[oó]n|operaci[oó]n|distribution|distributor|distribuidora|"
+                      r"servicio|servicios|management|operation|operations)$", re.IGNORECASE)
 _SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
+_FIRST_PERSON = re.compile(r"\b(we|our|us|nosotros|nuestr[oa]s?|n[oó]s|noss[oa]s?|nous|"
+                           r"notre|nos|wir|unser\w*)\b", re.IGNORECASE)
 SERVICE_VERBS = re.compile(
     r"\b(suppl(?:y|ies|ied|ying)|provid(?:e|es|ed|ing)|deliver(?:s|ed|ing)?|serv(?:e|es|ed|"
     r"ing)|distribut\w*|operat(?:es|ed|ing)|manag(?:es|ed|ing)|responsible\s+for|"
@@ -156,17 +206,27 @@ def utility_key(name: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", k).split())
 
 def _clean(name: str) -> str:
-    name = re.sub(r"^(?:The|the|La|El|Los|Las)\s+", "", name.strip(" ,.;:()"))
-    return " ".join(name.split())
+    words = name.strip(" ,.;:()").split()
+    while words and words[0].casefold().strip(".,") in _LEADING_STOP:
+        words = words[1:]
+    return " ".join(words)
 
-def _specific(name: str, exclude: set[str]) -> bool:
+def _specific(name: str, exclude: set[str], places: frozenset[str] = frozenset()) -> bool:
+    """An organisation name, not a description: at least one word that is neither generic,
+    a water descriptor, nor a country/continent name; no possessive, digits or initials."""
+    if not name or re.search(r"['’]s\b|\d", name) or re.search(r"\b[A-Z]\.\s", name):
+        return False
     words = utility_key(name).split()
     if not words:
         return False
     if name.isupper() and 2 < len(name) <= 8:
         return True
+    if fold(words[0]) in _NON_UTILITY_HEADS:
+        return False
     # "<City> Public Works" is specific; the city name or "Public Works" alone is not.
-    return any(w not in _GENERIC for w in words) and utility_key(name) not in exclude
+    distinctive = [w for w in words if w not in _GENERIC and w not in _DESCRIPTORS
+                   and w not in places and len(w) > 1]
+    return bool(distinctive) and utility_key(name) not in exclude
 
 def _host(url: str) -> str:
     return (urlsplit(url or "").hostname or "").casefold().removeprefix("www.")
@@ -189,19 +249,41 @@ class _Doc:
     source_type: str | None
     scope: DocumentScope
 
-def mine_names(texts: Iterable[str], exclude: set[str]) -> tuple[list[str], dict[str, str]]:
-    """(organisation names found, alias -> full-name key from "Full Name (ABBR)")."""
+_TITLE_SEGMENTS = re.compile(r"\s*[|–—]\s*|\s+-\s+")
+
+def mine_names(texts: Iterable[str], exclude: set[str], titles: Iterable[str] = (),
+               places: frozenset[str] = frozenset()) -> tuple[list[str], dict[str, str]]:
+    """(organisation names found, alias -> full-name key from "Full Name (ABBR)"). In titles
+    only a whole title segment counts ("Home - <City> Water Company"), so title-case
+    headlines ("<Name> Cuts Water ...") don't become names."""
     names: dict[str, str] = {}
     aliases: dict[str, str] = {}
-    for text in texts:
+    for title in titles:
+        for segment in _TITLE_SEGMENTS.split(title or ""):
+            seg = _clean(segment)
+            if seg and any(p.fullmatch(seg) for p in _ORG_PATTERNS) and _specific(
+                    seg, exclude, places):
+                names.setdefault(utility_key(seg), seg)
+    # One sentence at a time: a name never spans a sentence boundary ("United States.
+    # <City> Public Works ...").
+    sentences = (st for text in texts for st in _SENTENCE.split(text) if st.strip())
+    for text in sentences:
         for pattern in _ORG_PATTERNS:
             for m in pattern.finditer(text):
+                after = text[m.end():m.end() + 30].split()
+                if after and after[0].casefold().strip(".,;:()") in _AFTER_FRAGMENT:
+                    continue
                 n = _clean(m.group(0))
-                if _WATER_WORD.search(n) and _specific(n, exclude):
+                if _WATER_WORD.search(n) and _specific(n, exclude, places):
                     names.setdefault(utility_key(n), n)
         for m in _ABBR.finditer(text):
             full, abbr = _clean(m.group(1)), m.group(2).strip(".")
-            if _WATER_WORD.search(full) and _specific(full, exclude):
+            # A name given with its own acronym is an organisation even when its words are
+            # generic ("Servicio Municipal de Agua Potable y Alcantarillado (SMAPA)").
+            if _WATER_WORD.search(full) and utility_key(full) not in exclude and (
+                    _specific(full, exclude, places) or abbr.isupper()) and len(
+                    full.split()) > 1 and fold(utility_key(full).split()[0]) not in \
+                    _NON_UTILITY_HEADS:
                 names.setdefault(utility_key(full), full)
                 aliases[utility_key(abbr)] = utility_key(full)
                 aliases.setdefault(f"_abbr:{utility_key(abbr)}", abbr)
@@ -229,13 +311,17 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
                        if cl.value is not None and cl.review_status != "REJECTED"]
     exclude = {utility_key(x) for x in (city, country or "") if x} | {
         utility_key(n) for n in matcher.region_names + matcher.country_names}
+    from water_source_research.services.places import gazetteer
+    places = frozenset(w for n in (*gazetteer()[1], *matcher.country_names)
+                       for w in utility_key(n).split())
 
     found: dict[str, UtilityCandidate] = {}
 
     def add(name: str, origin: str) -> UtilityCandidate | None:
         name = _clean(name)
         k = utility_key(name)
-        if not k or not _specific(name, exclude):
+        if not k or (origin not in ("claim", "acronym")
+                     and not _specific(name, exclude, places)):
             return None
         cand = found.get(k)
         if cand is None:
@@ -246,10 +332,11 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
 
     for n in claim_names:
         add(n, "claim")
-    mined, alias_map = mine_names([*(d.title for d in docs.values()),
-                                   *(c.text for c in chunks)], exclude)
+    mined, alias_map = mine_names([c.text for c in chunks], exclude,
+                                  titles=[d.title for d in docs.values()], places=places)
+    with_acronym = {v for k, v in alias_map.items() if not k.startswith("_abbr:")}
     for n in mined:
-        add(n, "text")
+        add(n, "acronym" if utility_key(n) in with_acronym else "text")
     for abbr_key, full_key in list(alias_map.items()):
         if abbr_key.startswith("_abbr:"):
             continue
@@ -267,26 +354,61 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
 
     _predecessors(found, chunks, add)
     patterns = {k: _name_re(c.all_names()) for k, c in found.items()}
-    _bind_hosts(found, patterns, docs, chunks)
+    _bind_hosts(found, patterns, docs, chunks, places)
+    owner: dict[str, list[str]] = {}
+    for k, cand in found.items():
+        for h in cand.bound_hosts:
+            owner.setdefault(h, []).append(k)
+    by_url: dict[str, list[EvidenceChunk]] = {}
+    for c in chunks:
+        by_url.setdefault(c.url, []).append(c)
+    doc_places: dict[str, Any] = {}
+
+    def doc_place(url: str):
+        """Whether the document as a whole is about the city (title + first passages)."""
+        if url not in doc_places:
+            d = docs[url]
+            text = " ".join([d.title or "", *(c.text[:2000] for c in by_url[url][:3])])
+            doc_places[url] = matcher.match_place(text, d.scope)
+        return doc_places[url]
+
     for c in chunks:
         doc = docs[c.url]
         low = c.text.casefold()
+        named: set[str] = set()
         for k, cand in found.items():
             pattern = patterns[k]
             if pattern is None or not any(n.casefold()[:12] in low for n in cand.all_names()):
                 continue
             for s in _SENTENCE.split(c.text):
                 if s.strip() and pattern.search(s):
-                    ev = _classify(s, pattern, cand, doc, c.chunk_id, matcher)
+                    named.add(s)
+                    ev = _classify(s, pattern, cand, doc, c.chunk_id, matcher, doc_place)
                     if ev is not None:
+                        cand.evidence.append(ev)
+        own = owner.get(doc.host, [])
+        if len(own) > 1:  # several bound: the one the page's title names
+            titled = [k for k in own if patterns[k] is not None
+                      and patterns[k].search(doc.title or "")]
+            own = titled
+        if len(own) == 1:  # "we supply water to ..." on the utility's own site
+            cand = found[own[0]]
+            for s in _SENTENCE.split(c.text):
+                if s.strip() and s not in named and _FIRST_PERSON.search(s):
+                    ev = _classify(s, None, cand, doc, c.chunk_id, matcher, doc_place)
+                    if ev is not None and ev.relationship != "MENTION_ONLY":
+                        ev.geo_reason = (ev.geo_reason + "; first-person statement on its "
+                                         "own site").strip("; ")
                         cand.evidence.append(ev)
     for cand in found.values():
         _decide(cand, found)
     order = {"VERIFIED": 0, "SANITATION_ONLY": 1, "CANDIDATE": 2, "AMBIGUOUS_GEOGRAPHY": 3,
              "HISTORICAL": 4, "OTHER_CITY": 5, "NON_SERVING": 6}
+    # Names that are only mentioned (no relationship of any kind, no own host, no claim) are
+    # not kept: a mention is not evidence of anything.
     kept = [c for c in found.values()
-            if "claim" in c.origins or c.evidence or c.bound_hosts or c.predecessor_of
-            or c.successor_of]
+            if "claim" in c.origins or c.bound_hosts or c.predecessor_of or c.successor_of
+            or any(e.relationship != "MENTION_ONLY" for e in c.evidence)]
     kept.sort(key=lambda c: (order[c.status], c.name.casefold()))
     return UtilityRegistry(policy_version=UTILITY_POLICY_VERSION, city=city, country=country,
                            identity=identity_signature(city, country), candidates=kept)
@@ -365,8 +487,23 @@ def _predecessors(found: dict[str, UtilityCandidate], chunks: Sequence[EvidenceC
                         host=_host(c.url), chunk_id=c.chunk_id, quote=quote,
                         source_type=c.source_type, other=p.name))
 
+def _spells(cand: UtilityCandidate, host: str, places: frozenset[str]) -> bool:
+    """The host spells the candidate itself: one of its distinctive words (4+ letters) or an
+    acronym alias is in a host label, and discovery's org/host check agrees. A generic label
+    ("water.igad.int") never counts."""
+    labels = [lab for lab in host.split(".")[:-1] if lab not in ("www", "com", "org", "net",
+                                                                 "co", "gov", "go", "ac")]
+    words = {w for n in cand.all_names() for w in utility_key(n).split()
+             if len(w) >= 4 and w not in _GENERIC and w not in _DESCRIPTORS and w not in places}
+    acronyms = {utility_key(a).replace(" ", "") for a in cand.aliases if a.isupper()}
+    hit = any(w in lab.replace("-", "") for lab in labels for w in words) or any(
+        lab.startswith(a) for lab in labels for a in acronyms if len(a) >= 3)
+    return hit and any(host_names_org(n, host) for n in cand.all_names()) or (
+        hit and bool(acronyms))
+
 def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pattern | None],
-                docs: Mapping[str, _Doc], chunks: Sequence[EvidenceChunk]) -> None:
+                docs: Mapping[str, _Doc], chunks: Sequence[EvidenceChunk],
+                places: frozenset[str] = frozenset()) -> None:
     """A host is the candidate's own when it spells the candidate's name and its pages name
     the candidate (title or text), and it isn't about another country or region."""
     text_by_host: dict[str, list[str]] = {}
@@ -383,19 +520,42 @@ def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pa
         for host, texts in text_by_host.items():
             if not host or host in elsewhere:
                 continue
-            if (host not in cand.bound_hosts
-                    and any(host_names_org(n, host) for n in cand.all_names())
+            if (host not in cand.bound_hosts and _spells(cand, host, places)
                     and any(p.search(t) for t in texts)):
                 cand.bound_hosts.append(host)
 
-def _classify(sentence: str, pattern: re.Pattern[str], cand: UtilityCandidate, doc: _Doc,
-              chunk_id: str, matcher: GeoMatcher) -> UtilityEvidence | None:
-    rest = pattern.sub(" ", sentence)
-    title = pattern.sub(" ", doc.title or "")
+def _acting(sentence: str, pattern: re.Pattern[str] | None, rest: str) -> bool:
+    """Is the candidate the one providing the service? Its name (or the first person, on its
+    own site) comes before a service verb (not a service noun) within VERB_WINDOW characters,
+    or it is introduced as "the water utility of ..."."""
+    if UTILITY_IDENTITY.search(rest):
+        return True
+    starts = ([m.end() for m in pattern.finditer(sentence)] if pattern is not None
+              else [m.end() for m in _FIRST_PERSON.finditer(sentence)])
+    for v in SERVICE_VERBS.finditer(sentence):
+        if _NOMINAL.match(v.group(0)):
+            continue
+        if any(0 <= v.start() - a <= VERB_WINDOW for a in starts):
+            return True
+    return False
+
+VERB_WINDOW = 150
+
+def _classify(sentence: str, pattern: re.Pattern[str] | None, cand: UtilityCandidate,
+              doc: _Doc, chunk_id: str, matcher: GeoMatcher,
+              doc_place=None) -> UtilityEvidence | None:
+    rest = pattern.sub(" ", sentence) if pattern is not None else sentence
+    title = pattern.sub(" ", doc.title or "") if pattern is not None else (doc.title or "")
     place = matcher.match_place(rest, doc.scope, context=title)
+    if place.status == "NONE" and doc_place is not None:
+        whole = doc_place(doc.url)  # the sentence names no place: the document's place
+        if whole.is_target:
+            from water_source_research.services.geo_match import GeoMatch
+            place = GeoMatch("PROBABLE", f"the document is about the city ({whole.reason})",
+                             whole.evidence)
     quote = " ".join(sentence.split())[:400]
     relationship, role = "MENTION_ONLY", None
-    serving_words = SERVICE_VERBS.search(rest) or UTILITY_IDENTITY.search(rest)
+    serving_words = _acting(sentence, pattern, rest)
     potable = POTABLE.search(rest) or UTILITY_IDENTITY.search(rest)
     to_people = re.search(r"\b(residents|inhabitants|population|customers|households|"
                           r"people|habitantes|clientes|hogares|vecinos|usuarios)\b", rest,

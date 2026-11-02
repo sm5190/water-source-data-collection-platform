@@ -1,0 +1,56 @@
+# Which organisations supply each evaluated city's drinking water: evaluation expectations
+# only (never read by research; tests/test_no_hardcoded_answers.py keeps them out of src/ and
+# config/). Drafted by the assistant from general knowledge, NOT from the reference workbook,
+# on 2026-11-01. Every entry is UNCONFIRMED until a person confirms it (status: CONFIRMED).
+version: 1
+status: UNCONFIRMED
+cities:
+  - city: Santiago
+    country: Chile
+    serving:
+      - {name: Aguas Andinas, hosts: [aguasandinas.cl], role: DRINKING_WATER_OPERATOR,
+         note: main operator of Greater Santiago}
+      - {name: Aguas Cordillera, hosts: [], role: DRINKING_WATER_OPERATOR,
+         note: group subsidiary serving eastern communes}
+      - {name: Aguas Manquehue, hosts: [], role: DRINKING_WATER_OPERATOR,
+         note: group subsidiary serving some communes}
+      - {name: SMAPA, hosts: [], role: DRINKING_WATER_OPERATOR, note: municipal operator in Maipú}
+    predecessors:
+      - {name: EMOS, successor: Aguas Andinas}
+    not_serving:
+      - {name: Almar Water Solutions, hosts: [almarwater.com], why: water-infrastructure company}
+      - {name: Aguas Horizonte, hosts: [aguashorizonte.cl], why: desalination for a mine}
+  - city: Houston
+    country: United States of America
+    serving:
+      - {name: Houston Public Works, aliases: [Houston Water, City of Houston Public Works],
+         hosts: [houstonpublicworks.org, houstontx.gov],
+         role: DRINKING_WATER_OPERATOR, note: "city department; 'Houston Water' is its division name"}
+      - {name: Coastal Water Authority, hosts: [], role: WHOLESALE_SUPPLIER,
+         note: raw-water conveyance to the city's plants}
+    not_serving:
+      - {name: City of Houston (Mississippi), hosts: [msdh.ms.gov], why: another Houston}
+      - {name: McCarthy Building Companies, hosts: [], why: contractor}
+  - city: Nairobi
+    country: Kenya
+    serving:
+      - {name: Nairobi City Water and Sewerage Company, aliases: [Nairobi Water Company,
+         Nairobi City Water, NCWSC], hosts: [nairobiwater.co.ke],
+         role: DRINKING_WATER_OPERATOR}
+    not_serving:
+      - {name: Oloolaiser Water and Sewerage Company, hosts: [oloolaiserwatercompany.co.ke],
+         why: serves neighbouring towns (Ongata Rongai, Kiserian)}
+  - city: Luanda
+    country: Angola
+    serving:
+      - {name: Empresa Pública de Águas de Luanda, aliases: [EPAL,
+         Luanda Provincial Water Company], hosts: [epal.co.ao],
+         role: DRINKING_WATER_OPERATOR, note: EPAL}
+  - city: Vienna
+    country: Austria
+    serving:
+      - {name: Vienna Water, aliases: [Wiener Wasser], hosts: [wien.gv.at],
+         role: DRINKING_WATER_OPERATOR,
+         note: "Wiener Wasser, Municipal Department 31"}
+    not_serving:
+      - {name: Town of Vienna (Virginia), hosts: [viennava.gov], why: another Vienna}

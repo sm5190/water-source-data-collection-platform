@@ -141,7 +141,9 @@ def test_now_inside_a_sentence_is_not_a_renaming():
     gov = chunk("https://www.siss.gob.cl/n", "Aguas Andinas now operates the Maipo Water "
                 "Works (MWW) for Santiago, Chile.", source_type="GOVERNMENT")
     reg = registry([gov])
-    assert not reg.find("Aguas Andinas").predecessor_of
+    for name in ("Aguas Andinas", "MWW", "Maipo Water Works"):
+        cand = reg.find(name)
+        assert cand is None or not (cand.predecessor_of or cand.successor_of), name
 
 # --- Houston ------------------------------------------------------------------------------
 
@@ -196,3 +198,42 @@ def test_refresh_records_status_changes_once_and_persists(tmp_path):
     assert {(r["round"], r["status"]) for r in rows if r["name"] == "Aguas Andinas"} == {
         (2, "CANDIDATE"), (3, "VERIFIED")}
     assert all(r["identity"] != "catalog-only" for r in rows)
+
+# --- precision on real stored text (Nairobi, Santiago, Houston runs) -----------------------
+
+def test_water_descriptions_are_not_organisations():
+    """'Surface Water' and 'Waste Water' were VERIFIED on the stored Nairobi run, through a
+    'water.' subdomain: descriptions are not names, a generic host label binds nothing."""
+    igad = chunk("https://water.igad.int/resources/x.pdf",
+                 "Surface Water from the Tana Basin supplies drinking water to Nairobi, Kenya. "
+                 "Waste Water is treated at Dandora for Nairobi, Kenya.", source_type="TECHNICAL")
+    reg = registry([igad], "Nairobi", "Kenya")
+    assert reg.find("Surface Water") is None and reg.find("Waste Water") is None
+    assert reg.verified_hosts() == []
+
+def test_headlines_and_fragments_are_not_names():
+    news = chunk("https://www.riotimesonline.com/x", "About Houston Water and Africa's Water.",
+                 title="Aguas Andinas Cuts Water in 4 Santiago Areas | The Rio Times")
+    reg = registry([news])
+    assert reg.find("Aguas Andinas Cuts Water") is None
+    assert reg.find("Africa's Water") is None
+
+def test_first_person_statements_on_the_utilitys_own_site_count():
+    home = chunk("https://nairobiwater.co.ke/", "Welcome.", source_type="UTILITY",
+                 title="Home - Nairobi Water Company", cid="h")
+    supply = chunk("https://nairobiwater.co.ke/know-your-supply-day/", "We supply drinking "
+                   "water to the different areas of Nairobi, Kenya.", source_type="UTILITY",
+                   title="Know your Supply Day - Nairobi Water Company", cid="s")
+    reg = registry([home, supply], "Nairobi", "Kenya")
+    cand = reg.find("Nairobi Water Company")
+    assert cand.status == "VERIFIED" and cand.bound_hosts == ["nairobiwater.co.ke"]
+    assert any("first-person" in e.geo_reason for e in cand.evidence)
+
+def test_a_statement_without_a_place_takes_the_documents_place():
+    wqr = chunk("https://houstonpublicworks.org/wqr.pdf", "Houston Water Quality Report 2025 "
+                "for Houston, Texas, United States. Houston Public Works produces and "
+                "distributes drinking water through 7,000 miles of pipeline.",
+                source_type="UTILITY", title="Houston Water Quality Report")
+    reg = registry([wqr], *H)
+    ev = [e for e in reg.find("Houston Public Works").evidence if e.relationship == "SERVES"]
+    assert ev and ev[0].geo_status in ("CONFIRMED", "PROBABLE")

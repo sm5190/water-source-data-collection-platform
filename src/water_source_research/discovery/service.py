@@ -226,4 +226,15 @@ def build_discovery_service(settings: Any = None, **http_kwargs: Any) -> Discove
                                                   **http_kwargs))
     crossref = (CrossrefDiscovery(settings.crossref_mailto, d, **http_kwargs)
                 if "crossref" in enabled else None)
+    if d.replay_paths:
+        from .recorded import RecordedProvider, load_snapshots
+        snaps = load_snapshots(*[p.strip() for p in d.replay_paths.split(",") if p.strip()])
+        web = [RecordedProvider(p.name, snaps, p if d.replay_live_on_miss else None)
+               for p in web]
+        scholarly = [RecordedProvider(p.name, snaps, p if d.replay_live_on_miss else None)
+                     for p in scholarly]
+    if d.record_path:
+        from .recorded import RecordingProvider
+        web = [RecordingProvider(p, d.record_path, d.record_label) for p in web]
+        scholarly = [RecordingProvider(p, d.record_path, d.record_label) for p in scholarly]
     return DiscoveryService(d, web=web, scholarly=scholarly, crossref=crossref)

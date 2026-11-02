@@ -56,6 +56,14 @@ class DiscoverySettings(BaseModel):
     crossref_verify_top_n: int = Field(default=15, ge=0)
     semantic_scholar_related_per_round: int = Field(default=0, ge=0)  # related-paper expansion
 
+    # Controlled experiments (discovery/recorded.py): append every provider response to this
+    # JSON-lines snapshot, or serve searches from recorded snapshots (comma-separated paths;
+    # a query not recorded is a miss: empty, or live with replay_live_on_miss).
+    record_path: str | None = None
+    record_label: str = ""
+    replay_paths: str | None = None
+    replay_live_on_miss: bool = False
+
     # Rate limits per provider
     searxng_limits: SearXNGLimits = Field(default_factory=SearXNGLimits)
     openalex_limits: OpenAlexLimits = Field(default_factory=OpenAlexLimits)
