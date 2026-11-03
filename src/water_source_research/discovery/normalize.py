@@ -339,6 +339,21 @@ def is_city_domain(host: str, city: str) -> bool:
     """Is ``host`` the city's own website (toronto.ca, cityofhouston.gov, ville-paris.fr)?"""
     return _is_city_domain(host.replace("-", ""), city)
 
+# A city department's own host spelled from the city's name ("<city>publicworks.org"): a hint
+# for acquisition priority only (MUNICIPAL_CANDIDATE). Never authority: anyone can register
+# such a name; affiliation needs independent corroboration (Milestone 3.1 Phase 3).
+_DEPARTMENT_LABELS = ("publicworks", "dpw", "waterworks", "utilities", "waterdept",
+                      "waterdepartment", "watersewer", "waterandsewer")
+
+def municipal_hint(host: str, city: str | None) -> bool:
+    compact = _NON_ALNUM.sub("", fold(city or ""))
+    if len(compact) < 3:
+        return False
+    labels = (host or "").casefold().removeprefix("www.").split(".")[:-1]
+    return any(label in {f"{compact}{d}" for d in _DEPARTMENT_LABELS}
+               | {f"{d}{compact}" for d in _DEPARTMENT_LABELS}
+               | {f"cityof{compact}{d}" for d in _DEPARTMENT_LABELS} for label in labels)
+
 def _is_city_domain(host: str, city: str) -> bool:
     compact = _NON_ALNUM.sub("", fold(city))
     if len(compact) < 3:

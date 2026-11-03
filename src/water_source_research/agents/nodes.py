@@ -185,6 +185,19 @@ def utility_hosts(state: GraphState) -> list[str]:
             out += [h for h in c.get("bound_hosts") or [] if h not in suppressed]
     return list(dict.fromkeys(out))
 
+def candidate_hosts(state: GraphState) -> list[str]:
+    """Bound hosts of unverified utility candidates that a claim names (CANDIDATE /
+    AMBIGUOUS_GEOGRAPHY), not suppressed: acquisition order only (after official pages),
+    never site: queries or authority."""
+    registry = state.get("utility_registry") or {}
+    suppressed = set(state.get("suppressed_hosts") or [])
+    out: list[str] = []
+    for c in registry.get("candidates", []):
+        if c.get("status") in ("CANDIDATE", "AMBIGUOUS_GEOGRAPHY") and "claim" in (
+                c.get("origins") or []):
+            out += [h for h in c.get("bound_hosts") or [] if h not in suppressed]
+    return list(dict.fromkeys(out))
+
 # Publisher kinds whose hosts may be suppressed, and those that never are.
 SUPPRESSIBLE_KINDS = frozenset({"COMMERCIAL", "DIRECTORY"})
 PROTECTED_KINDS = frozenset({"GOVERNMENT", "REGULATOR", "ACADEMIC", "TECHNICAL",
@@ -366,7 +379,9 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
                                               round_no=state.get("discovery_rounds", 1),
                                               priority_hosts=utility_hosts(state),
                                               skip_hosts=state.get("suppressed_hosts") or [],
-                                              features=features)
+                                              features=features,
+                                              candidate_hosts=candidate_hosts(state),
+                                              city=research.city_name)
     chunks = list(state.get("evidence_chunks", []))
     known = {c["chunk_id"] for c in chunks}
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]

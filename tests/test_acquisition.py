@@ -185,7 +185,8 @@ def test_selection_prefers_official_and_caps_hosts():
              candidate("https://gov.example/x", source_type="GOVERNMENT"),
              candidate("https://water.gov.example/data.xlsx", source_type="UTILITY")]
     chosen = select_candidates(cands, set(), s, budget=10)
-    assert [c["url"] for c in chosen] == ["https://water.gov.example/a", "https://gov.example/x",
+    # Milestone 3.1: government before an unverified UTILITY classification
+    assert [c["url"] for c in chosen] == ["https://gov.example/x", "https://water.gov.example/a",
                                           "https://uni.example/p"]
 
 def test_round_acquires_html_and_pdf_and_ignores_snippets():

@@ -15,7 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
-from water_source_research.discovery.normalize import canonical_url
+from water_source_research.discovery.normalize import canonical_url, municipal_hint
 from water_source_research.observability.otel import get_tracer
 from water_source_research.observability.tracing import safe_url
 from water_source_research.schemas.research import EvidenceChunk
@@ -32,6 +32,12 @@ log = logging.getLogger(__name__)
 # Official/primary sources first; academic and other web results only fill remaining slots.
 TIER_ORDER = {"UTILITY": 0, "GOVERNMENT": 1, "REGULATORY": 2, "TECHNICAL": 3, "ACADEMIC": 4}
 OTHER_TIER = 5
+# Selection groups (Milestone 3.1): a UTILITY classification is not a serving relationship, so
+# it no longer outranks government pages; unverified UTILITY-classified pages keep a small
+# quota so a real utility not yet verified still gets fetched.
+G_VERIFIED, G_OFFICIAL, G_CANDIDATE, G_UTILITY_UNVERIFIED, G_SECONDARY, G_OTHER, G_ELSEWHERE = (
+    range(7))
+UNVERIFIED_UTILITY_PER_ROUND = 2
 SKIP_EXTENSIONS = (".xls", ".xlsx", ".csv", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".gz",
                    ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4", ".kmz", ".kml",
                    ".shp", ".exe", ".dwg")
@@ -67,32 +73,59 @@ def _elsewhere(c: Mapping[str, Any], features: Sequence[str]) -> bool:
     text = f"{c.get('title') or ''} {c.get('snippet') or ''}".casefold()
     return not any(f.casefold() in text for f in features)
 
+def selection_group(c: Mapping[str, Any], host: str, preferred: set[str],
+                    candidate_hosts: set[str], features: Sequence[str],
+                    city: str | None) -> int:
+    """Where a candidate stands in acquisition order (lower first):
+    verified utility host; government/regulatory pages and city-department host hints
+    (MUNICIPAL_CANDIDATE: priority only); hosts of registry candidates (unverified utilities
+    the evidence names); other UTILITY-classified pages (quota); technical and academic;
+    everything else; pages about another place sharing the name (last, 1 per round)."""
+    if _elsewhere(c, features):
+        return G_ELSEWHERE
+    if host in preferred:
+        return G_VERIFIED
+    tier = (c.get("source_type") or "").upper()
+    if tier in ("GOVERNMENT", "REGULATORY") or municipal_hint(host, city):
+        return G_OFFICIAL
+    if host in candidate_hosts:
+        return G_CANDIDATE
+    if tier == "UTILITY":
+        return G_UTILITY_UNVERIFIED
+    if tier in ("TECHNICAL", "ACADEMIC"):
+        return G_SECONDARY
+    return G_OTHER
+
 def select_candidates(candidates: list[Mapping[str, Any]],
                       attempted: set[str], settings: AcquisitionSettings,
                       budget: int, priority_hosts: Sequence[str] = (),
                       skip_hosts: Sequence[str] = (),
-                      features: Sequence[str] = ()) -> list[Mapping[str, Any]]:
-    """Up to ``budget`` (<= per-round cap) unattempted candidates, official tiers first,
-    keeping discovery's ranking within a tier, at most ``max_per_host`` per host. Pages on a
-    verified utility's host (``priority_hosts``) come first; pages about another place sharing
-    the city's name come last, at most ELSEWHERE_PER_ROUND per round; ``skip_hosts`` (hosts
-    suppressed for this run) are never fetched."""
+                      features: Sequence[str] = (), *,
+                      candidate_hosts: Sequence[str] = (),
+                      city: str | None = None) -> list[Mapping[str, Any]]:
+    """Up to ``budget`` (<= per-round cap) unattempted candidates by ``selection_group``,
+    keeping discovery's ranking within a group (tier order breaks ties), at most
+    ``max_per_host`` per host and UNVERIFIED_UTILITY_PER_ROUND unverified UTILITY pages;
+    ``skip_hosts`` (hosts suppressed or failing for this run) are never fetched."""
     preferred = {h.removeprefix("www.") for h in priority_hosts}
     skipped = {h.removeprefix("www.") for h in skip_hosts}
+    named = {h.removeprefix("www.") for h in candidate_hosts}
 
     def host_of(c: Mapping[str, Any]) -> str:
         return (urlsplit(c.get("url") or "").hostname or "").removeprefix("www.")
 
+    groups = {i: selection_group(c, host_of(c), preferred, named, features, city)
+              for i, c in enumerate(candidates)}
     ordered = sorted(enumerate(candidates), key=lambda ic: (
-        1 if _elsewhere(ic[1], features) else 0,
-        0 if host_of(ic[1]) in preferred else 1,
-        TIER_ORDER.get((ic[1].get("source_type") or "").upper(), OTHER_TIER), ic[0]))
+        groups[ic[0]], TIER_ORDER.get((ic[1].get("source_type") or "").upper(), OTHER_TIER)
+        if groups[ic[0]] == G_SECONDARY else 0, ic[0]))
     elsewhere_taken = 0
+    unverified_taken = 0
     chosen: list[Mapping[str, Any]] = []
     per_host: dict[str, int] = {}
     keys: set[str] = set()
     limit = min(budget, settings.max_documents_per_round)
-    for _, c in ordered:
+    for index, c in ordered:
         if len(chosen) >= limit:
             break
         url = c.get("url") or ""
@@ -107,10 +140,14 @@ def select_candidates(candidates: list[Mapping[str, Any]],
         host = (parts.hostname or "").removeprefix("www.")
         if host in skipped or per_host.get(host, 0) >= settings.max_per_host:
             continue
-        if _elsewhere(c, features):
+        if groups[index] == G_ELSEWHERE:
             if elsewhere_taken >= ELSEWHERE_PER_ROUND:
                 continue
             elsewhere_taken += 1
+        if groups[index] == G_UTILITY_UNVERIFIED:
+            if unverified_taken >= UNVERIFIED_UTILITY_PER_ROUND:
+                continue
+            unverified_taken += 1
         per_host[host] = per_host.get(host, 0) + 1
         keys.add(key)
         chosen.append(c)
@@ -129,7 +166,9 @@ class AcquisitionService:
                             round_no: int = 1,
                             priority_hosts: Sequence[str] = (),
                             skip_hosts: Sequence[str] = (),
-                            features: Sequence[str] = ()) -> AcquisitionOutcome:
+                            features: Sequence[str] = (), *,
+                            candidate_hosts: Sequence[str] = (),
+                            city: str | None = None) -> AcquisitionOutcome:
         """Acquire new documents for one round. ``previous`` are earlier document records
         (any status), used for de-duplication and the per-run budget. Never raises."""
         attempted = set()
@@ -146,7 +185,8 @@ class AcquisitionService:
         if budget <= 0:
             return outcome
         chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts,
-                                   skip_hosts, features)
+                                   skip_hosts, features, candidate_hosts=candidate_hosts,
+                                   city=city)
         results = await asyncio.gather(*(self._fetch_one(c) for c in chosen))
 
         # Sequential, in selection order: deterministic de-duplication and chunking.
