@@ -38,7 +38,8 @@ from water_source_research.services.utility_registry import (
     GOVERNMENT_TYPES, WHOLESALE, _name_re, build_registry,
 )
 
-RELATIONSHIP_POLICY_VERSION = "relationship-1"
+RELATIONSHIP_POLICY_VERSION = "relationship-2"  # 2: typing, reporting period, affiliation,
+# feature location, registry reconciliation
 SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
 GAP = 90  # characters allowed between an entity mention and the predicate
 
@@ -129,6 +130,42 @@ _KIND_WORDS = [("spring", r"spring|quelle|manantial|vertiente|source\b"),
                ("lake", r"\blake|\blago|\blac\b|laguna|\bsee\b"),
                ("river", r"river|\br[ií]o\b|fluss|rivi[eè]re|fleuve|creek")]
 
+# Geographic areas, never a water source themselves (the springs or rivers in them are).
+REGION_WORDS = re.compile(
+    r"\b(?:alps|alpen|kalkalpen|mountains?|range|highlands?|valley|basin|region|province|"
+    r"plateau|massif|sierra|cordillera|hills|uplands|catchment\s+area|\w+gebirge|bergland|"
+    r"cuenca|regi[oó]n|provincia|valle)\b", re.IGNORECASE)
+# Plants and works, not water sources.
+INFRASTRUCTURE_WORDS = re.compile(
+    r"\b(?:(?:water\s+)?(?:treatment|purification|filtration|pumping|booster|desalination)\s+"
+    r"(?:plant|station|works|facility)|pump(?:ing)?\s+station|intake|planta\s+de\s+"
+    r"(?:tratamiento|potabilizaci[oó]n)|wasserwerk|usine)\b", re.IGNORECASE)
+# Administrative and hydrological areas a source can be located in.
+AREA_WORDS = re.compile(
+    r"\b(?:county|parish|district|department|state|province|prefecture|canton|oblast|kreis|"
+    r"bezirk|land|watershed|sub-watershed|catchment|river\s+system|river\s+basin|delta|"
+    r"departamento|municipio|comuna|estado|bundesland)\b", re.IGNORECASE)
+# Words that make a located-in place a point, structure, water body or date, not an area.
+NOT_AN_AREA = re.compile(
+    r"\b(?:january|february|march|april|may|june|july|august|september|october|november|"
+    r"december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|"
+    r"noviembre|diciembre|st|city\s+of|bridge|station|plant|intake|toma|bocatoma|area|street|"
+    r"road|avenue|park|gauge|gauging|pier|outfall|showing|river|lake|creek|r[ií]o|dam|"
+    r"reservoir|embalse|lago)\b", re.IGNORECASE)
+NATURAL_KINDS = frozenset({"river", "aquifer", "spring", "wellfield", "natural_lake",
+                           "general_groundwater", "sea"})
+
+def _reservoir_statement(name: str) -> re.Pattern[str]:
+    n = re.escape(name)
+    return re.compile(
+        rf"{n}[^.;\n]{{0,80}}\b(?:reservoir|impoundment|impounded|man-made\s+lake|artificial"
+        rf"\s+lake|embalse|stausee|talsperre)\b|\b(?:reservoir|embalse)\s+(?:called\s+|named\s+|"
+        rf"known\s+as\s+)?{n}", re.IGNORECASE)
+
+def _natural_statement(name: str) -> re.Pattern[str]:
+    return re.compile(rf"{re.escape(name)}[^.;\n]{{0,60}}\bnatural\s+lake\b|\bnatural\s+"
+                      rf"lake\s+(?:called\s+|named\s+)?{re.escape(name)}", re.IGNORECASE)
+
 def _infer_kind(name: str) -> str | None:
     for kind, pattern in _KIND_WORDS:
         if re.search(pattern, name, re.IGNORECASE):
@@ -170,16 +207,41 @@ class _Builder:
         self.entities: dict[str, Entity] = {self.city.entity_id: self.city}
         self.found: dict[str, SupplyRelationship] = {}
         self.rejected: list[RejectedStatement] = []
+        self.missing: list[str] = []  # registry-verified utilities absent from the graph
         self.utilities = {c.key: c for c in registry.candidates
                           if c.status not in ("NON_SERVING", "OTHER_CITY", "SANITATION_ONLY")}
         self.utility_res = {k: _name_re(c.all_names()) for k, c in self.utilities.items()}
         self.sources = self._known_sources()
+        self.doc_years = self._document_years()
         from water_source_research.services.affiliation import assess
         self.affiliations = assess(self.matcher, registry.candidates, self.chunks, links or {},
                                    city, documents)
         self.department_hosts = {h for a in self.affiliations if a.verified
                                  for c in [registry.get(a.candidate_key)] if c
                                  for h in c.bound_hosts}
+
+    def _document_years(self) -> dict[str, int]:
+        """url -> the year a document reports for: the latest year on its first page or chunk
+        (a report's cover, a dated article's header), else the HTML publication date. PDF
+        metadata dates are not trusted (they are often the file's modification date)."""
+        from datetime import UTC, datetime
+        now = datetime.now(UTC).year
+        first: dict[str, EvidenceChunk] = {}
+        for c in self.chunks:
+            if c.url not in first or (c.page_number or 0) < (first[c.url].page_number or 0):
+                first.setdefault(c.url, c)
+        out = {}
+        for url, c in first.items():
+            years = [int(y) for y in YEAR.findall(c.text[:1500]) if 1900 <= int(y) <= now]
+            if years:
+                out[url] = max(years)
+                continue
+            doc = self._doc(url)
+            date_text = str(doc.get("source_date") or "")
+            if date_text[:4].isdigit() and "pdf" not in str(doc.get("media_type") or "").lower() \
+                    and not url.lower().endswith(".pdf"):
+                out[url] = int(date_text[:4])
+        return out
 
     # entities ---------------------------------------------------------------------------
 
@@ -201,13 +263,58 @@ class _Builder:
                       flags=re.IGNORECASE)
         key = name_key(name)
         known = self.sources.get(key)
-        system = bool(SYSTEM.fullmatch(name))
-        kind = kind or (known[1] if known else None) or ("supply_system" if system
-                                                         else _infer_kind(name))
-        etype = "system" if kind == "supply_system" else "source"
+        kind, basis = self._kind(name, kind or (known[1] if known else None))
+        etype = {"supply_system": "system", "region": "region", "reservoir": "infrastructure",
+                 "infrastructure": "infrastructure"}.get(kind or "", "source")
+        natural = True if kind in NATURAL_KINDS else (
+            None if kind in (None, "lake_unspecified") else False)
         eid = f"{etype}:{kind or 'unspecified'}:{key}"
-        return self.entities.setdefault(eid, Entity(entity_id=eid, type=etype, name=known[0]
-                                                    if known else name, kind=kind))
+        return self.entities.setdefault(eid, Entity(
+            entity_id=eid, type=etype, name=known[0] if known else name, kind=kind,
+            natural=natural, kind_basis=basis))
+
+    def _kind(self, name: str, claimed: str | None) -> tuple[str | None, str | None]:
+        """(kind, basis): systems, regions and plants by their wording; a claim's kind; an
+        explicit statement in the run's evidence ("X is a reservoir", "natural lake"); the
+        name's water word. A lake is natural only when stated: "Lake X" alone is
+        lake_unspecified (it may be a reservoir)."""
+        if SYSTEM.fullmatch(name) or claimed == "supply_system":
+            return "supply_system", "system name" if SYSTEM.fullmatch(name) else "claim"
+        if INFRASTRUCTURE_WORDS.search(name):
+            return "infrastructure", "name"
+        if claimed == "region" or REGION_WORDS.search(name):
+            return "region", "claim" if claimed == "region" else "name"
+        if claimed in ("reservoir",):
+            return "reservoir", "claim"
+        if claimed and claimed not in ("lake", "category"):
+            return claimed, "claim"
+        guess = _infer_kind(name)
+        if guess == "reservoir":
+            return "reservoir", "name"
+        if guess in (None, "lake") or claimed == "lake":
+            stated = self._stated_lake_kind(name)
+            if stated:
+                return stated, "statement"
+            if guess == "lake" or claimed == "lake":
+                return "lake_unspecified", "name" if guess == "lake" else "claim"
+        return guess, "name" if guess else None
+
+    def _stated_lake_kind(self, name: str) -> str | None:
+        cache = self.__dict__.setdefault("_lake_kinds", {})
+        if name not in cache:
+            res, nat = _reservoir_statement(name), _natural_statement(name)
+            low = name.casefold()
+            found = None
+            for c in self.chunks:
+                if low not in c.text.casefold():
+                    continue
+                if res.search(c.text):
+                    found = "reservoir"
+                    break
+                if nat.search(c.text):
+                    found = "natural_lake"
+            cache[name] = found
+        return cache[name]
 
     def utility_entity(self, key: str) -> Entity:
         cand = self.registry.get(key)
@@ -244,7 +351,7 @@ class _Builder:
             predicate=predicate[:120], geo_status=geo_status, geo_reason=geo_reason[:300],
             placed=placed, strength=strength, basis=basis, host=host, source_type=stype,
             document_scope=scope.label(), temporal=temporal, temporal_marker=marker,
-            years=years, negated=negated)
+            years=years, negated=negated, reporting_year=self.doc_years.get(url))
 
     def add(self, kind: str, subject: Entity, obj: Entity, ev: RelationshipEvidence) -> None:
         key = f"{kind}|{subject.entity_id}|{obj.entity_id}"
@@ -533,13 +640,30 @@ class _Builder:
             phrase_start = sentence.find(f.phrase.split()[0], max(0, f.span[0] - 60))
             src = next((s for s in reversed(sources) if s[1] <= f.span[0]
                         and (phrase_start - s[1] <= 40 or s[0] <= phrase_start < s[1])), None)
-            if src is None or src[2].type not in ("source", "system"):
+            if src is None or src[2].type not in ("source", "system", "infrastructure"):
                 continue
+            if not self._geographic_area(f.place, f.phrase):
+                continue  # a station, intake, landmark, date or abbreviation, not an area
             place = self.place_entity(f.place)
             ev = self.evidence(chunk, chunk.url, quote, f.phrase, "NONE",
                                "the source's location (not the passage's place)", True,
                                "SUPPORTING", [])
             self.add("SOURCE_LOCATED_IN", src[2], place, ev)
+
+    def _geographic_area(self, place: str, phrase: str = "") -> bool:
+        """Does a located-in place name an area (a basin, watershed, county, region, river
+        system, country, a named region "in Styria")? Stations, intakes, landmarks, dates,
+        abbreviations, other water bodies and "near ..." phrases don't."""
+        if AREA_WORDS.search(place) or REGION_WORDS.search(place):
+            return True
+        m = self.matcher
+        if m.other_country_re.fullmatch(place) or m.country_re.fullmatch(place) or (
+                m.other_region_re is not None and m.other_region_re.fullmatch(place)):
+            return True
+        if NOT_AN_AREA.search(place) or (place.replace(".", "").isupper() and len(place) <= 6):
+            return False
+        return not re.search(r"\b(?:near|upstream|above|below|close\s+to)\b", phrase,
+                             re.IGNORECASE)
 
     def place_entity(self, name: str) -> Entity:
         eid = f"region:place:{name_key(name)}"
@@ -609,6 +733,25 @@ class _Builder:
                 continue
             rel.status, rel.status_reason, rel.temporal = status, reason, temporal
             rel.basis = sorted({e.basis for e in rel.evidence})
+        # A location is kept only for sources the run is about: a claimed source or one in a
+        # supply relationship. A distant feature merely located somewhere is not relevant.
+        relevant = {name_key(v[0]) for v in self.sources.values()}
+        for rel in self.found.values():
+            if rel.kind in ("SOURCE_SUPPLIES_CITY", "SOURCE_SUPPLIES_UTILITY",
+                            "SOURCE_PART_OF_SYSTEM"):
+                relevant |= {name_key(rel.subject.name), name_key(rel.object.name)}
+        for key in [k for k, r in self.found.items() if r.kind == "SOURCE_LOCATED_IN"
+                    and name_key(r.subject.name) not in relevant]:
+            del self.found[key]
+        self._reporting_periods()
+        for rel in self.found.values():
+            if rel.subject.type == "region" and rel.kind in ("SOURCE_SUPPLIES_CITY",
+                                                             "SOURCE_SUPPLIES_UTILITY"):
+                rel.notes.append("the subject is a region, not a standardized water source")
+            if rel.subject.type == "infrastructure" and rel.kind.startswith("SOURCE_"):
+                rel.notes.append(f"the subject is {rel.subject.kind}, not a natural source")
+            if rel.subject.kind == "lake_unspecified":
+                rel.notes.append("a lake not shown to be natural (it may be a reservoir)")
         # a predecessor's own service is historical (succession is temporal evidence)
         historical = {c.key for c in self.registry.candidates if c.status == "HISTORICAL"
                       and c.predecessor_of}
@@ -617,6 +760,97 @@ class _Builder:
                     in historical:
                 rel.status, rel.temporal = "HISTORICAL", "HISTORICAL"
                 rel.status_reason = "the operator is a stated predecessor"
+        self._reconcile()
+
+    def _reporting_periods(self) -> None:
+        """Temporal scope from the documents' reporting years. A utility relationship is
+        HISTORICAL (REPORTING_PERIOD) when every statement comes from documents reporting for
+        a year at least REPORTING_GAP years before another operator's statements of the same
+        kind for the city (one that cannot be the same organisation under another name)."""
+        from water_source_research.services.utility_registry import utility_key
+        city_words = set(utility_key(self.research.city_name).split())
+        for rel in self.found.values():
+            rel.temporal_scope = _reporting_scope(rel)
+        utility = [r for r in self.found.values() if r.kind in ("UTILITY_SERVES_CITY",
+                                                               "SUPPLIES_WHOLESALE_TO")]
+        for a in utility:
+            if a.status in ("HISTORICAL", "CONTRADICTED"):
+                continue
+            years = [e.reporting_year for e in a.evidence]
+            if not years or None in years:
+                continue
+            last = max(years)
+            later = [b for b in utility if b is not a and b.kind == a.kind
+                     and b.status in ("VERIFIED", "SUPPORTED")
+                     and not _same_organisation_possible(a.subject, b.subject, city_words)
+                     and max((e.reporting_year or 0) for e in b.evidence) >= last + REPORTING_GAP]
+            if later:
+                b = max(later, key=lambda r: max(e.reporting_year or 0 for e in r.evidence))
+                newest = max(e.reporting_year or 0 for e in b.evidence)
+                a.status, a.temporal = "HISTORICAL", "HISTORICAL"
+                a.status_reason = (f"reporting period: its statements report for {last} or "
+                                   f"earlier; {b.subject.name} is reported for {newest}")
+                a.temporal_scope = f"reported up to {last} (superseded)"
+
+    def _reconcile(self) -> None:
+        """Say why a utility relationship's status differs from the registry's verdict on
+        the same organisation (no silent inconsistency)."""
+        verified = {c.key: c for c in self.registry.candidates}
+        affiliation = {a.candidate_key: a for a in self.affiliations}
+        for rel in self.found.values():
+            if rel.kind not in ("UTILITY_SERVES_CITY", "SUPPLIES_WHOLESALE_TO"):
+                continue
+            cand = verified.get(rel.subject.entity_id.split(":", 1)[1])
+            if cand is None:
+                continue
+            rel.registry_status = cand.status
+            reg_verified = cand.status == "VERIFIED"
+            if reg_verified == (rel.status == "VERIFIED"):
+                continue
+            if rel.status == "VERIFIED":
+                rel.difference = "GRAPH_STRONGER"
+                rel.notes.append("verified by a government page or a verified city department, "
+                                 "which the registry doesn't weigh")
+                continue
+            if rel.status == "HISTORICAL":
+                rel.difference = "REPORTING_PERIOD"
+                continue
+            current = [e for e in rel.evidence if not e.negated]
+            placed = [e for e in current if e.placed]
+            dept = affiliation.get(cand.key)
+            if placed and all(e.basis == "SELF_DESCRIPTION" for e in placed):
+                rel.difference = "SELF_DESCRIPTION_ONLY"
+            elif any(e.geo_status in ("CONFIRMED", "PROBABLE") and not e.placed
+                     for e in current):
+                rel.difference = "TITLE_PLACEMENT_ONLY"
+            elif not current or all(e.basis == "CLAIM" for e in current):
+                rel.difference = "EQUIVALENCE_UNRESOLVED"
+            else:
+                rel.difference = "LOGIC_ERROR"
+            if dept is not None and not dept.verified:
+                rel.notes.append("a municipal-department candidate: verified affiliation "
+                                 "would make its own pages government (AFFILIATION_MISSING)")
+                if rel.difference in ("TITLE_PLACEMENT_ONLY", "SELF_DESCRIPTION_ONLY"):
+                    rel.difference += "+AFFILIATION_MISSING"
+        # a registry VERIFIED utility with no relationship in the graph
+        present = {r.subject.entity_id for r in self.found.values()}
+        for c in self.registry.candidates:
+            if c.status == "VERIFIED" and f"utility:{c.key}" not in present:
+                self.missing.append(f"{c.name}: registry VERIFIED, no graph relationship")
+
+REPORTING_GAP = 5
+
+def _same_organisation_possible(a: Entity, b: Entity, city_words: set[str]) -> bool:
+    """Could two utility names be one organisation (aliases are never merged)? Both carry
+    the city's name, or they share a distinctive word."""
+    from water_source_research.services.utility_registry import (
+        _DESCRIPTORS, _GENERIC, ORG_TYPE_WORDS, utility_key,
+    )
+    wa, wb = set(utility_key(a.name).split()), set(utility_key(b.name).split())
+    if wa & city_words and wb & city_words:
+        return True
+    plain = _GENERIC | _DESCRIPTORS | ORG_TYPE_WORDS | city_words | {"ltd", "sa", "s", "a"}
+    return bool((wa - plain) & (wb - plain))
 
 def _status(rel: SupplyRelationship) -> tuple[str | None, str, str]:
     """(status, reason, temporal) from the relationship's evidence (schemas/relationships.py);
@@ -672,6 +906,12 @@ def _status(rel: SupplyRelationship) -> tuple[str | None, str, str]:
         return "CANDIDATE", "a research claim only", temporal
     return "CANDIDATE", "no statement that itself places the city", temporal
 
+def _reporting_scope(rel: SupplyRelationship) -> str | None:
+    years = sorted({e.reporting_year for e in rel.evidence if e.reporting_year})
+    if not years:
+        return None
+    return f"reported {years[0]}" if len(years) == 1 else f"reported {years[0]}-{years[-1]}"
+
 def build_relationships(research: CityResearchState, chunks: Sequence[EvidenceChunk],
                         documents: Mapping[str, Mapping[str, Any]] | None = None,
                         registry: UtilityRegistry | None = None,
@@ -698,4 +938,4 @@ def build_relationships(research: CityResearchState, chunks: Sequence[EvidenceCh
         identity=identity_signature(city, country),
         entities=sorted((e for e in b.entities.values() if e.entity_id in used),
                         key=lambda e: e.entity_id),
-        relationships=rels, rejected=b.rejected)
+        relationships=rels, rejected=b.rejected, unreconciled=b.missing)

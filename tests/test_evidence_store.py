@@ -101,7 +101,8 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
 
     # the relationship graph is stored at finalize (provenance only) and served
     graph_view = client.get(f"/research/runs/{run_id}/relationships").json()
-    assert graph_view["policy_version"] == "relationship-1"
+    from water_source_research.services.supply_relationships import RELATIONSHIP_POLICY_VERSION
+    assert graph_view["policy_version"] == RELATIONSHIP_POLICY_VERSION
     for r in graph_view["relationships"]:
         assert r["evidence"] and all(e["quote"] and e["url"] for e in r["evidence"])
 

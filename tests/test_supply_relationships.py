@@ -250,10 +250,10 @@ def test_a_stored_graph_is_replaced_not_duplicated(tmp_path):
     assert repo.save_relationships("run-1", g) == n  # rebuild: same rows, no duplicates
     stored = repo.relationships("run-1")
     assert len(stored["relationships"]) == len(g["relationships"])
-    assert stored["geo_basis"] == g["geo_basis"] and stored["versions"] == ["relationship-1"]
+    assert stored["geo_basis"] == g["geo_basis"] and stored["versions"] == [g["policy_version"]]
     other = {**g, "policy_version": "relationship-0"}
     repo.save_relationships("run-1", other)  # another version is kept apart
-    assert repo.relationships("run-1")["versions"] == ["relationship-0", "relationship-1"]
+    assert repo.relationships("run-1")["versions"] == sorted(["relationship-0", g["policy_version"]])
     assert repo.relationships("run-2")["relationships"] == []
 
 # --- precision lessons from the stored runs ----------------------------------------------------
@@ -300,4 +300,94 @@ def test_a_distant_feature_without_a_link_to_the_city_supplies_nothing():
                 "irrigation.")
     g = graph("Nairobi", [doc])
     assert g.of_kind("SOURCE_SUPPLIES_CITY") == [] and g.of_kind("SOURCE_SUPPLIES_UTILITY") == []
-    assert [r.object.name for r in g.of_kind("SOURCE_LOCATED_IN")] == ["Lesotho"]
+    # not a source the run is about: its location isn't recorded either
+    assert g.of_kind("SOURCE_LOCATED_IN") == []
+    claimed = graph("Nairobi", [doc], sources=[("Katse Dam", "reservoir", [])])
+    assert [r.object.name for r in claimed.of_kind("SOURCE_LOCATED_IN")] == ["Lesotho"]
+
+# --- entity typing ------------------------------------------------------------------------------
+
+def entity(g, word):
+    return next(e for e in g.entities if word.casefold() in e.name.casefold())
+
+def test_a_lake_is_not_natural_unless_stated_and_a_reservoir_statement_types_it():
+    plain = chunk("https://www.usgs.gov/a", "Lake Brook is the primary drinking-water source "
+                  "for Houston, Texas.", "GOVERNMENT")
+    g = graph("Houston", [plain])
+    e = entity(g, "Lake Brook")
+    assert e.kind == "lake_unspecified" and e.natural is None
+    stated = chunk("https://www.twdb.texas.gov/b", "Lake Brook is a reservoir on the Elm River.",
+                   "GOVERNMENT")
+    g = graph("Houston", [plain, stated])
+    e = entity(g, "Lake Brook")
+    assert e.kind == "reservoir" and e.natural is False and e.type == "infrastructure"
+    assert e.kind_basis == "statement"
+    assert any("not a natural source" in n for r in g.relationships for n in r.notes)
+
+def test_a_natural_lake_needs_explicit_wording():
+    doc = chunk("https://www.toronto.ca/w", "Lake Clearwater, a natural lake, supplies "
+                "drinking water to Houston, Texas.", "GOVERNMENT")
+    assert entity(graph("Houston", [doc]), "Clearwater").kind == "natural_lake"
+
+def test_a_mountain_region_is_a_region_not_a_source():
+    doc = chunk("https://www.wien.gv.at/r", "Vienna's water is supplied by the Limestone Alps "
+                "of Lower Austria.", "GOVERNMENT")
+    g = graph("Vienna", [doc], sources=[("Limestone Alps of Lower Austria", "region", [])])
+    e = entity(g, "Limestone Alps")
+    assert e.type == "region" and e.natural is False
+    r = rel(g, "SOURCE_SUPPLIES_CITY", "Limestone Alps")
+    assert r is not None and any("region" in n for n in r.notes)
+
+def test_a_treatment_plant_is_infrastructure():
+    doc = chunk("https://www.houstontx.gov/p", "Houston takes its water from the Northeast "
+                "Water Purification Plant, Texas.", "GOVERNMENT")
+    g = graph("Houston", [doc], sources=[("Northeast Water Purification Plant", None, [])])
+    e = entity(g, "Purification Plant")
+    assert e.type == "infrastructure" and e.natural is False
+
+# --- reporting period ---------------------------------------------------------------------------
+
+def test_an_old_report_and_a_later_other_operator_make_the_old_service_historical():
+    old = chunk("https://documents.example.org/old.pdf", "Implementation report 1995. "
+                "The Metro Waterworks Board supplies drinking water to Santiago, Chile.",
+                "TECHNICAL", page=1)
+    new = chunk("https://www.example-news.cl/2026", "October 2026. Andes Water Company "
+                "supplies drinking water to Santiago, Chile.", "OTHER")
+    g = graph("Santiago", [old, new], utilities=[("Metro Waterworks Board", old.url, "x"),
+                                                 ("Andes Water Company", new.url, "x")])
+    o = rel(g, "UTILITY_SERVES_CITY", "Metro Waterworks")
+    assert o.status == "HISTORICAL" and "reporting period" in o.status_reason
+    assert o.temporal_scope.startswith("reported up to 1995")
+    assert rel(g, "UTILITY_SERVES_CITY", "Andes Water").status != "HISTORICAL"
+
+def test_undated_or_same_organisation_statements_stay_current_or_unknown():
+    a = chunk("https://www.example-a.org/x", "Santiago Water Board supplies drinking water to "
+              "Santiago, Chile.")
+    b = chunk("https://www.example-b.org/y", "Report 2026. Santiago Water Company supplies "
+              "drinking water to Santiago, Chile.")
+    g = graph("Santiago", [a, b], utilities=[("Santiago Water Board", a.url, "x"),
+                                             ("Santiago Water Company", b.url, "x")])
+    # undated, and both carry the city's name (possibly one organisation): never superseded
+    assert rel(g, "UTILITY_SERVES_CITY", "Water Board").status != "HISTORICAL"
+
+# --- reconciliation with the registry -------------------------------------------------------------
+
+def test_every_registry_graph_difference_is_explained():
+    own = chunk("https://www.bayouwater.example/about", "Bayou Water Authority supplies "
+                "drinking water to 300,000 residents of Houston, Texas.", "UTILITY",
+                "Bayou Water Authority")
+    g = graph("Houston", [own], utilities=[("Bayou Water Authority", own.url, "x")])
+    r = rel(g, "UTILITY_SERVES_CITY", "Bayou Water Authority")
+    assert r.registry_status == "VERIFIED" and r.status == "SUPPORTED"
+    assert r.difference == "SELF_DESCRIPTION_ONLY"
+    for r in g.relationships:
+        if r.kind == "UTILITY_SERVES_CITY" and r.registry_status and (
+                (r.registry_status == "VERIFIED") != (r.status == "VERIFIED")):
+            assert r.difference and r.difference != "LOGIC_ERROR"
+
+def test_only_areas_are_locations_not_stations_dates_or_abbreviations():
+    text = ("Lake Alder lies in the Elm River Basin. Lake Alder near Smith Bridge was sampled. "
+            "Lake Alder wells in September 2003. Lake Alder treatment plants (WWTP) failed.")
+    g = graph("Houston", [chunk("https://www.twdb.texas.gov/x", text, "GOVERNMENT")],
+              sources=[("Lake Alder", None, [])])
+    assert [r.object.name for r in g.of_kind("SOURCE_LOCATED_IN")] == ["Elm River Basin"]

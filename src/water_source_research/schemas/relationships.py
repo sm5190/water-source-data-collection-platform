@@ -13,8 +13,10 @@ Statuses (recomputed from all evidence on every build; a rebuild never promotes 
 - CANDIDATE: no placed explicit statement: a research claim only, or statements whose place
   is uncertain (AMBIGUOUS) or taken only from the document as a whole.
 - HISTORICAL: every statement carries explicit historical scope (a closed year range, "until
-  1998", "formerly", "replaced by", "no longer", a predecessor statement). Past tense alone is
-  never enough (temporal stays UNKNOWN).
+  1998", "formerly", "replaced by", "no longer", a predecessor statement), or by reporting
+  period: every statement comes from documents reporting for a year at least 5 years before
+  another operator's statements of the same kind for the city (REPORTING_PERIOD). Past tense
+  alone is never enough (temporal stays UNKNOWN).
 - CONTRADICTED: current statements together with an explicit negation or discontinuation that
   no later dated statement overrides. Every statement is kept.
 Transitions: CANDIDATE -> SUPPORTED -> VERIFIED as placed evidence is added; any -> CONTRADICTED
@@ -50,7 +52,12 @@ class Entity(BaseModel):
     entity_id: str  # "<type>:<key>" (sources: "source:<kind>:<key>")
     type: EntityType
     name: str
-    kind: str | None = None  # sources: SOURCE_KINDS value (river, spring, reservoir, ...)
+    # river, aquifer, spring, wellfield, natural_lake (natural); lake_unspecified (a "Lake X"
+    # not shown to be natural or a reservoir); reservoir, infrastructure, supply_system,
+    # region / place. From explicit evidence and wording only (services/supply_relationships).
+    kind: str | None = None
+    natural: bool | None = None  # True natural source, False infrastructure/region, None unknown
+    kind_basis: str | None = None  # claim | statement | name | system name
 
 class RelationshipEvidence(BaseModel):
     url: str
@@ -74,6 +81,9 @@ class RelationshipEvidence(BaseModel):
     negated: bool = False  # "does not supply", "no longer supplies", "ya no abastece"
     # DEPARTMENT_OF evidence (services/affiliation.py): what kind of signal, the link target,
     # the heading the link sits under, and when the page was observed.
+    # the year the document reports for (its first page's latest year, else the HTML
+    # publication date): temporal scope, never the claim's measurement year
+    reporting_year: int | None = None
     affiliation_basis: str | None = None
     target_url: str | None = None
     heading: str | None = None
@@ -89,6 +99,13 @@ class SupplyRelationship(BaseModel):
     temporal: Temporal = "UNKNOWN"
     basis: list[Basis] = Field(default_factory=list)
     evidence: list[RelationshipEvidence] = Field(default_factory=list)
+    temporal_scope: str | None = None  # "reported 1995", "reported up to 1995 (superseded)"
+    # Utility relationships: the utility registry's status for the subject, and why the graph
+    # differs when it does (SELF_DESCRIPTION_ONLY, TITLE_PLACEMENT_ONLY, AFFILIATION_MISSING,
+    # EQUIVALENCE_UNRESOLVED, REPORTING_PERIOD, GRAPH_STRONGER, LOGIC_ERROR).
+    registry_status: str | None = None
+    difference: str | None = None
+    notes: list[str] = Field(default_factory=list)
 
 class RejectedStatement(BaseModel):
     """A statement that names both entities with a predicate but is not about the city (or
@@ -109,6 +126,8 @@ class RelationshipGraph(BaseModel):
     entities: list[Entity] = Field(default_factory=list)
     relationships: list[SupplyRelationship] = Field(default_factory=list)
     rejected: list[RejectedStatement] = Field(default_factory=list)
+    # registry-verified utilities that have no relationship in the graph (each explained)
+    unreconciled: list[str] = Field(default_factory=list)
 
     def get(self, key: str) -> SupplyRelationship | None:
         return next((r for r in self.relationships if r.key == key), None)
