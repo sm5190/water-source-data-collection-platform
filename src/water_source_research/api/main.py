@@ -264,6 +264,14 @@ def create_app(queue: ResearchQueue | None = None,
                                 for k, v in rs.city_values.items()},
                 "exports": records.exports(run_id)}
 
+    @app.get("/research/runs/{run_id}/relationships")
+    async def get_relationships(run_id: str, policy_version: str | None = None):
+        """The run's water-supply relationship graph (provenance only): every relationship
+        with its status, basis and evidence (URL, document, chunk, page, quote, span,
+        predicate, passage geography, temporal context), plus the rejected statements."""
+        require_run(run_id)
+        return evidence.relationships(run_id, policy_version)
+
     @app.get("/research/runs/{run_id}/records/{record_key}/trace")
     async def trace_value(run_id: str, record_key: str, field_key: str):
         """One exported value back to its evidence: value -> resolution (and reviewer
@@ -304,7 +312,22 @@ def create_app(queue: ResearchQueue | None = None,
                        for i in (calc.inputs if calc else [])],
             "resolution_history": resolutions,
             "review_decisions": [decisions[i] for i in rv.review_decision_ids if i in decisions],
+            "relationships": _related(run_id, field_key, rv.value),
         }
+
+    def _related(run_id: str, field_key: str, value) -> list[dict]:
+        """Relationships of the value's entity (water sources and utilities): explanation
+        only, the value's acceptance never depends on them."""
+        if field_key not in ("water_source", "reservoir_names", "utility_name") or value is None:
+            return []
+        from water_source_research.services.resolution import name_key
+        key = name_key(str(value))
+        out = []
+        for r in evidence.relationships(run_id)["relationships"]:
+            names = {name_key(r["subject"]["name"]), name_key(r["object"]["name"])}
+            if key in names:
+                out.append(r)
+        return out
 
     @app.get("/research/runs/{run_id}/export")
     async def export_run(run_id: str, format: str = "csv", kind: str = "standardized",

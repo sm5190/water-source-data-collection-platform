@@ -1089,6 +1089,23 @@ def make_assemble_node(fields: Mapping[str, FieldDefinition]):
                 "completion": rs.completion, "events": events}
     return assemble_node
 
+def save_relationship_graph(state: GraphState, evidence_store: EvidenceRepository) -> int:
+    """Build the run's water-supply relationship graph from its final evidence, claims and
+    utility registry (services/supply_relationships.py) and store it. Returns rows stored."""
+    from water_source_research.services.supply_relationships import build_relationships
+    research = CityResearchState.model_validate(state["research_state"])
+    chunks = [EvidenceChunk.model_validate(c) for c in state.get("evidence_chunks", [])]
+    if not chunks:
+        return 0
+    ids: dict[str, int] = {}
+    for d in evidence_store.documents(state["run_id"]):
+        for u in (d.get("final_url"), d.get("requested_url"), d.get("canonical_url")):
+            if u:
+                ids.setdefault(u, d["document_id"])
+    # the registry is rebuilt from the same evidence: the graph depends on nothing else
+    graph = build_relationships(research, chunks, _documents_by_url(state), None, ids)
+    return evidence_store.save_relationships(state["run_id"], graph.model_dump(mode="json"))
+
 def make_finalize_node(
     fields: Mapping[str, FieldDefinition],
     run_recorder: RunRecorder | None = None,
@@ -1109,6 +1126,13 @@ def make_finalize_node(
                 await asyncio.to_thread(record_store.save, state["run_id"],
                                         RecordSet.model_validate(state["record_set"]))
             # The scientific result is complete here; everything below is soft post-processing.
+            if evidence_store is not None and state.get("run_id"):
+                try:
+                    n = await asyncio.to_thread(save_relationship_graph, state, evidence_store)
+                    span.set_attribute("research.supply_relationships", n)
+                except Exception:  # provenance only: never fails a finished run
+                    log.warning("could not build or store the relationship graph",
+                                exc_info=True)
             post = await asyncio.to_thread(finalize_post_processing, state, run_recorder,
                                            usage_tracker, fields)
             span.set_attribute("research.post_processing_errors",

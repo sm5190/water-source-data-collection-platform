@@ -237,3 +237,21 @@ def test_a_rebuild_is_identical():
     a = graph("Vienna", chunks).model_dump()
     b = graph("Vienna", chunks).model_dump()
     assert a == b
+
+
+# --- persistence -------------------------------------------------------------------------------
+
+def test_a_stored_graph_is_replaced_not_duplicated(tmp_path):
+    from procedure_helpers import make_engine
+    from water_source_research.services.evidence_store import EvidenceRepository
+    repo = EvidenceRepository(make_engine(tmp_path, "rel.db"))
+    g = graph("Vienna", [SPRINGS]).model_dump(mode="json")
+    n = repo.save_relationships("run-1", g)
+    assert repo.save_relationships("run-1", g) == n  # rebuild: same rows, no duplicates
+    stored = repo.relationships("run-1")
+    assert len(stored["relationships"]) == len(g["relationships"])
+    assert stored["geo_basis"] == g["geo_basis"] and stored["versions"] == ["relationship-1"]
+    other = {**g, "policy_version": "relationship-0"}
+    repo.save_relationships("run-1", other)  # another version is kept apart
+    assert repo.relationships("run-1")["versions"] == ["relationship-0", "relationship-1"]
+    assert repo.relationships("run-2")["relationships"] == []

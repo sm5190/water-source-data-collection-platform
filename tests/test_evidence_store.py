@@ -99,6 +99,12 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
                         params={"document_id": docs[PDF_URL]["document_id"]}).json()["chunks"]
     assert {c["page_number"] for c in chunks} == {1, 2}
 
+    # the relationship graph is stored at finalize (provenance only) and served
+    graph_view = client.get(f"/research/runs/{run_id}/relationships").json()
+    assert graph_view["policy_version"] == "relationship-1"
+    for r in graph_view["relationships"]:
+        assert r["evidence"] and all(e["quote"] and e["url"] for e in r["evidence"])
+
     stored = client.get(f"/research/runs/{run_id}/claims").json()
     withdrawal = next(c for c in stored["claims"]
                       if c["field_key"] == "total_city_water_withdrawals_m3_day")

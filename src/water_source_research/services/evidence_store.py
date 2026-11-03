@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.db.evidence_models import (
     ClaimCitationRecord, DiscoveryResultRecord, EvidenceChunkRecord, FieldClaimRecord,
-    FieldResolutionRecord, RunFieldStateRecord, RunUtilityCandidateRecord, SourceDocumentRecord,
+    FieldResolutionRecord, RunFieldStateRecord, RunSupplyRelationshipRecord,
+    RunUtilityCandidateRecord, SourceDocumentRecord,
 )
 from water_source_research.llm.extraction import normalize_quote
 from water_source_research.schemas.common import FINAL_STATUSES
@@ -130,6 +131,53 @@ class EvidenceRepository:
                 policy_version=str(registry.get("policy_version"))[:32],
                 identity=str(registry.get("identity"))[:32]) for c in new)
         return len(new)
+
+    def save_relationships(self, run_id: str, graph: Mapping[str, Any]) -> int:
+        """The run's relationship graph (services/supply_relationships.py) for its policy
+        version: replaces that version's rows, so a rebuild never duplicates; rows of other
+        versions are kept. Rejected statements are stored with status REJECTED."""
+        version = str(graph.get("policy_version"))[:32]
+        meta = {"identity": str(graph.get("identity"))[:32],
+                "geo_basis": str(graph.get("geo_basis"))[:24], "policy_version": version}
+        rows = [RunSupplyRelationshipRecord(
+            run_id=run_id, relationship_key=r["key"][:1000], kind=r["kind"],
+            subject_id=r["subject"]["entity_id"][:500], object_id=r["object"]["entity_id"][:500],
+            status=r["status"], temporal=r.get("temporal"), payload=r, **meta)
+            for r in graph.get("relationships") or []]
+        seen: set[str] = set()
+        for r in graph.get("rejected") or []:
+            key = f"REJECTED|{r['kind']}|{r['subject']}|{r['object']}|{r['url']}|{r['quote']}"
+            key = key[:1000]
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(RunSupplyRelationshipRecord(
+                run_id=run_id, relationship_key=key, kind=r["kind"],
+                subject_id=str(r["subject"])[:500], object_id=str(r["object"])[:500],
+                status="REJECTED", temporal=None, payload=r, **meta))
+        with Session(self.engine) as session, session.begin():
+            session.execute(delete(RunSupplyRelationshipRecord).where(
+                RunSupplyRelationshipRecord.run_id == run_id,
+                RunSupplyRelationshipRecord.policy_version == version))
+            session.add_all(rows)
+        return len(rows)
+
+    def relationships(self, run_id: str, policy_version: str | None = None
+                      ) -> dict[str, Any]:
+        """{policy_version, geo_basis, identity, relationships, rejected} for the run's newest
+        (or the given) policy version; empty lists when none was built."""
+        with Session(self.engine) as session:
+            q = select(RunSupplyRelationshipRecord).where(
+                RunSupplyRelationshipRecord.run_id == run_id)
+            rows = session.scalars(q.order_by(RunSupplyRelationshipRecord.id)).all()
+        versions = sorted({r.policy_version for r in rows})
+        version = policy_version or (versions[-1] if versions else None)
+        rows = [r for r in rows if r.policy_version == version]
+        return {"policy_version": version, "versions": versions,
+                "geo_basis": rows[0].geo_basis if rows else None,
+                "identity": rows[0].identity if rows else None,
+                "relationships": [r.payload for r in rows if r.status != "REJECTED"],
+                "rejected": [r.payload for r in rows if r.status == "REJECTED"]}
 
     def utility_candidates(self, run_id: str) -> list[dict[str, Any]]:
         with Session(self.engine) as session:

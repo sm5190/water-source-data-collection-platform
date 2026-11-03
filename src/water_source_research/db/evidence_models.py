@@ -172,6 +172,30 @@ class RunUtilityCandidateRecord(Base):
     identity: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+class RunSupplyRelationshipRecord(Base):
+    """The run's water-supply relationship graph (services/supply_relationships.py), one row
+    per relationship (status REJECTED rows: statements kept to audit exclusions). A rebuild for
+    the same policy version replaces the run's rows; other versions are kept. Provenance only:
+    no claim or review decision reads it."""
+
+    __tablename__ = "run_supply_relationships"
+    __table_args__ = (UniqueConstraint("run_id", "policy_version", "relationship_key",
+                                       name="uq_run_supply_relationships"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    relationship_key: Mapped[str] = mapped_column(String(1000))
+    kind: Mapped[str] = mapped_column(String(32))
+    subject_id: Mapped[str] = mapped_column(String(500))
+    object_id: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16))
+    temporal: Mapped[str | None] = mapped_column(String(16))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    identity: Mapped[str] = mapped_column(String(32))
+    geo_basis: Mapped[str] = mapped_column(String(24))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 class DiscoveryResultRecord(Base):
     """One search hit as a provider returned it (before merging and ranking), so a later
     diagnosis can tell which URLs the recorded searches returned. Proves only what the
