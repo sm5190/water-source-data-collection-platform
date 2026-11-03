@@ -18,8 +18,8 @@ Before = `6deb746` (git archive), after = `c2936d4`.
 | 1a27f5c | Fix found on the labels: a foreign homonym's region (Bissau) made a multi-country report "another region" |
 | c2936d4 | Slot precision fixes found on real Houston data (below) |
 
-Full suite at e4110b5/97926ea: 1128 passed, 37 skipped; the targeted suites pass after c2936d4
-(full suite not rerun after the last two commits).
+Full suite at f005281: 1136 passed, 37 skipped (live/Postgres-only). One guard failure found
+on the way (real utility names in a docstring example) was fixed in f005281.
 
 ## 1. Geographic inclusions and exclusions (74 labelled documents, 43 passages)
 
