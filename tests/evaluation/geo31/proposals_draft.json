@@ -1,0 +1,298 @@
+{
+ "G001": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: global chronology list; Luanda possibly one entry"
+ },
+ "G002": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: Global South review; Nairobi role unknown"
+ },
+ "G003": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: quote: dateline LUANDA, water projects in Angola"
+ },
+ "G004": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Chile water code (national; covers Santiago region)"
+ },
+ "G005": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: drinking fountains in Vienna (Austria implied by city pass site); weak on supply"
+ },
+ "G006": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: Vienna Woods hydrothermal field (Pacific), not the city"
+ },
+ "G007": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: corporate HQ in Vienna; not water supply"
+ },
+ "G008": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title: thesis on Rio Luanda (a river; may not be Angola's capital)"
+ },
+ "G009": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Chilean cities (Santiago among them)"
+ },
+ "G010": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Luanda tap water, Angola"
+ },
+ "G011": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: water supply and demand in Nairobi"
+ },
+ "G012": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: quote: Oloolaiser Water (Ongata Rongai/Kajiado), Nairobi only an address"
+ },
+ "G013": {
+  "about_place": "SUPPLY_SOURCE",
+  "basis": "DRAFT: title: ICPDR Danube annual report (Danube basin; Vienna bank filtrate) - uncertain link"
+ },
+ "G014": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: Nairobi only as a bank's HQ"
+ },
+ "G015": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Angola national SDG6 data (country level)"
+ },
+ "G016": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: drinking water in Vienna"
+ },
+ "G017": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: UNICEF Angola national report"
+ },
+ "G018": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Angola water supply projects (national, may include Luanda)"
+ },
+ "G019": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Vienna Water drinking water sources pilot"
+ },
+ "G020": {
+  "about_place": "SUPPLY_SOURCE",
+  "basis": "DRAFT: title: Maipo River (supplies Santiago)"
+ },
+ "G021": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Hyderabad (Telangana) drinking water supply"
+ },
+ "G022": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: FAIRS country report (food import rules), not water supply"
+ },
+ "G023": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: remote sensing in Chile, place unclear"
+ },
+ "G024": {
+  "about_place": "SUPPLY_SOURCE",
+  "basis": "DRAFT: title: Lake Ontario climatology (Toronto's source)"
+ },
+ "G025": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: US thermoelectric withdrawals; not Vienna"
+ },
+ "G026": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: quote: Luanda Bita Water Supply project"
+ },
+ "G027": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Vienna, Virginia (viennava.gov) water quality report"
+ },
+ "G028": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Nairobi City Water & Sewerage Company"
+ },
+ "G029": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Kenya national water fiche"
+ },
+ "G030": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: climate change and water in a region; place not stated"
+ },
+ "G031": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Almar Water corporate code of conduct; no place"
+ },
+ "G032": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Kenya national groundwater policy"
+ },
+ "G033": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: Vienna stock exchange quotation; not water"
+ },
+ "G034": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: Hyderabad irrigation project of a company; Telangana not stated, not city supply"
+ },
+ "G035": {
+  "about_place": "SUPPLY_SOURCE",
+  "basis": "DRAFT: title: Maipo basin irrigation (Santiago's supply basin) - agricultural focus"
+ },
+ "G036": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: Luanda hospitals; not water"
+ },
+ "G037": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: drinking water quality study; place unclear (Nairobi?)"
+ },
+ "G038": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Houston's big water pipes (Houston, Texas)"
+ },
+ "G039": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: quote: IWA congress held in Toronto; not about Toronto's supply"
+ },
+ "G040": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: horses in Austria"
+ },
+ "G041": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Houston, Mississippi water quality report (msdh.ms.gov)"
+ },
+ "G042": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: water quality index in the City of Nairobi (uonbi)"
+ },
+ "G043": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title: AMWA member directory (may list Houston)"
+ },
+ "G044": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Vienna, Austria story map"
+ },
+ "G045": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: Typsa engineering annual report; no place"
+ },
+ "G046": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: Reddit photo of an estate; not water"
+ },
+ "G047": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Texas water use survey (state; includes Houston)"
+ },
+ "G048": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: Kenya rural water regulation; not Nairobi"
+ },
+ "G049": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: debris flow susceptibility; place unclear"
+ },
+ "G050": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: quote: North Fort Bend Water Authority minutes (Houston region wholesale)"
+ },
+ "G051": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Codelco copper company homepage"
+ },
+ "G052": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Nairobi city water supply project"
+ },
+ "G053": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: ideam.gov.co Colombia groundwater; not Santiago, Chile"
+ },
+ "G054": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: title: Vienna Development Knowledge Center (World Bank office); not water"
+ },
+ "G055": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Angola national water supply investment"
+ },
+ "G056": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Viennese water (Terra Mater documentary)"
+ },
+ "G057": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Vienna, Virginia tap water report"
+ },
+ "G058": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Santiago de Compostela, Spain"
+ },
+ "G059": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: holiday packages"
+ },
+ "G060": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: hydrogeology of Angola (national; Luanda aquifers likely)"
+ },
+ "G061": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: water insecurity in Nairobi, Kenya"
+ },
+ "G062": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: Nairobi Water portal registration page (utility; weak content)"
+ },
+ "G063": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: minvivienda.gov.co Colombia; Santiago de Tolú"
+ },
+ "G064": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Chile country page"
+ },
+ "G065": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: Vienna's future water supply reservoir"
+ },
+ "G066": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: Nairobi Water portal home"
+ },
+ "G067": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: Nairobi Water Company audit report"
+ },
+ "G068": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: Chile environmental technologies (national)"
+ },
+ "G069": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: BITA water project in Luanda"
+ },
+ "G070": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: quote: multi-city African groundwater assessment incl. Luanda"
+ },
+ "G071": {
+  "about_place": "OTHER_PLACE",
+  "basis": "DRAFT: Great Lakes - Upper Mississippi board; not Houston"
+ },
+ "G072": {
+  "about_place": "MIXED",
+  "basis": "DRAFT: title: PROAGUA Angola programme (Mitrelli; may include Luanda)"
+ },
+ "G073": {
+  "about_place": "UNCERTAIN",
+  "basis": "DRAFT: title only: rural drinking water in Chile; place unclear"
+ },
+ "G074": {
+  "about_place": "TARGET",
+  "basis": "DRAFT: title: water access and housing in Luanda"
+ }
+}

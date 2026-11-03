@@ -58,7 +58,7 @@ class DiscoverySettings(BaseModel):
 
     # Controlled experiments (discovery/recorded.py): append every provider response to this
     # JSON-lines snapshot, or serve searches from recorded snapshots (comma-separated paths;
-    # a query not recorded is a miss: empty, or live with replay_live_on_miss).
+    # a query not recorded is a miss: a NOT_RECORDED failure, or live with replay_live_on_miss).
     record_path: str | None = None
     record_label: str = ""
     replay_paths: str | None = None

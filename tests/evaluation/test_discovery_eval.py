@@ -75,6 +75,6 @@ def test_labels_and_expectations_never_reach_research_code():
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         mods = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
-        assert not {m for m in mods if m.endswith(("discovery_labels", "discovery_metrics"))}, \
+        assert not {m for m in mods if m.endswith(("discovery_labels", "discovery_metrics", "geo_labels"))}, \
             path
         assert "tests/evaluation" not in path.read_text(encoding="utf-8"), path

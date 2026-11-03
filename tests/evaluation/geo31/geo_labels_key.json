@@ -1,0 +1,774 @@
+{
+  "pool_sizes": {
+    "Santiago": {
+      "INCLUDED": 202,
+      "EXCLUDED": 22
+    },
+    "Houston": {
+      "INCLUDED": 150,
+      "EXCLUDED": 3
+    },
+    "Nairobi": {
+      "INCLUDED": 152,
+      "EXCLUDED": 9
+    },
+    "Vienna": {
+      "INCLUDED": 146,
+      "EXCLUDED": 17
+    },
+    "Luanda": {
+      "INCLUDED": 104,
+      "EXCLUDED": 10
+    },
+    "Toronto": {
+      "INCLUDED": 72,
+      "EXCLUDED": 1
+    },
+    "Hyderabad": {
+      "INCLUDED": 89,
+      "EXCLUDED": 1
+    }
+  },
+  "samples": {
+    "G001": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": 251,
+      "url": "https://www.worldwater.org/conflict/list/",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G002": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://wires.onlinelibrary.wiley.com/doi/10.1002/wat2.1466",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G003": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": 252,
+      "url": "https://english.www.gov.cn/news/internationalexchanges/202209/21/content_WS632ad025c6d0a757729e050d.html",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G004": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://apps.fas.usda.gov/newgainapi/api/Report/DownloadReportByFileName?fileName=Modernization%20of%20Chile%27s%20Water%20Code_Santiago_Chile_01-18-2022.pdf",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G005": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://easycitypass.com/en/blog/easy-insider/summer-in-vienna-1-500-drinking-fountains-provide-refreshment",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_PROBABLE"
+    },
+    "G006": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": null,
+      "url": "https://doi.org/10.1016/j.gca.2010.11.008",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_UNKNOWN_HOMONYM"
+    },
+    "G007": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": 273,
+      "url": "https://www.borealisgroup.com/storage/Company/About-Borealis/Annual-Report/Borealis-Group-Annual-Report-2025-EN.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G008": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://pt.scribd.com/document/1007162880/Tese-de-Mestrado-Rio-Luanda",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G009": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10372401/",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G010": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://tapwatersafe.com/luanda-ao",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_CONFIRMED"
+    },
+    "G011": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://www.grida.no/resources/8199",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_HOMONYM"
+    },
+    "G012": {
+      "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+      "document_id": 290,
+      "url": "https://www.oloolaiserwatercompany.co.ke/docu/OloolaiserAnnualReport6thAGM.pdf",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "DOCUMENT_TARGET_COUNTRY"
+    },
+    "G013": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://www.icpdr.org/sites/default/files/2025-01/WEB%20VERSION%20ICPDR_AR23.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G014": {
+      "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+      "document_id": 291,
+      "url": "https://waterequity.com/wp-content/uploads/2025/08/2022-WaterEquity-Annual-Report.pdf",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G015": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": null,
+      "url": "https://www.sdg6data.org/country-or-area/Angola",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G016": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": null,
+      "url": "https://fontane-pubbliche.it/en/city/vienna",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_HOMONYM"
+    },
+    "G017": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://www.unicef.org/angola/media/6796/file/Annual%20Report%202025.pdf",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G018": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://24horas.pt/noticia/angola-reforca-abastecimento-de-agua-com-216-projetos",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G019": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://programme2014-20.interreg-central.eu/Content.Node/TEACHER-CE/OT38-PA6-Vienna-Water-final-Copy.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_HOMONYM"
+    },
+    "G020": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://thrivingearthexchange.org/project/san-jose-de-maipo-chile/",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G021": {
+      "run_id": "b617e84b-3370-4227-9a32-f2d7754e4095",
+      "document_id": null,
+      "url": "https://www.andhrajyothy.com/2026/telangana/hyderabad/telangana-cs-sanjay-jaju-reviews-drinking-water-supply-in-hyderabad-vk-1572193.html",
+      "city": "Hyderabad",
+      "country": "India",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G022": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://apps.fas.usda.gov/newgainapi/api/Report/DownloadReportByFileName?fileName=FAIRS+Country+Report+Annual_Vienna_Austria_AU2025-0004.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G023": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12299355/",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G024": {
+      "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+      "document_id": null,
+      "url": "https://glisa.umich.edu/sustained-assessment/ontario-climatology/",
+      "city": "Toronto",
+      "country": "Canada",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G025": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": null,
+      "url": "https://doi.org/10.3133/sir20145184",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_UNKNOWN_OTHER_PLACE"
+    },
+    "G026": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": 1540,
+      "url": "https://documents1.worldbank.org/curated/en/099042423172032756/pdf/P16361007eb2000cd0891304d56768cd0ad.pdf",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G027": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://www.viennava.gov/files/assets/town/v/1/dpw/pdfs/reports/ccr_final-tov_2025.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G028": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://susteq.nl/project/nairobi-city-water-sewage-company-ncwsc-kenya/",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_CONFIRMED"
+    },
+    "G029": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://dicf.unepgrid.ch/kenya/water",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G030": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://research.fs.usda.gov/treesearch/30857",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G031": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": null,
+      "url": "https://almarwater.com/wp-content/uploads/2026/10/Code-of-Conduct_ALMAR.pdf",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G032": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://ftp.itc.nl/pub/naivasha/PolicyNGO/DWI2013.pdf",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G033": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": 304,
+      "url": "https://www.verbund.com/media/hq2nhfvp/verbund-annual-financial-report-2025-englisch.pdf",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "DOCUMENT_UNKNOWN"
+    },
+    "G034": {
+      "run_id": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae",
+      "document_id": 228,
+      "url": "https://sustainability.aboutamazon.com/water-replenishment-project-portfolio.pdf",
+      "city": "Hyderabad",
+      "country": "India",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G035": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://www.linkedin.com/posts/kilimo-climatech_from-data-to-droplets-how-google-and-kilimo-activity-7384562514476400640-2Arc",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G036": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": 284,
+      "url": "https://www.eni.com/content/dam/enicom/documents/eng/reports/2025/ar-2025/Annual-Report-2025.pdf",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G037": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6419249/",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G038": {
+      "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+      "document_id": null,
+      "url": "https://www.asce.org/publications-and-news/civil-engineering-source/civil-engineering-magazine/issues/magazine-issue/article/2026/07/houstons-big-bet-on-big-water-pipes",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_PROBABLE"
+    },
+    "G039": {
+      "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+      "document_id": 1586,
+      "url": "https://worldwatercongress.org/wp-content/uploads/2025/03/IWA_WWCE2024_Toronto-Report_web.pdf",
+      "city": "Toronto",
+      "country": "Canada",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G040": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://doi.org/10.1111/j.1439-0396.2008.00874.x",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G041": {
+      "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+      "document_id": 199,
+      "url": "https://msdh.ms.gov/ccr/2024/271576.pdf",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_REGION"
+    },
+    "G042": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://uonjournals.uonbi.ac.ke/index.php/ajps/article/download/1205/1586/6562",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_NONE"
+    },
+    "G043": {
+      "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+      "document_id": null,
+      "url": "https://www.amwa.net/members",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G044": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": null,
+      "url": "https://storymaps.arcgis.com/stories/c4077f85f93d4cc584b9a327a05c9aef",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_CONFIRMED"
+    },
+    "G045": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://www.typsa.com/wp-content/uploads/InformeAnual_2025_EN.pdf",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G046": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://www.reddit.com/r/UrbanHell/comments/1tt0kyu/pipeline_estate_in_nairobi_kenya/",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_CONFIRMED"
+    },
+    "G047": {
+      "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+      "document_id": null,
+      "url": "https://www.twdb.texas.gov/waterplanning/waterusesurvey/dashboard/index.asp",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_NONE"
+    },
+    "G048": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://reachwater.uk/wp-content/uploads/2025/01/Kenya-rural-water-regulations-Jan2025.pdf",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G049": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://doi.org/10.1109/igarss53475.2024.10640463",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G050": {
+      "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+      "document_id": 1482,
+      "url": "https://www.nfbwa.com/uploads/files/general/NFBWA-Aug.-27-2024.pdf",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G051": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": null,
+      "url": "https://www.codelco.com/",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G052": {
+      "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+      "document_id": null,
+      "url": "https://www.afd.fr/en/projects/kenya-scaling-nairobi-citys-water-supply-meet-growing-demand-informal-neighbourhoods",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_CONFIRMED"
+    },
+    "G053": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": null,
+      "url": "https://www.ideam.gov.co/sites/default/files/prensa/boletines/2024-08-23/anexo_7_aguas_subterraneas_0.pdf",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G054": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": 302,
+      "url": "https://openknowledge.worldbank.org/entities/publication/c5786509-9fb9-48ca-bea2-d1a8c9134816",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G055": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://www.angop.ao/noticias/economia/governo-destaca-investimento-para-abastecimento-de-agua-em-angola/",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_NONE"
+    },
+    "G056": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://www.terramater.at/productions/viennese-water/",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_NONE"
+    },
+    "G057": {
+      "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+      "document_id": null,
+      "url": "https://tapsafetyreport.com/virginia/vienna",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_PROBABLE"
+    },
+    "G058": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": null,
+      "url": "https://doi.org/10.1007/s11368-024-03833-7",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_UNKNOWN_HOMONYM"
+    },
+    "G059": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": null,
+      "url": "https://www.worldholidayvibes.com/destinations/africa/angola/angola",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_UNKNOWN_OTHER_PLACE"
+    },
+    "G060": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": null,
+      "url": "https://earthwise.bgs.ac.uk/index.php/Hydrogeology_of_Angola",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G061": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://www.sciencedirect.com/science/article/pii/S2666558126000771",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_CONFIRMED"
+    },
+    "G062": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://portal.nairobiwater.co.ke/pages/register",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_PROBABLE"
+    },
+    "G063": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": 392,
+      "url": "https://www.minvivienda.gov.co/sites/default/files/documentos/informe-nacional-de-calidad-del-agua-para-consumo-humano-inca-2024_compressed.pdf",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G064": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://wateractionhub.org/geos/country/44/d/chile/",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G065": {
+      "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+      "document_id": null,
+      "url": "https://ic-group.org/en/magazine/detail/worlds-largest-drinking-water-reservoir-viennas-future-water-supply",
+      "city": "Vienna",
+      "country": "Austria",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_PROBABLE"
+    },
+    "G066": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://portal.nairobiwater.co.ke/homes/",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 3,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_PROBABLE"
+    },
+    "G067": {
+      "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+      "document_id": null,
+      "url": "https://www.nairobiwater.co.ke/wp-content/uploads/2022/07/ANNUAL-AUDIT-FINANCIAL-ACCOUNTS-FY2019-2020.pdf",
+      "city": "Nairobi",
+      "country": "Kenya",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_TARGET_COUNTRY_PROBABLE"
+    },
+    "G068": {
+      "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+      "document_id": null,
+      "url": "https://www.trade.gov/country-commercial-guides/chile-environmental-technologies",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 2,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_COUNTRY_NONE"
+    },
+    "G069": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://angolanewswire.com/bita-water-project-to-secure-over-1000-household-connections-in-luanda/",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G070": {
+      "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+      "document_id": 254,
+      "url": "https://documents1.worldbank.org/curated/en/420291533931251279/pdf/Assessment-of-groundwater-challenges-and-opportunities-in-Sub-Saharan-Africa.pdf",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "EXCLUDED",
+      "reason": "DOCUMENT_OTHER_COUNTRY"
+    },
+    "G071": {
+      "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+      "document_id": null,
+      "url": "https://www.health.state.mn.us/communities/environment/water/tenstates/index.html",
+      "city": "Houston",
+      "country": "United States of America",
+      "round": 3,
+      "stratum": "EXCLUDED",
+      "reason": "SEARCH_OTHER_REGION_NONE"
+    },
+    "G072": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://mitrelli.com/project/proagua-water-infrastructure-management-program/",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 2,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_NONE"
+    },
+    "G073": {
+      "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+      "document_id": null,
+      "url": "https://doi.org/10.17561/at.30.8892",
+      "city": "Santiago",
+      "country": "Chile",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_CONFIRMED"
+    },
+    "G074": {
+      "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+      "document_id": null,
+      "url": "https://doi.org/10.5070/f7351009558",
+      "city": "Luanda",
+      "country": "Angola",
+      "round": 1,
+      "stratum": "INCLUDED",
+      "reason": "SEARCH_UNKNOWN_PROBABLE"
+    }
+  }
+}

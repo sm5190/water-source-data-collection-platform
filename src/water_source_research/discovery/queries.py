@@ -108,6 +108,8 @@ def ineffective_topics(events: Sequence[Mapping[str, Any]], topics: Sequence[str
             continue
         if a.get("sources_retained"):
             continue
+        if e.get("strategy") == "not_recorded":  # replay miss: outcome unknown, not a miss
+            continue
         q = str(a["query"]).casefold()
         for t in topics:
             if t.casefold() in q:

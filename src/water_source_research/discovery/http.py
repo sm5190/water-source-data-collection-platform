@@ -29,6 +29,8 @@ class ProviderErrorKind(StrEnum):
     HTTP = "http_error"
     MALFORMED = "malformed_response"
     UNCONFIGURED = "unconfigured"
+    # A replayed search the recording doesn't contain: unknown, never "zero results".
+    NOT_RECORDED = "not_recorded"
 
 class ProviderError(Exception):
     def __init__(self, provider: str, kind: ProviderErrorKind, message: str = "",

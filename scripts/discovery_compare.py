@@ -99,13 +99,20 @@ def cmd_report(fresh: Path) -> str:
              "labelled documents), not absolute recall."), "",
              ("| run | searches | site: (non-serving host) | docs OK | about elsewhere | "
              "relevant / irrelevant / uncertain / unlabelled | precision | pooled recall | "
-             "steering hosts | registry verifies (new rules, this evidence) |"),
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "steering hosts | registry verifies (new rules, this evidence) | replay |"),
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for run in runs:
         city, country = run["city"], run["country"]
         exp = expectations.get((city, country)) or {}
         serving_hosts = {h for s in exp.get("serving", []) for h in s.get("hosts", [])}
-        searches = [s for r in run["rounds"] for s in r["searches"]]
+        rep = run.get("replay")
+        replay = ("live" if not rep else
+                  ("recorded" if rep["like_for_like"] else
+                   f"NOT like-for-like: {rep['counts']['NOT_RECORDED']} not recorded"))
+        if rep and rep["counts"].get("LIVE_ON_MISS"):
+            replay += f", {rep['counts']['LIVE_ON_MISS']} live on miss"
+        searches = [s for r in run["rounds"] for s in r["searches"]
+                    if s.get("replay") != "NOT_RECORDED"]  # unknown outcome, not a search
         site = [s["query"].split()[0][5:] for s in searches
                 if (s.get("query") or "").startswith("site:")]
         site_bad = [h for h in site if h.removeprefix("www.") not in serving_hosts]
@@ -146,7 +153,7 @@ def cmd_report(fresh: Path) -> str:
             f"| {elsewhere} | {rel['YES']} / {rel['NO']} / {rel['UNCERTAIN']} / "
             f"{rel['UNLABELLED']} | {rel['YES']}/{judged if judged else '—'} | "
             f"{len(found_relevant)}/{len(pool)} | {', '.join(steering[:3]) or '—'} | "
-            f"correct {acc.get('correct', [])}, wrong {acc.get('wrong', [])} |")
+            f"correct {acc.get('correct', [])}, wrong {acc.get('wrong', [])} | {replay} |")
     return "\n".join(lines) + "\n"
 
 def main() -> int:

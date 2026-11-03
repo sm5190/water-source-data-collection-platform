@@ -4,8 +4,9 @@ Live search results change over time, so a fresh-discovery comparison records wh
 provider returned: ``RecordingProvider`` wraps a provider and appends every response to a
 JSON-lines snapshot (provider, query, limit, timestamp, results, sha256 of the results).
 ``RecordedProvider`` serves a snapshot back: the same (provider, query) returns the recorded
-results; a query the snapshot doesn't have is a *miss*, counted and returned empty (or, with
-``live``, searched live and marked as such). Nothing here is evidence: results are discovery
+results; a query the snapshot doesn't have is a *miss*: it raises ``ProviderError`` of kind
+``NOT_RECORDED`` (the call is a failure whose outcome is unknown, never a search that found
+nothing), or, with ``live``, is searched live and listed in ``live_misses``. Nothing here is evidence: results are discovery
 candidates as before.
 
 Enabled by ``DISCOVERY__RECORD_PATH`` / ``DISCOVERY__REPLAY_PATH``
@@ -19,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from .base import DiscoveryProvider, SearchResult
+from .http import ProviderError, ProviderErrorKind
 
 _LOCK = threading.Lock()
 
@@ -68,6 +70,7 @@ class RecordedProvider:
                  live: DiscoveryProvider | None = None):
         self.name, self.snapshots, self.live = name, snapshots, live
         self.misses: list[str] = []
+        self.live_misses: list[str] = []
         self.hits = 0
 
     def __getattr__(self, item: str) -> Any:
@@ -82,5 +85,6 @@ class RecordedProvider:
             return [SearchResult.from_dict(r) for r in rows[:limit]]
         self.misses.append(query)
         if self.live is not None:
+            self.live_misses.append(query)
             return await self.live.search(query, limit)
-        return []
+        raise ProviderError(self.name, ProviderErrorKind.NOT_RECORDED, "query not in snapshot")

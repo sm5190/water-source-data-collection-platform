@@ -15,6 +15,17 @@ acquisition budgets), the searches and documents per round (with their first pas
 labelling) — nothing is written to the research database.
 
     uv run python scripts/discovery_experiment.py settings   # the snapshot only (compare arms)
+
+Controlled replay (both arms see the same search results):
+
+    ... run --city Houston --country "United States" --arm improved --repeat 1         --replay reports/eval/geo31/searches/Houston-*.snapshots.jsonl [--live-on-miss]
+
+A replayed query the recording doesn't contain is NOT a search that found nothing. Coverage is
+checked here, by this script, against the snapshot files (so it holds for baseline code too):
+each search is RECORDED, NOT_RECORDED (no live fallback: outcome unknown) or LIVE_ON_MISS.
+A run with NOT_RECORDED searches is marked ``like_for_like: false``; discovery_compare.py
+reports it apart. Semantic Scholar related-paper lookups and Crossref DOI checks are not
+replayed (Crossref stays live; related lookups don't run under replay) — listed per run.
 """
 
 import argparse
@@ -52,6 +63,32 @@ def settings_snapshot() -> dict:
         "identity_draft": os.environ.get("CITY_IDENTITY_ALLOW_DRAFT", ""),
     }
 
+def _snapshot_key(provider: str, query: str) -> str:  # = discovery/recorded.py::_key
+    return f"{provider}|{' '.join(query.split()).casefold()}"
+
+def replay_coverage(rounds: list[dict], paths: list[str], live_on_miss: bool) -> dict:
+    keys: set[str] = set()
+    for path in paths:
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                row = json.loads(line)
+                keys.add(_snapshot_key(row["provider"], row["query"]))
+    counts = {"RECORDED": 0, "NOT_RECORDED": 0, "LIVE_ON_MISS": 0, "NOT_REPLAYED": 0}
+    misses = []
+    for r in rounds:
+        for s in r["searches"]:
+            if not s.get("query"):  # related papers / Crossref: not part of the recording
+                s["replay"] = "NOT_REPLAYED"
+            elif _snapshot_key(s["provider"], s["query"]) in keys:
+                s["replay"] = "RECORDED"
+            else:
+                s["replay"] = "LIVE_ON_MISS" if live_on_miss else "NOT_RECORDED"
+                misses.append({"round": r["round"], "provider": s["provider"],
+                               "query": s["query"]})
+            counts[s["replay"]] += 1
+    return {"paths": paths, "live_on_miss": live_on_miss, "counts": counts,
+            "misses": misses, "like_for_like": counts["NOT_RECORDED"] == 0}
+
 async def run_once(city: str, country: str, rounds: int) -> dict:
     from water_source_research.acquisition.service import build_acquisition_service
     from water_source_research.agents.nodes import make_acquire_node, make_discover_node
@@ -80,7 +117,9 @@ async def run_once(city: str, country: str, rounds: int) -> dict:
         per_round.append({
             "round": r,
             "searches": [{"provider": e.get("provider"), "query": (e.get("attrs") or {})
-                          .get("query"), "found": (e.get("attrs") or {}).get("sources_found"),
+                          .get("query"), "strategy": e.get("strategy"),
+                          "result": e.get("result"),
+                          "found": (e.get("attrs") or {}).get("sources_found"),
                           "retained": (e.get("attrs") or {}).get("sources_retained")}
                          for e in events if e.get("kind") == "TOOL_CALL"
                          and e.get("node") == "discover"],
@@ -107,6 +146,10 @@ def main() -> int:
     r.add_argument("--repeat", type=int, default=1)
     r.add_argument("--rounds", type=int, default=3)
     r.add_argument("--out", type=Path, default=Path("reports/eval/discovery/fresh"))
+    r.add_argument("--replay", nargs="+", default=None,
+                   help="snapshot files to serve searches from (controlled replay)")
+    r.add_argument("--live-on-miss", action="store_true",
+                   help="search live when a query isn't recorded (marked LIVE_ON_MISS)")
     sub.add_parser("settings")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -115,13 +158,22 @@ def main() -> int:
         return 0
     label = f"{args.city}-{args.arm}-{args.repeat}"
     args.out.mkdir(parents=True, exist_ok=True)
-    os.environ["DISCOVERY__RECORD_PATH"] = str((args.out / f"{label}.snapshots.jsonl").resolve())
-    os.environ["DISCOVERY__RECORD_LABEL"] = label
+    if args.replay:
+        label += "-replay"
+        os.environ["DISCOVERY__REPLAY_PATHS"] = ",".join(str(Path(p).resolve())
+                                                         for p in args.replay)
+        os.environ["DISCOVERY__REPLAY_LIVE_ON_MISS"] = "true" if args.live_on_miss else "false"
+    else:
+        os.environ["DISCOVERY__RECORD_PATH"] = str(
+            (args.out / f"{label}.snapshots.jsonl").resolve())
+        os.environ["DISCOVERY__RECORD_LABEL"] = label
     from water_source_research.core.config import get_settings
     get_settings.cache_clear()
     started = datetime.now(UTC).isoformat(timespec="seconds")
     from water_source_research.research_queue.checkpointing import run_async
     result = run_async(run_once(args.city, args.country, args.rounds))
+    if args.replay:
+        result["replay"] = replay_coverage(result["rounds"], args.replay, args.live_on_miss)
     out = {"label": label, "city": args.city, "country": args.country, "arm": args.arm,
            "repeat": args.repeat, "started_at": started,
            "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -131,6 +183,9 @@ def main() -> int:
     docs = [d for rr in result["rounds"] for d in rr["documents"]]
     print(f"{label}: {sum(len(rr['searches']) for rr in result['rounds'])} searches, "
           f"{len(docs)} documents ({sum(d.get('status') == 'OK' for d in docs)} OK)")
+    if args.replay:
+        rep = result["replay"]
+        print(f"replay: {rep['counts']}; like_for_like={rep['like_for_like']}")
     return 0
 
 if __name__ == "__main__":
