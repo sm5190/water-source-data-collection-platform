@@ -6,11 +6,18 @@ queries are built from the city/utility and a per-field-type topic. Queries alre
 earlier round (read back from the trusted TOOL_CALL events) are not repeated.
 
 Discovery v2 (``DiscoveryPlan``, Milestone 3; DISCOVERY_POLICY_VERSION):
-- place terms: city + country, plus the region when the identity lists a large homonym or a
-  same-country homonym (Santiago, Hyderabad); local-language queries use the same place;
+- place terms (discovery-3, ``place_variants``): natural wording, not every place term in
+  every query. With a same-country homonym the region is always there ("Houston Texas"); with
+  only foreign homonyms the country suffices and the region or the city's own qualified name
+  ("Santiago de Chile") are variants; a region whose name contains the city's replaces it
+  (never "Santiago Santiago ..."). Field types rotate through the variants (stable across
+  rounds). Local-language queries use the identity's local names ("Wien");
 - verified utilities (utility registry) get ``site:<host> <topic>`` (no place terms: the host
-  disambiguates) and quoted-name queries; unverified candidates get up to two verification
-  queries per round; predecessor names only for historical withdrawals;
+  disambiguates) and quoted-name queries; unverified candidates get verification queries:
+  one web slot each round is reserved for them whatever fields are planned (discovery-3: a
+  utility_name claim used to take the field out of the plan, so its candidate was never
+  verified), up to two per round, in English and the local language;
+  predecessor names only for historical withdrawals;
 - no verified utility: government / regulator topics instead of guessing a utility;
 - upstream: a linked water feature + topic (the city isn't required);
 - a topic that returned nothing retained twice is dropped.
@@ -65,7 +72,9 @@ MAX_VERIFICATION_QUERIES = 2
 class DiscoveryPlan:
     """What the run knows that steers the next round's searches (agents/nodes.py builds it
     from the utility registry, the city identity, the evidence and earlier searches)."""
-    place: str = ""  # identity-based place terms ("" = city + country)
+    place: str = ""  # identity-based place terms ("" = city + country): the first variant
+    places: tuple[str, ...] = ()  # all variants (place_variants); empty = (place,)
+    local_place: str = ""  # local-language place ("" = place)
     verified_hosts: tuple[str, ...] = ()
     verified_names: tuple[str, ...] = ()
     candidate_names: tuple[str, ...] = ()  # unverified: verification queries
@@ -86,34 +95,92 @@ def _local_languages() -> dict[str, dict[str, str]]:
             for code, lang in (data.get("languages") or {}).items()
             for c in lang.get("countries") or []}
 
-def place_terms(identity) -> str:
-    """City + country, plus the first-level region when the name is ambiguous (a large
-    homonym anywhere, or a homonym in the same country). ``identity``: a CityIdentity."""
-    parts = [identity.city]
+def _words(text: str) -> list[str]:
+    return text.casefold().split()
+
+def _contains(outer: str, inner: str) -> bool:
+    """``inner``'s words appear in order, as whole words, inside ``outer``."""
+    o, i = _words(outer), _words(inner)
+    return bool(i) and any(o[k:k + len(i)] == i for k in range(len(o) - len(i) + 1))
+
+def _join(*parts: str | None) -> str:
+    """Place terms without repeating a term another one already contains."""
+    kept: list[str] = []
+    for p in (x for x in parts if x):
+        if any(_contains(k, p) for k in kept):
+            continue
+        kept = [k for k in kept if not _contains(p, k)] + [p]
+    return " ".join(kept)
+
+def _local_name(names, lang: str) -> str | None:
+    for n in names:
+        if (n.lang or "").split("-")[0] == lang and n.independently_confirmed:
+            return n.name
+    return None
+
+def place_variants(identity, lang: str | None = None) -> tuple[str, ...]:
+    """Place wordings for queries (discovery-3), most specific need first. ``identity``: a
+    CityIdentity; ``lang``: a local query language (ISO 639-1) for local-language queries."""
+    city, country = identity.city, identity.country
     region = identity.region.name if identity.region else None
-    ambiguous = any((h.population or 0) >= 100_000 for h in identity.homonyms) or any(
-        h.iso2 and identity.country_info and h.iso2 == identity.country_info.iso2
-        for h in identity.homonyms)
-    if region and ambiguous and region.casefold() not in identity.city.casefold():
-        parts.append(region)
-    parts.append(identity.country)
-    return " ".join(dict.fromkeys(p for p in parts if p))
+    same_country = any(h.iso2 and identity.country_info and h.iso2 == identity.country_info.iso2
+                       for h in identity.homonyms)
+    large = any((h.population or 0) >= 100_000 for h in identity.homonyms)
+    if lang:
+        local_city = next((n.name for n in identity.names if n.kind == "OFFICIAL_LOCAL"
+                           and (n.lang or "").split("-")[0] == lang
+                           and n.independently_confirmed), None) or city
+        local_region = (_local_name(identity.region.names, lang) if identity.region
+                        else None) or region
+        if local_city != city and _contains(local_city, city):  # "Santiago de Chile"
+            return (local_city,)
+        if same_country and local_region:
+            return (_join(local_city, local_region),)
+        return (_join(local_city, country),)
+    if same_country and region:  # Houston, Texas vs Houston, Mississippi
+        return (_join(city, region), _join(city, region, country))
+    if large:  # only foreign homonyms: the country disambiguates
+        own = [n.name for n in identity.names if n.independently_confirmed
+               and _contains(n.name, city) and n.name.casefold() != city.casefold()]
+        out = [_join(city, country)]
+        if region:
+            out.append(_join(city, region, country))
+        out += own[:1]
+        return tuple(dict.fromkeys(out))
+    return (_join(city, country),)
+
+def place_terms(identity) -> str:
+    """The first place variant (kept for callers that need one place string)."""
+    return place_variants(identity)[0]
+
+def local_language(country: str | None) -> str | None:
+    """The configured local query language for the country, if any."""
+    return (_local_languages().get((country or "").casefold()) or {}).get("code")
 
 def ineffective_topics(events: Sequence[Mapping[str, Any]], topics: Sequence[str]) -> set[str]:
-    """Topics whose earlier searches retained nothing at least twice."""
-    misses: dict[str, int] = {}
+    """Topics whose earlier searches retained nothing at least twice. A search counts once
+    whatever the number of providers that ran it (discovery-3), only if some provider
+    answered (failures and replay misses say nothing about the topic) and none of its results
+    was retained; a topic matches only as the query's ending ("<place> <topic>"), so a topic
+    inside a longer one isn't charged for the longer one's misses."""
+    answered: dict[str, bool] = {}  # query -> retained something
     for e in events:
         a = e.get("attrs") if isinstance(e.get("attrs"), dict) else {}
         if e.get("kind") != "TOOL_CALL" or e.get("node") != "discover" or not a.get("query"):
             continue
-        if a.get("sources_retained"):
+        if e.get("result") == "FAILURE" or e.get("strategy") == "not_recorded":
             continue
-        if e.get("strategy") == "not_recorded":  # replay miss: outcome unknown, not a miss
+        q = " ".join(str(a["query"]).split()).casefold()
+        answered[q] = answered.get(q, False) or bool(a.get("sources_retained"))
+    longest = sorted(topics, key=len, reverse=True)
+    misses: dict[str, int] = {}
+    for q, retained in answered.items():
+        if retained:
             continue
-        q = str(a["query"]).casefold()
-        for t in topics:
-            if t.casefold() in q:
-                misses[t] = misses.get(t, 0) + 1
+        topic = next((t for t in longest if q == t.casefold()
+                      or q.endswith(" " + t.casefold())), None)
+        if topic is not None:
+            misses[topic] = misses.get(topic, 0) + 1
     return {t for t, n in misses.items() if n >= 2}
 
 def all_topics() -> list[str]:
@@ -174,18 +241,30 @@ def build_queries(
 
     candidates: dict[QueryKind, list[list[PlannedQuery]]] = {"web": [], "academic": []}
     place = plan.place or " ".join(p for p in (city, country) if p)
+    places = plan.places or (place,)
     # Local-language queries name the place too: a bare city name found same-named towns in
     # other countries (Santiago -> Colombian and Mexican national reports).
-    local_place = plan.place or place
-    verifications = 0
-    for field_type, field_key in groups.items():
+    local_place = plan.local_place or place
+    utility_key = next((k for k, d in fields.items() if d.field_type == "utility"
+                        and not d.derived), "utility_name")
+    local_verification = _local_topics().get((country or "").casefold(), {}).get(
+        "verification")
+    # Every candidate's English query before any local-language one, so two candidates are
+    # both checked in the same round.
+    verify = [PlannedQuery("web", f'"{name}" {place} {VERIFICATION_TOPIC}', "utility",
+                           utility_key) for name in plan.candidate_names]
+    if local_verification:
+        verify += [PlannedQuery("web", f'"{name}" {local_place} {local_verification}',
+                                "utility", utility_key) for name in plan.candidate_names]
+    for index, (field_type, field_key) in enumerate(groups.items()):
+        variant = places[index % len(places)]
         web: list[PlannedQuery] = [PlannedQuery("web", q, field_type, field_key)
                                    for q in (planned_queries or {}).get(field_type, []) if q]
         academic: list[PlannedQuery] = []
         topic = TOPICS.get(field_type, _fallback_topic(fields[field_key]))
         if topic:
             web_topic, academic_topic = topic
-            subject = utility or place
+            subject = utility or variant
             site_topic = UTILITY_SITE_TOPICS.get(field_type)
             # Priority order (round-robin takes each type's first query not yet run): the
             # field type's own topic, its local-language topic, then what the run learned.
@@ -200,13 +279,6 @@ def build_queries(
             if plan.verified_names and site_topic:
                 web.append(PlannedQuery("web", f'"{plan.verified_names[0]}" {site_topic}',
                                         field_type, field_key))
-            if field_type == "utility" and plan.candidate_names:
-                for name in plan.candidate_names:
-                    if verifications >= MAX_VERIFICATION_QUERIES:
-                        break
-                    web.append(PlannedQuery("web", f'"{name}" {place} {VERIFICATION_TOPIC}',
-                                            field_type, field_key))
-                    verifications += 1
             if field_type in UPSTREAM_FIELD_TYPES and plan.features:
                 feature = plan.features[0]
                 extra = f" {country}" if country and len(feature.split()) < 2 else ""
@@ -222,28 +294,39 @@ def build_queries(
                 if local_fb and local_fb not in skip:
                     web.append(PlannedQuery("web", f"{local_place} {local_fb}", field_type,
                                             field_key))
-            academic.append(PlannedQuery("academic", f"{place} {academic_topic}", field_type,
-                                         field_key))
+            academic.append(PlannedQuery("academic", f"{variant} {academic_topic}",
+                                         field_type, field_key))
         candidates["web"].append(web)
         candidates["academic"].append(academic)
 
     out: list[PlannedQuery] = []
     seen = {q.casefold() for q in already_run}
+
+    def take(q: PlannedQuery) -> bool:
+        text = " ".join(q.query.split())
+        if text.casefold() in seen:
+            return False
+        seen.add(text.casefold())
+        out.append(PlannedQuery(q.kind, text, q.field_type, q.field_key))
+        return True
+
+    # The reserved verification slot; the utility field type (when planned) may take one
+    # more of the verification queries through the round-robin.
+    reserved = next((q for q in verify if take(q)), None)
+    remaining = [q for q in verify if " ".join(q.query.split()).casefold() not in seen]
+    if "utility" in groups and candidates["web"]:
+        utility_index = list(groups).index("utility")
+        candidates["web"][utility_index] += remaining[:MAX_VERIFICATION_QUERIES - 1]
     for kind in ("web", "academic"):
-        picked = 0
+        picked = 1 if kind == "web" and reserved is not None else 0
         # Round-robin across field types so one type can't use the whole budget.
         queues = [list(g) for g in candidates[kind]]
         while picked < max_per_kind and any(queues):
             for queue in queues:
                 if not queue or picked >= max_per_kind:
                     continue
-                q = queue.pop(0)
-                text = " ".join(q.query.split())
-                if text.casefold() in seen:
-                    continue
-                seen.add(text.casefold())
-                out.append(PlannedQuery(q.kind, text, q.field_type, q.field_key))
-                picked += 1
+                if take(queue.pop(0)):
+                    picked += 1
     return out
 
 def _fallback_topic(d: FieldDefinition) -> tuple[str, str] | None:

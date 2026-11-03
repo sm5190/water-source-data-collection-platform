@@ -241,7 +241,7 @@ def discovery_plan(state: GraphState, research: CityResearchState, events: list[
     """The DiscoveryPlan for the next round (discovery/queries.py)."""
     from water_source_research.context_manager.relevance import _claim_values, _feature_key
     from water_source_research.discovery.queries import (
-        DiscoveryPlan, all_topics, ineffective_topics, place_terms,
+        DiscoveryPlan, all_topics, ineffective_topics, local_language, place_variants,
     )
     from water_source_research.services.geo_match import matcher_for
     matcher = matcher_for(research.city_name, research.country)
@@ -255,8 +255,12 @@ def discovery_plan(state: GraphState, research: CityResearchState, events: list[
                         key=lambda c: (0 if "claim" in c.get("origins", []) else 1, c["name"]))
     features = [v for key in ("water_source", "reservoir_names")
                 for v in _claim_values(research, key) if _feature_key(v)]
+    places = place_variants(matcher.identity) if matcher is not None else ()
+    lang = local_language(research.country)
+    local = place_variants(matcher.identity, lang) if matcher is not None and lang else ()
     return DiscoveryPlan(
-        place=place_terms(matcher.identity) if matcher is not None else "",
+        place=places[0] if places else "", places=places,
+        local_place=local[0] if local else "",
         verified_hosts=tuple(utility_hosts(state)),
         verified_names=tuple(c["name"] for c in verified),
         candidate_names=tuple(c["name"] for c in unverified),

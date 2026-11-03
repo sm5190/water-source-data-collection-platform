@@ -28,4 +28,4 @@ RESOLUTION_POLICY_VERSION = "resolve-5"  # 5: official sources = verified utilit
 CLASSIFICATION_VERSION = "classify-2"
 # Discovery planning (discovery/queries.py DiscoveryPlan, agents/nodes.py): verified utility
 # hosts and names, verification and fallback searches, identity place terms, host suppression.
-DISCOVERY_POLICY_VERSION = "discovery-2"
+DISCOVERY_POLICY_VERSION = "discovery-3"  # 3: verification slot, place variants, topic misses

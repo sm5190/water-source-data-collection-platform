@@ -57,5 +57,5 @@ def test_replay_misses_never_make_a_topic_ineffective():
     topic = "drinking water source"
     misses = [_event(f"Santiago {topic}", "not_recorded") for _ in range(3)]
     assert ineffective_topics(misses, [topic]) == set()
-    empty = [_event(f"Santiago {topic}", "web_search") for _ in range(2)]
+    empty = [_event(f"{place} {topic}", "web_search") for place in ("Santiago", "Maipú")]
     assert ineffective_topics(empty, [topic]) == {topic}

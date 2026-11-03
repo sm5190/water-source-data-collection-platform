@@ -9,7 +9,7 @@ from water_source_research.acquisition.config import AcquisitionSettings
 from water_source_research.acquisition.service import select_candidates
 from water_source_research.agents.nodes import _record_suppression, suppressed_hosts
 from water_source_research.discovery.queries import (
-    DiscoveryPlan, build_queries, ineffective_topics, place_terms,
+    DiscoveryPlan, build_queries, ineffective_topics, place_terms, place_variants,
 )
 from water_source_research.discovery.ranking import merge_and_rank
 from water_source_research.services.city_identity import load_city_identities
@@ -26,13 +26,34 @@ def queries(plan, keys=("utility_name", "water_source", "total_city_water_withdr
 
 # --- place terms --------------------------------------------------------------------------
 
-def test_the_region_is_added_only_for_ambiguous_names():
-    assert place_terms(BY[("Santiago", "Chile")]) == \
-        "Santiago Santiago Metropolitan Region Chile"  # large homonyms elsewhere
-    assert place_terms(BY[("Hyderabad", "India")]) == "Hyderabad Telangana India"
-    assert place_terms(BY[("Houston", "United States of America")]) == \
-        "Houston Texas United States of America"  # same-country homonyms (Mississippi, ...)
-    assert place_terms(BY[("Vienna", "Austria")]) == "Vienna Austria"  # small homonyms only
+def test_place_variants_are_natural_and_always_disambiguate():
+    """discovery-3 (F7): no "Santiago Santiago ..."; a same-country homonym always gets the
+    region; foreign homonyms only need the country, with region / own qualified name as
+    variants; small homonyms only: city + country."""
+    santiago = place_variants(BY[("Santiago", "Chile")])
+    assert santiago == ("Santiago Chile", "Santiago Metropolitan Region Chile",
+                        "Santiago de Chile")
+    assert not any("Santiago Santiago" in v for v in santiago)
+    assert place_variants(BY[("Hyderabad", "India")]) == (
+        "Hyderabad India", "Hyderabad Telangana India")
+    houston = place_variants(BY[("Houston", "United States of America")])
+    assert houston == ("Houston Texas", "Houston Texas United States of America")
+    assert all("Texas" in v for v in houston)  # Houston, Mississippi shares the country
+    assert place_variants(BY[("Vienna", "Austria")]) == ("Vienna Austria",)
+    assert place_terms(BY[("Santiago", "Chile")]) == "Santiago Chile"
+
+def test_local_language_variants_use_local_names():
+    assert place_variants(BY[("Santiago", "Chile")], "es") == ("Santiago de Chile",)
+    assert place_variants(BY[("Vienna", "Austria")], "de") == ("Wien Austria",)
+
+def test_field_types_rotate_through_variants():
+    plan = DiscoveryPlan(place="Santiago Chile", places=(
+        "Santiago Chile", "Santiago Metropolitan Region Chile", "Santiago de Chile"),
+        local_place="Santiago de Chile")
+    qs = queries(plan)
+    assert "Santiago Chile drinking water utility" in qs
+    assert any(q.startswith("Santiago Metropolitan Region Chile ") for q in qs)
+    assert any(q.startswith("Santiago de Chile ") for q in qs)
 
 def test_local_language_queries_name_the_place():
     qs = queries(DiscoveryPlan(), keys=("water_source",))
@@ -161,3 +182,48 @@ def test_ranking_is_unchanged_without_an_identity():
                 source_type="TECHNICAL")
     ranked = merge_and_rank([cali, chile], "Santiago", country="Chile")
     assert ranked[0].url == "https://www.example.org/cali" and ranked[0].geo_status is None
+
+# --- Milestone 3.1 (discovery-3): verification independent of the utility field ------------
+
+def test_verification_has_a_reserved_slot_when_utility_name_is_not_planned():
+    """F6, Santiago run b844390c: a round-1 utility_name claim took the field out of the plan,
+    so "Aguas Andinas" was never verified."""
+    plan = DiscoveryPlan(place="Santiago Chile", candidate_names=("Aguas Andinas",))
+    planned = build_queries(city="Santiago", country="Chile", utility=None,
+                            field_keys=["water_source", "total_city_water_withdrawals_m3_day"],
+                            fields=FIELDS, plan=plan, max_per_kind=2)
+    web_q = [q for q in planned if q.kind == "web"]
+    assert len(web_q) == 2  # the reserved slot counts toward the budget
+    assert web_q[0].query == '"Aguas Andinas" Santiago Chile drinking water supply'
+    assert web_q[0].field_key == "utility_name"
+
+def test_verification_moves_to_the_local_language_once_the_english_query_ran():
+    plan = DiscoveryPlan(place="Santiago Chile", candidate_names=("Aguas Andinas",))
+    ran = {'"Aguas Andinas" Santiago Chile drinking water supply'}
+    qs = queries(plan, keys=("water_source",), already_run=ran)
+    assert '"Aguas Andinas" Santiago Chile empresa sanitaria concesionaria agua potable ' \
+           'área de concesión' in qs
+
+def test_no_candidates_no_verification_queries():
+    qs = queries(DiscoveryPlan(place="Santiago Chile"), keys=("water_source",))
+    assert not any(q.startswith('"') for q in qs)
+
+def test_ineffective_topics_count_each_search_once_and_match_the_topic_suffix():
+    """discovery-3: one query sent to two academic providers is one miss, not two; a miss on
+    "... drinking water quality report" isn't charged to "drinking water quality"; failed
+    calls say nothing about the topic."""
+    def ev(query, retained=0, result="NO_RESULT", provider="openalex"):
+        return {"kind": "TOOL_CALL", "node": "discover", "provider": provider,
+                "result": result, "attrs": {"query": query, "sources_retained": retained}}
+    topics = ["drinking water quality", "drinking water quality report"]
+    both = [ev("Santiago Chile drinking water quality"),
+            ev("Santiago Chile drinking water quality", provider="semantic_scholar")]
+    assert ineffective_topics(both, topics) == set()
+    longer = [ev(f"{p} drinking water quality report") for p in ("Santiago", "Maipú")]
+    assert ineffective_topics(longer, topics) == {"drinking water quality report"}
+    failed = [ev(f"{p} drinking water quality", result="FAILURE") for p in ("A", "B")]
+    assert ineffective_topics(failed, topics) == set()
+    one_kept = [ev("A drinking water quality"),
+                ev("A drinking water quality", retained=2, provider="semantic_scholar"),
+                ev("B drinking water quality")]
+    assert ineffective_topics(one_kept, topics) == set()
