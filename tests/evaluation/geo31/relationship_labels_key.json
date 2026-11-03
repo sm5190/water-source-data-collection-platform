@@ -1,7 +1,34 @@
 {
- "R05b559af": {
+ "Rae269160": {
   "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
-  "key": "SOURCE_SUPPLIES_CITY|source:lake:lake houston|city:houston|united states of america",
+  "key": "SOURCE_LOCATED_IN|infrastructure:reservoir:lake houston|region:place:san jacinto",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R1454ed62": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SOURCE_LOCATED_IN|infrastructure:reservoir:lake houston|region:place:san jacinto river basin",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "Re0aae5d4": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SOURCE_LOCATED_IN|source:lake_unspecified:lake livingston|region:place:trinity river system",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R249ce0d5": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SOURCE_SUPPLIES_CITY|infrastructure:reservoir:lake houston|city:houston|united states of america",
   "kind": "SOURCE_SUPPLIES_CITY",
   "status": "VERIFIED",
   "basis": [
@@ -15,15 +42,6 @@
   "status": "SUPPORTED",
   "basis": [
    "SELF_DESCRIPTION"
-  ]
- },
- "R0a1d8a7c": {
-  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
-  "key": "SUPPLIES_WHOLESALE_TO|utility:east water|city:houston|united states of america",
-  "kind": "SUPPLIES_WHOLESALE_TO",
-  "status": "SUPPORTED",
-  "basis": [
-   "INDEPENDENT"
   ]
  },
  "R372e7431": {
@@ -71,6 +89,15 @@
    "INDEPENDENT"
   ]
  },
+ "R57dbd2ae": {
+  "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+  "key": "SOURCE_LOCATED_IN|source:river:rio maipo|region:place:manzano",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
  "Rff21ddd0": {
   "run_id": "b844390c-4e71-4635-8433-dc6122779573",
   "key": "SOURCE_SUPPLIES_UTILITY|source:river:rio maipo|utility:aguas andinas",
@@ -87,6 +114,24 @@
   "status": "CANDIDATE",
   "basis": [
    "CLAIM"
+  ]
+ },
+ "Rdb0f3b7f": {
+  "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+  "key": "DEPARTMENT_OF|utility:municipal department 31 vienna water|city:vienna|austria",
+  "kind": "DEPARTMENT_OF",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R805170a9": {
+  "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+  "key": "DEPARTMENT_OF|utility:vienna water|city:vienna|austria",
+  "kind": "DEPARTMENT_OF",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
   ]
  },
  "Reda37e9a": {
@@ -165,9 +210,9 @@
   "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
   "key": "UTILITY_SERVES_CITY|utility:toronto water|city:toronto|canada",
   "kind": "UTILITY_SERVES_CITY",
-  "status": "CANDIDATE",
+  "status": "VERIFIED",
   "basis": [
-   "SELF_DESCRIPTION"
+   "GOVERNMENT_OR_REGULATOR"
   ]
  },
  "Re250ffa3": {
@@ -186,6 +231,43 @@
   "status": "CANDIDATE",
   "basis": [
    "CLAIM"
+  ]
+ },
+ "R07e2fc95": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "DEPARTMENT_OF|utility:houston public works|city:houston|united states of america",
+  "kind": "DEPARTMENT_OF",
+  "status": "CANDIDATE",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR",
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "R00eab87b": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "SOURCE_LOCATED_IN|source:lake_unspecified:lake houston|region:place:san jacinto",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "Rc86bcf43": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "SOURCE_LOCATED_IN|source:lake_unspecified:lake houston|region:place:san jacinto river basin",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R99ef7a30": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "SOURCE_LOCATED_IN|source:lake_unspecified:lake livingston|region:place:trinity river system",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
   ]
  },
  "R3b7e90f8": {
@@ -219,14 +301,14 @@
   "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
   "key": "UTILITY_SERVES_CITY|utility:empresa metropolitana de obras sanitarias|city:santiago|chile",
   "kind": "UTILITY_SERVES_CITY",
-  "status": "SUPPORTED",
+  "status": "HISTORICAL",
   "basis": [
    "INDEPENDENT"
   ]
  },
- "Rc05c422b": {
+ "Rb7ac9916": {
   "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
-  "key": "SOURCE_SUPPLIES_CITY|source:unspecified:limestone alps of lower austria and styria|city:vienna|austria",
+  "key": "SOURCE_SUPPLIES_CITY|region:region:limestone alps of lower austria and styria|city:vienna|austria",
   "kind": "SOURCE_SUPPLIES_CITY",
   "status": "VERIFIED",
   "basis": [
@@ -240,6 +322,15 @@
   "status": "VERIFIED",
   "basis": [
    "GOVERNMENT_OR_REGULATOR",
+   "INDEPENDENT"
+  ]
+ },
+ "Rd78933e5": {
+  "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+  "key": "SOURCE_LOCATED_IN|infrastructure:reservoir:ndakaini|region:place:thika chania",
+  "kind": "SOURCE_LOCATED_IN",
+  "status": "SUPPORTED",
+  "basis": [
    "INDEPENDENT"
   ]
  },
@@ -297,9 +388,9 @@
    "INDEPENDENT"
   ]
  },
- "R82d1a121": {
+ "R8003957c": {
   "run_id": "0618af70-5e17-4719-b040-22509451d523",
-  "key": "SOURCE_SUPPLIES_CITY|source:lake:lake ontario|city:toronto|canada",
+  "key": "SOURCE_SUPPLIES_CITY|source:lake_unspecified:lake ontario|city:toronto|canada",
   "kind": "SOURCE_SUPPLIES_CITY",
   "status": "VERIFIED",
   "basis": [
@@ -310,9 +401,9 @@
   "run_id": "0618af70-5e17-4719-b040-22509451d523",
   "key": "UTILITY_SERVES_CITY|utility:toronto water|city:toronto|canada",
   "kind": "UTILITY_SERVES_CITY",
-  "status": "SUPPORTED",
+  "status": "VERIFIED",
   "basis": [
-   "SELF_DESCRIPTION"
+   "GOVERNMENT_OR_REGULATOR"
   ]
  },
  "R7a3532cc": {

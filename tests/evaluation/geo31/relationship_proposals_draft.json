@@ -146,5 +146,49 @@
  "R91dc0c52": {
   "label": "CORRECT",
   "basis": "Wiener Wasser, the city's water utility"
+ },
+ "R07e2fc95": {
+  "label": "CORRECT",
+  "basis": "Houston Public Works is a City of Houston department (status candidate is the system's)"
+ },
+ "Rae269160": {
+  "label": "CORRECT",
+  "basis": "Lake Houston is in the San Jacinto basin (chunk cut the word 'River Basin')"
+ },
+ "R1454ed62": {
+  "label": "CORRECT",
+  "basis": "Lake Houston (San Jacinto River Basin)"
+ },
+ "R00eab87b": {
+  "label": "CORRECT",
+  "basis": "as Rae269160"
+ },
+ "Rc86bcf43": {
+  "label": "CORRECT",
+  "basis": "as R1454ed62"
+ },
+ "Re0aae5d4": {
+  "label": "CORRECT",
+  "basis": "Lake Livingston is on the Trinity River system"
+ },
+ "R99ef7a30": {
+  "label": "CORRECT",
+  "basis": "as Re0aae5d4"
+ },
+ "Rd78933e5": {
+  "label": "CORRECT",
+  "basis": "Ndakaini Dam in the Thika-Chania sub-watershed"
+ },
+ "R57dbd2ae": {
+  "label": "UNCERTAIN",
+  "basis": "El Manzano is a gauging point on the Maipo, a locality rather than an area"
+ },
+ "Rdb0f3b7f": {
+  "label": "CORRECT",
+  "basis": "MA 31 - Vienna Water is a municipal department (smartcity.wien.gv.at)"
+ },
+ "R805170a9": {
+  "label": "CORRECT",
+  "basis": "Vienna Water (MA 31) is a municipal department"
  }
 }

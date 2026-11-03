@@ -1,0 +1,68 @@
+{
+ "directory": "reports/eval/geo31/phase4",
+ "written_at": "2026-11-03T23:25:56+00:00",
+ "git_commit": "887fef1",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "decisions_fragment_rule.json",
+   "bytes": 693,
+   "sha256": "d708544069a6098cb90f1d3fdfb5863c3183e182c901132f424b4368a3b3f5a6",
+   "modified": "2026-11-03T23:06:11+00:00"
+  },
+  {
+   "path": "decisions_phase3_vs_e.json",
+   "bytes": 693,
+   "sha256": "d708544069a6098cb90f1d3fdfb5863c3183e182c901132f424b4368a3b3f5a6",
+   "modified": "2026-11-03T23:23:34+00:00"
+  },
+  {
+   "path": "geo_labels_compare.json",
+   "bytes": 26135,
+   "sha256": "9423228f0d897ae953610249764905c44d0baf1a75ce82c66ac4bb12fb362ee6",
+   "modified": "2026-11-03T23:21:08+00:00"
+  },
+  {
+   "path": "graphs.json",
+   "bytes": 145078,
+   "sha256": "8b55cb9ebdb621a7ec32f74db90769a7532322312143f450dd1402762bdd037c",
+   "modified": "2026-11-03T23:17:29+00:00"
+  },
+  {
+   "path": "graphs.log",
+   "bytes": 2942,
+   "sha256": "63aa62f22470d8a40c75eb55919bb2b4218b4e35c801d8b2a5dec7fa9af67b1b",
+   "modified": "2026-11-03T23:17:29+00:00"
+  },
+  {
+   "path": "graphs_affiliation.json",
+   "bytes": 124552,
+   "sha256": "b7470b5a01f92bb421f91fc92461fa8b81688b4f3594a5d16df9c742589fd439",
+   "modified": "2026-11-03T23:00:24+00:00"
+  },
+  {
+   "path": "revalidation_e.json",
+   "bytes": 9161,
+   "sha256": "8a2f6d8ceaec2456d240fb755766b44fea9ef7e9a426424465e5ee9cf40e3bd2",
+   "modified": "2026-11-03T23:23:16+00:00"
+  },
+  {
+   "path": "revalidation_e.log",
+   "bytes": 1542,
+   "sha256": "7c2cec05e70ff1a281e4757e679666232e2161d93626a94d66d8809ff5f979b6",
+   "modified": "2026-11-03T23:23:16+00:00"
+  },
+  {
+   "path": "revalidation_fragment.json",
+   "bytes": 9161,
+   "sha256": "4f792036744402b0dd502000f0e660d390ea1d1124f87d5a9caf382fb21be468",
+   "modified": "2026-11-03T23:05:55+00:00"
+  },
+  {
+   "path": "revalidation_fragment.log",
+   "bytes": 1542,
+   "sha256": "25fa5ba155c20cf19fe40b1bcfde2aff6841f40ec0463520e6e729f66f1b63d1",
+   "modified": "2026-11-03T23:05:55+00:00"
+  }
+ ]
+}

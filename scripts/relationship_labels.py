@@ -37,14 +37,19 @@ def sample_id(run_id: str, key: str) -> str:
 
 def export(graphs: dict, out: Path) -> int:
     sheet, key_path = out / "relationship_labels.csv", out / "relationship_labels_key.json"
-    old = {}
-    if sheet.exists():  # keep labels already written
-        old = {r["sample_id"]: r for r in csv.DictReader(sheet.open(encoding="utf-8"))}
+    old, by_content = {}, {}
+    if sheet.exists():  # keep labels already written (also when a relationship's key changed)
+        for r in csv.DictReader(sheet.open(encoding="utf-8")):
+            old[r["sample_id"]] = r
+            by_content[(r["city"], r["kind"], r["subject"], r["object"])] = r
     rows, key = [], {}
     for run_id, city, r in _rows(graphs):
         sid = sample_id(run_id, r["key"])
         ev = r["evidence"]
-        row = {c: "" for c in COLUMNS} | old.get(sid, {})
+        previous = old.get(sid) or by_content.get((city, r["kind"], r["subject"]["name"],
+                                                   r["object"]["name"]), {})
+        row = {c: "" for c in COLUMNS} | {k: v for k, v in previous.items()
+                                          if k not in ("sample_id",)}
         row.update(sample_id=sid, city=city, kind=r["kind"], subject=r["subject"]["name"],
                    object=r["object"]["name"],
                    quote_1=ev[0]["quote"][:400] if ev else "", url_1=ev[0]["url"] if ev else "",
@@ -94,12 +99,17 @@ def metrics(out: Path) -> dict:
         for g in ((k["kind"], k["status"], status), (k["kind"], "ALL", status),
                   ("ALL", k["status"], status), ("ALL", "ALL", status)):
             groups[g][label or "UNLABELLED"] += 1
+            # OUTDATED is right when the graph calls the relationship HISTORICAL
+            if label == "CORRECT" or (label == "OUTDATED" and k["status"] == "HISTORICAL"):
+                groups[g]["_right"] += 1
     out_m = {}
     for (kind, st, status), c in sorted(groups.items()):
         decided = c["CORRECT"] + c["OUTDATED"] + c["INCORRECT"]
+        right = c["_right"]
         out_m[f"{kind}|{st}|{status}"] = {
-            **dict(c), "decided": decided,
-            "precision": round(c["CORRECT"] / decided, 3) if decided else None}
+            **{k: v for k, v in c.items() if not k.startswith("_")}, "decided": decided,
+            "right": right,
+            "precision": round(right / decided, 3) if decided else None}
     return out_m
 
 def main() -> int:
@@ -122,13 +132,13 @@ def main() -> int:
               "rows proposed (UNCONFIRMED)")
     else:
         result = metrics(args.out)
-        lines = ["| kind | system status | labels | correct / decided | precision |",
+        lines = ["| kind | system status | labels | right / decided | precision |",
                  "|---|---|---|---|---|"]
         for k, v in result.items():
             kind, st, status = k.split("|")
             counts = ", ".join(f"{x} {v[x]}" for x in (*LABELS, "UNLABELLED") if v.get(x))
             lines.append(f"| {kind} | {st} ({status}) | {counts} | "
-                         f"{v.get('CORRECT', 0)}/{v['decided']} | {v['precision']} |")
+                         f"{v['right']}/{v['decided']} | {v['precision']} |")
         md = "\n".join(lines) + "\n"
         if args.report:
             args.report.write_text(md, encoding="utf-8")
