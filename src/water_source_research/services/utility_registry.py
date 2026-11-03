@@ -598,8 +598,8 @@ def _host_is_the_name(cand: UtilityCandidate, host: str, places: frozenset[str],
                       city_words: frozenset[str]) -> bool:
     """Stricter than ``_spells`` for a host none of whose pages was acquired yet: a label holds
     a distinctive word of the name (not the city, a place, a generic or descriptor word), or a
-    label *is* the name without its organisation-type words ("nairobiwater" for "Nairobi Water
-    Company"). "houstonwatersolutions" is not "Houston Water"."""
+    label *is* the name without its organisation-type words ("examplewater" for "Example Water
+    Company"). A longer label that only contains the name ("examplewatersolutions") is not it."""
     labels = [lab.replace("-", "") for lab in host.split(".")[:-1]
               if lab not in ("www", "com", "org", "net", "co", "gov", "go", "ac")]
     for n in cand.all_names():

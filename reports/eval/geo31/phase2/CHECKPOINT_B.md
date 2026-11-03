@@ -1,4 +1,4 @@
-# Milestone 3.1 — Checkpoint B (Phase 2), PARTIAL
+# Milestone 3.1 — Checkpoint B (Phase 2)
 
 Date: 2026-11-03. All checks offline on stored runs (no searches, fetches or model calls).
 Geography uses the DRAFT identity (`CITY_IDENTITY_ALLOW_DRAFT=1`); labels are UNCONFIRMED
@@ -84,12 +84,17 @@ round, so the reservation would not fetch it.** Why, from the stored evidence:
 
 ## 3. Acceptance (no-LLM revalidation of 8 M1 + 7 M3 runs)
 
-Both arms were revalidated (`revalidation_before.json`, `revalidation_after.json`).
-- **Not done:** the arm-vs-arm comparison of automatic decisions, and the cache-only evaluation
-  plus `acceptance_report.py`. The differences printed by `--verify` are against the original
-  parents (older resolve-3 decisions): 9 of 15 parents show 0 differences in both arms.
-- Also not done: the after-arm revalidation ran before c2936d4 (the slot changes don't affect
-  validation) but after the region fix.
+Both arms were revalidated (`revalidation_before.json`, `revalidation_after.json`). The after
+arm includes the region fix; the c2936d4 slot changes don't touch validation.
+- **0 automatic decisions changed between the arms in all 15 runs** (status, rule and selected
+  claims per field and entity; `decisions_before_vs_after.json`).
+- So acceptance is unchanged: Checkpoint A's 15 AUTO values on the M1 runs, all correct, with 0
+  wrong, stay exactly as they were. With identical decisions, cache-only evaluations would only
+  repeat that, so they were not rerun.
+- The differences `--verify` prints against the original parents come from older resolve-3
+  decisions and are the same in both arms (9 of 15 parents show none).
+- The geography changes therefore affect discovery, acquisition and the registry, not
+  acceptance on the stored evidence. Whether they change live results needs controlled runs.
 
 ## Still needed from you
 
