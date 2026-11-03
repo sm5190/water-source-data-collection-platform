@@ -266,3 +266,54 @@ def test_fresh_run_false_verifications_stay_unverified():
     ncw = reg.find("Nairobi City Water & Sewerage Company")
     assert ncw is not None and ncw.status == "VERIFIED"  # the Assembly states its mandate
     assert "nairobiassembly.go.ke" not in ncw.bound_hosts  # but it isn't the utility's site
+
+# --- Milestone 3.1 Phase 1: diagnosed rule bugs (F3, F4, F5) --------------------------------
+
+def test_a_utility_that_commissions_design_is_the_client_not_a_contractor():
+    """F4, seen in Santiago run b844390c: the noun "diseño" read as a building verb made the
+    city's utility NON_SERVING (and stopped its verification searches)."""
+    gov = chunk("https://planesynormas.mma.gob.cl/informe.pdf", "Aguas Andinas encargó a la "
+                "empresa Hidrosan el diseño de la planta de tratamiento.",
+                source_type="GOVERNMENT")
+    assert status(registry([gov]), "Aguas Andinas") in (None, "CANDIDATE")
+    contracted = chunk("https://x.example/news", "Aguas Andinas contracted Hidrosan Ingeniería "
+                       "to design and build the new plant.", source_type="OTHER")
+    assert status(registry([contracted]), "Aguas Andinas") in (None, "CANDIDATE")
+    # the contractor itself, doing the work, is still a contractor
+    builder = chunk("https://hidrosan.example/proyectos", "Hidrosan Water Services diseñó y "
+                    "construyó la planta para la empresa sanitaria.", source_type="COMMERCIAL")
+    cand = registry([builder]).find("Hidrosan Water Services")
+    assert cand is not None and any(e.role == "CONTRACTOR" for e in cand.evidence)
+
+def test_untreated_surface_water_to_cities_is_wholesale():
+    """F3: "provides untreated surface water to the cities of ..." is bulk supply, not a
+    drinking-water operator."""
+    cwa = chunk("https://www.coastalwaterauthority.org/about", "The Coastal Water Authority "
+                "provides untreated surface water to the cities of Houston, Baytown, and Deer "
+                "Park, Texas, United States.", source_type="GOVERNMENT",
+                title="About | Coastal Water Authority")
+    cand = registry([cwa], *H).find("Coastal Water Authority")
+    roles = {e.role for e in cand.evidence if e.relationship != "MENTION_ONLY"}
+    assert roles == {"WHOLESALE_SUPPLIER"}
+    assert "DRINKING_WATER_OPERATOR" not in cand.verified_roles
+
+def test_descriptor_names_are_not_organisations_on_any_path():
+    """F5: "Non-Revenue Water (NRW)" (acronym path, verified in Nairobi run 21b46e42) and a
+    page heading "<City> Drinking Water Operations" are descriptions, not utilities."""
+    nrw = chunk("https://nairobiassembly.go.ke/r.pdf", "Non-Revenue Water (NRW) reduction "
+                "improves water supply in Nairobi, Kenya, where the company provides water "
+                "services.", source_type="GOVERNMENT")
+    assert registry([nrw], "Nairobi", "Kenya").find("Non-Revenue Water") is None
+    ops = chunk("https://houstonpublicworks.org/drinking-water-operations", "Houston Drinking "
+                "Water Operations supplies high quality drinking water to Houston, Texas.",
+                source_type="OTHER", title="Houston Drinking Water Operations")
+    assert registry([ops], *H).find("Houston Drinking Water Operations") is None
+    # a name with its own acronym that names a body is still an organisation
+    smapa = chunk("https://x.example/a", "El Servicio Municipal de Agua Potable y "
+                  "Alcantarillado (SMAPA) abastece de agua potable a Maipú, Santiago, Chile.",
+                  source_type="GOVERNMENT")
+    assert registry([smapa]).find("SMAPA") is not None
+    # "<City> Water" stays a name
+    tw = chunk("https://www.toronto.ca/water", "Toronto Water supplies drinking water to "
+               "Toronto, Ontario, Canada.", source_type="GOVERNMENT")
+    assert registry([tw], "Toronto", "Canada").find("Toronto Water") is not None

@@ -53,7 +53,7 @@ from water_source_research.services.geo_match import (
     UNKNOWN_SCOPE, DocumentScope, GeoMatcher, document_scopes, identity_signature, matcher_for,
 )
 
-UTILITY_POLICY_VERSION = "utility-1"
+UTILITY_POLICY_VERSION = "utility-2"  # 2: client vs contractor, untreated water, descriptor names
 GOVERNMENT_TYPES = frozenset({"GOVERNMENT", "REGULATORY"})
 SERVING = frozenset({"SERVES", "SERVES_PART", "SUPPLIES_WHOLESALE"})
 
@@ -166,9 +166,11 @@ SANITATION = re.compile(
     r"alcantarillado|aguas\s+servidas|aguas\s+residuales|saneamiento|esgoto\w*|"
     r"assainissement|eaux\s+us[ée]es|abwasser\w*|kanalisation)\b", re.IGNORECASE)
 WHOLESALE = re.compile(
-    r"\b(bulk|wholesale|raw\s+water|treated\s+water\s+to\s+(?:the\s+)?(?:utilities|"
-    r"municipalities|cities|member)|en\s+bloque|agua\s+cruda|[aá]gua\s+bruta|"
-    r"water\s+to\s+(?:the\s+)?(?:utilities|municipalities|member\s+cities))\b", re.IGNORECASE)
+    r"\b(bulk|wholesale|(?:raw|untreated)\s+(?:surface\s+|ground\s*)?water|"
+    r"treated\s+water\s+to\s+(?:the\s+)?(?:utilities|municipalities|cities|member)|"
+    r"en\s+bloque|agua\s+cruda|[aá]gua\s+bruta|"
+    r"water\s+to\s+(?:the\s+)?(?:utilities|municipalities|member\s+cities|cities\s+of))\b",
+    re.IGNORECASE)
 PART = re.compile(
     r"\b(communes?\s+of|comunas?|parts?\s+of|portions?\s+of|districts?\s+of|sectors?\s+of|"
     r"areas?\s+of|zona\s+(?:norte|sur|oriente|poniente)|northern|southern|eastern|western|"
@@ -180,9 +182,16 @@ PART = re.compile(
 CONTRACTOR = re.compile(
     r"\b(builds?|built|construct(?:s|ed|ing)?|designs?|designed|designing|epc|"
     r"engineering\s+services|consult(?:s|ed|ing|ancy)|supplies\s+(?:equipment|membranes|"
-    r"pipes|technology)|equipment\s+supplier|commission(?:ed|ing)|"
-    r"constru(?:ye|yen|y[oó]|ido)|dise[ñn](?:a|an|[oó])|constr[oó]i|construiu|"
+    r"pipes|technology)|equipment\s+supplier|"
+    r"constru(?:ye|yen|y[oó]|ido)|dise[ñn](?:a|an|ó)|constr[oó]i|construiu|"
     r"errichtet|baut)\b", re.IGNORECASE)
+# Between the candidate's name and a building verb, these make the candidate the client who
+# ordered the work ("<X> encargó a la empresa <Y> el diseño", "<X> contracted <Y> to build"):
+# commissioning work is not doing it. ("diseño", the noun, is not a verb: "diseñó" is.)
+CLIENT = re.compile(
+    r"\b(encarg[oó]\s+a|contrat[oó]\s+a|adjudic[oó]\s+(?:a|el)|licit[oó]|"
+    r"contracted|hired|commissioned|awarded|appointed|selected|engaged|retained|"
+    r"beauftragt\w*|vergab\w*|confi[eé]\s+[aà])\b", re.IGNORECASE)
 # Contract types name an arrangement, not who built what.
 _CONTRACT_TYPES = re.compile(r"\b(build[\s-]+operate[\s-]+(?:transfer|own)|design[\s-]+build|"
                              r"BOT|BOO|BOOT|DBO|EPC\s+contract)\b", re.IGNORECASE)
@@ -216,9 +225,30 @@ def _clean(name: str) -> str:
         words = words[1:]
     return " ".join(words)
 
-def _specific(name: str, exclude: set[str], places: frozenset[str] = frozenset()) -> bool:
+# Words that make a name an organisation type ("... Company", "Servicio ...", "... Works").
+ORG_TYPE_WORDS = frozenset({
+    "utility", "utilities", "authority", "board", "department", "services", "company",
+    "corporation", "commission", "district", "works", "waterworks", "servicio", "servico",
+    "empresa", "compania", "companhia", "sociedad", "corporacion", "acueducto", "obras",
+    "societe", "regie", "compagnie", "office", "stadtwerke", "wasserwerk", "wasserwerke",
+    "sewerage", "agency"})
+
+def _descriptor_name(name: str, city_words: frozenset[str]) -> bool:
+    """A description built on the city's name ("<City> Drinking Water Operations"): its only
+    distinctive words are the city's, the rest are water descriptors or activity nouns, and
+    no organisation-type word names a body. "<City> Water" (no descriptor) is still a name."""
+    words = utility_key(name).split()
+    rest = [w for w in words if w not in _GENERIC and w not in city_words]
+    return (bool(city_words & set(words)) and bool(rest)
+            and all(w in _DESCRIPTORS or w in _AFTER_FRAGMENT or _NOMINAL.match(w)
+                    for w in rest)
+            and not ORG_TYPE_WORDS & set(words))
+
+def _specific(name: str, exclude: set[str], places: frozenset[str] = frozenset(),
+              city_words: frozenset[str] = frozenset()) -> bool:
     """An organisation name, not a description: at least one word that is neither generic,
-    a water descriptor, nor a country/continent name; no possessive, digits or initials."""
+    a water descriptor, nor a country/continent name; no possessive, digits or initials; not
+    a description built on the city's name."""
     if not name or re.search(r"['’]s\b|\d", name) or re.search(r"\b[A-Z]\.\s", name):
         return False
     words = utility_key(name).split()
@@ -231,6 +261,8 @@ def _specific(name: str, exclude: set[str], places: frozenset[str] = frozenset()
     # "<City> Public Works" is specific; the city name or "Public Works" alone is not.
     distinctive = [w for w in words if w not in _GENERIC and w not in _DESCRIPTORS
                    and w not in places and len(w) > 1]
+    if city_words and _descriptor_name(name, city_words):
+        return False
     return bool(distinctive) and utility_key(name) not in exclude
 
 def _host(url: str) -> str:
@@ -257,7 +289,8 @@ class _Doc:
 _TITLE_SEGMENTS = re.compile(r"\s*[|–—]\s*|\s+-\s+")
 
 def mine_names(texts: Iterable[str], exclude: set[str], titles: Iterable[str] = (),
-               places: frozenset[str] = frozenset()) -> tuple[list[str], dict[str, str]]:
+               places: frozenset[str] = frozenset(), city_words: frozenset[str] = frozenset()
+               ) -> tuple[list[str], dict[str, str]]:
     """(organisation names found, alias -> full-name key from "Full Name (ABBR)"). In titles
     only a whole title segment counts ("Home - <City> Water Company"), so title-case
     headlines ("<Name> Cuts Water ...") don't become names."""
@@ -267,7 +300,7 @@ def mine_names(texts: Iterable[str], exclude: set[str], titles: Iterable[str] = 
         for segment in _TITLE_SEGMENTS.split(title or ""):
             seg = _clean(segment)
             if seg and any(p.fullmatch(seg) for p in _ORG_PATTERNS) and _specific(
-                    seg, exclude, places):
+                    seg, exclude, places, city_words):
                 names.setdefault(utility_key(seg), seg)
     # One sentence at a time: a name never spans a sentence boundary ("United States.
     # <City> Public Works ...").
@@ -279,14 +312,18 @@ def mine_names(texts: Iterable[str], exclude: set[str], titles: Iterable[str] = 
                 if after and after[0].casefold().strip(".,;:()") in _AFTER_FRAGMENT:
                     continue
                 n = _clean(m.group(0))
-                if _WATER_WORD.search(n) and _specific(n, exclude, places):
+                if _WATER_WORD.search(n) and _specific(n, exclude, places, city_words):
                     names.setdefault(utility_key(n), n)
         for m in _ABBR.finditer(text):
             full, abbr = _clean(m.group(1)), m.group(2).strip(".")
             # A name given with its own acronym is an organisation even when its words are
-            # generic ("Servicio Municipal de Agua Potable y Alcantarillado (SMAPA)").
+            # generic ("Servicio Municipal de Agua Potable y Alcantarillado (SMAPA)"), if they
+            # name a body; "Non-Revenue Water (NRW)" is a measure, not an organisation.
+            words = set(utility_key(full).split())
             if _WATER_WORD.search(full) and utility_key(full) not in exclude and (
-                    _specific(full, exclude, places) or abbr.isupper()) and len(
+                    _specific(full, exclude, places, city_words)
+                    or (abbr.isupper() and ORG_TYPE_WORDS & words
+                        and not _descriptor_name(full, city_words))) and len(
                     full.split()) > 1 and fold(utility_key(full).split()[0]) not in \
                     _NON_UTILITY_HEADS:
                 names.setdefault(utility_key(full), full)
@@ -337,8 +374,10 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
 
     for n in claim_names:
         add(n, "claim")
+    city_words = frozenset(w for n in matcher.city_names for w in utility_key(n).split())
     mined, alias_map = mine_names([c.text for c in chunks], exclude,
-                                  titles=[d.title for d in docs.values()], places=places)
+                                  titles=[d.title for d in docs.values()], places=places,
+                                  city_words=city_words)
     with_acronym = {v for k, v in alias_map.items() if not k.startswith("_abbr:")}
     for n in mined:
         add(n, "acronym" if utility_key(n) in with_acronym else "text")
@@ -359,7 +398,6 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
 
     _predecessors(found, chunks, add)
     patterns = {k: _name_re(c.all_names()) for k, c in found.items()}
-    city_words = frozenset(w for n in matcher.city_names for w in utility_key(n).split())
     _bind_hosts(found, patterns, docs, chunks, places, city_words, city)
     owner: dict[str, list[str]] = {}
     for k, cand in found.items():
@@ -568,8 +606,8 @@ def _builds(sentence: str, pattern: re.Pattern[str] | None) -> bool:
         return False
     text = _CONTRACT_TYPES.sub(" ", sentence)
     starts = [m.end() for m in pattern.finditer(text)]
-    return any(0 <= v.start() - a <= VERB_WINDOW for v in CONTRACTOR.finditer(text)
-               for a in starts)
+    return any(0 <= v.start() - a <= VERB_WINDOW and not CLIENT.search(text, a, v.start())
+               for v in CONTRACTOR.finditer(text) for a in starts)
 
 def _classify(sentence: str, pattern: re.Pattern[str] | None, cand: UtilityCandidate,
               doc: _Doc, chunk_id: str, matcher: GeoMatcher,
