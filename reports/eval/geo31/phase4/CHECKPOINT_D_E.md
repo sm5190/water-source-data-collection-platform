@@ -121,9 +121,11 @@ Of the 10 newly included not-relevant documents:
 
 No homonym document is included (Vienna VA, Houston MS, Santiago de Cali stay excluded).
 
-Most of this gain comes from fixing the evaluation tool. It had kept scoring search results by
-the publisher host, a rule production dropped in Phase 2. The feature-location change itself
-moves 0 of the 74 labelled documents.
+**Correction (2026-11-03, see `../phase5/PRE_EXTRACTION_CHECKS.md` §5):** an earlier version
+said most of this gain came from fixing the evaluation tool. That was wrong. The 8 → 0 is a
+production change made in Phase 2 (title-based search scope); the old evaluator had
+under-reported it at Checkpoint B. The feature-location change itself moves 0 of the 74
+labelled documents.
 
 ## 7. Relationship precision and recall (provisional)
 

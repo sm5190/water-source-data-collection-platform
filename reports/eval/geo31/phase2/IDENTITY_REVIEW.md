@@ -108,3 +108,33 @@ Sources: GeoNames dumps (CC BY 4.0) retrieved 2026-11-02 – 2026-11-02; Wikidat
 - Hyderabad: the two Urdu forms (Wikidata P1448/P1705 only) moved to unverified: Urdu is a language of Pakistan, which has a large homonym (Hyderabad, Sindh, 1.9 M). Telugu, Hindi and Bengali forms stay (no large homonym's country speaks them / two sources).
 - Santiago: Greater Santiago and Gran Santiago moved from unverified names to context names (METRO_AREA).
 - No other entry of the 56 changed. Rules are generic (builder `curate`, tests `tests/test_identity_curation.py`).
+
+## Approval addendum (2026-11-03): official websites and domain checks
+
+Each official website comes from Wikidata P856 of the city item. All resolved in DNS on
+2026-11-03. "Controlled" means a government-only suffix (.gov, gv.at, go.ke, gov.in); "open"
+means only P856 vouches for it.
+
+| City | Region (admin1, both sources) | Official website(s) | Suffix | Flag |
+|---|---|---|---|---|
+| Houston | Texas (US-TX) | houstontx.gov | controlled | — |
+| Toronto | Ontario (CA-ON) | toronto.ca | open (P856) | — |
+| Vienna | Vienna (AT-9) | wien.gv.at; wien.at | controlled; open (P856) | — |
+| Nairobi | Nairobi City County (KE-30) | nairobi.go.ke | controlled | — |
+| Hyderabad | Telangana (IN-TS) | ghmc.gov.in | controlled | Greater Hyderabad Municipal Corporation: the city's government, but the host doesn't spell the city |
+| Santiago | Santiago Metropolitan Region (CL-RM) | gobiernosantiago.cl | open (P856) | **Check:** appears to be a provincial/regional government site, not the Municipality of Santiago's. If so, remove it (affiliation would then have no official host for Santiago) or replace it with a person-sourced entry. |
+| Luanda | Luanda Province (AO-LUA) | none on Wikidata | — | **Check:** no official host, so municipal affiliation can't verify for Luanda until one is added with provenance |
+
+**What approval activates:** research uses only APPROVED entries. For an approved city, normal
+runs get:
+- City + Region + Country matching and homonym handling;
+- region inference, document/passage scope and feature location;
+- official hosts for affiliation;
+- geo_basis APPROVED.
+
+Cache keys change with the identity signature, so stored bundles and responses are not reused
+across that change.
+
+**To approve:** set `status: APPROVED` on the entry and fill `approval` at the top of
+`config/city_identity.yaml`. Entries with an open flag can be approved after the website line is
+edited, or stay DRAFT.
