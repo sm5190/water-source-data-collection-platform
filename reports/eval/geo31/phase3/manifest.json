@@ -1,0 +1,32 @@
+{
+ "directory": "reports/eval/geo31/phase3",
+ "written_at": "2026-11-03T22:34:02+00:00",
+ "git_commit": "1076510",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "decisions_phase2_vs_phase3.json",
+   "bytes": 693,
+   "sha256": "d708544069a6098cb90f1d3fdfb5863c3183e182c901132f424b4368a3b3f5a6",
+   "modified": "2026-11-03T22:30:19+00:00"
+  },
+  {
+   "path": "graphs.json",
+   "bytes": 90951,
+   "sha256": "225531c799c70afdc5f97ad192af4287f481e8c0bd67b28af3844545ed8d1aba",
+   "modified": "2026-11-03T22:26:44+00:00"
+  },
+  {
+   "path": "revalidation.log",
+   "bytes": 1542,
+   "sha256": "5cbae556b22644bcfcf2c013a354b40588fc73d26d350618fbb4b93035d8b3d2",
+   "modified": "2026-11-03T22:29:56+00:00"
+  },
+  {
+   "path": "revalidation_after.json",
+   "bytes": 9161,
+   "sha256": "13c08d52ca6d5f45ab4072bb8d3f92133182df6abd2878163c74cc32eae04bd6",
+   "modified": "2026-11-03T22:29:56+00:00"
+  }
+ ]
+}

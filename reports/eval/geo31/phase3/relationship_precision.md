@@ -1,0 +1,18 @@
+| kind | system status | labels | correct / decided | precision |
+|---|---|---|---|---|
+| ALL | ALL (provisional) | CORRECT 27, OUTDATED 1, INCORRECT 7, UNCERTAIN 2 | 27/35 | 0.771 |
+| ALL | CANDIDATE (provisional) | CORRECT 12, INCORRECT 6, UNCERTAIN 2 | 12/18 | 0.667 |
+| ALL | SUPPORTED (provisional) | CORRECT 6, OUTDATED 1, INCORRECT 1 | 6/8 | 0.75 |
+| ALL | VERIFIED (provisional) | CORRECT 9 | 9/9 | 1.0 |
+| PREDECESSOR_OF | ALL (provisional) | CORRECT 1, UNCERTAIN 1 | 1/1 | 1.0 |
+| PREDECESSOR_OF | CANDIDATE (provisional) | CORRECT 1, UNCERTAIN 1 | 1/1 | 1.0 |
+| SOURCE_SUPPLIES_CITY | ALL (provisional) | CORRECT 3 | 3/3 | 1.0 |
+| SOURCE_SUPPLIES_CITY | VERIFIED (provisional) | CORRECT 3 | 3/3 | 1.0 |
+| SOURCE_SUPPLIES_UTILITY | ALL (provisional) | CORRECT 1 | 1/1 | 1.0 |
+| SOURCE_SUPPLIES_UTILITY | VERIFIED (provisional) | CORRECT 1 | 1/1 | 1.0 |
+| SUPPLIES_WHOLESALE_TO | ALL (provisional) | CORRECT 1, INCORRECT 1 | 1/2 | 0.5 |
+| SUPPLIES_WHOLESALE_TO | SUPPORTED (provisional) | CORRECT 1, INCORRECT 1 | 1/2 | 0.5 |
+| UTILITY_SERVES_CITY | ALL (provisional) | CORRECT 21, OUTDATED 1, INCORRECT 6, UNCERTAIN 1 | 21/28 | 0.75 |
+| UTILITY_SERVES_CITY | CANDIDATE (provisional) | CORRECT 11, INCORRECT 6, UNCERTAIN 1 | 11/17 | 0.647 |
+| UTILITY_SERVES_CITY | SUPPORTED (provisional) | CORRECT 5, OUTDATED 1 | 5/6 | 0.833 |
+| UTILITY_SERVES_CITY | VERIFIED (provisional) | CORRECT 5 | 5/5 | 1.0 |
