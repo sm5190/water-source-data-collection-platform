@@ -54,7 +54,7 @@ from water_source_research.services.geo_match import (
     matcher_for,
 )
 
-UTILITY_POLICY_VERSION = "utility-4"  # 4: plant-name fragments (<X> Water Purification Plant)
+UTILITY_POLICY_VERSION = "utility-5"  # 5: feature location; 4: plant-name fragments
 # 2: client vs contractor, untreated water, descriptor names
 # 3: publisher apart from subject, section context, a missing homonym is not evidence
 GOVERNMENT_TYPES = frozenset({"GOVERNMENT", "REGULATORY"})

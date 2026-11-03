@@ -31,13 +31,14 @@ RelationshipKind = Literal[
     "SOURCE_SUPPLIES_UTILITY",  # a source (or infrastructure) supplies a utility
     "SOURCE_SUPPLIES_CITY",     # a source supplies the city
     "SOURCE_PART_OF_SYSTEM",    # a source is a stated component of a larger system
+    "SOURCE_LOCATED_IN",        # a source's physical location (a region or place) as stated
     "PREDECESSOR_OF",           # an operator preceded another
     "ALIAS_OF",                 # explicit equivalence ("also known as", "formerly")
     "DEPARTMENT_OF",            # an organisation is a department of the city (affiliation)
 ]
 RelationshipStatus = Literal["VERIFIED", "SUPPORTED", "CANDIDATE", "HISTORICAL", "CONTRADICTED"]
 Temporal = Literal["CURRENT", "HISTORICAL", "UNKNOWN"]
-EntityType = Literal["city", "utility", "source", "system"]
+EntityType = Literal["city", "utility", "source", "system", "infrastructure", "region"]
 # Who says it: the subject about itself (own site), a government/regulator, another document,
 # or only a research claim (extraction output).
 # MUNICIPAL_DEPARTMENT: a page of an organisation verified as a city department

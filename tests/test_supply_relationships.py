@@ -285,3 +285,19 @@ def test_no_plans_for_bulk_supply_is_not_a_wholesale_relationship():
                 "bulk supply.", "TECHNICAL")
     g = graph("Houston", [doc], utilities=[("Delta Water Company", doc.url, "Delta Water")])
     assert g.of_kind("SUPPLIES_WHOLESALE_TO") == []
+
+# --- feature location ---------------------------------------------------------------------------
+
+def test_a_springs_location_is_recorded_not_used_against_the_city():
+    g = graph("Vienna", [SPRINGS])
+    loc = g.of_kind("SOURCE_LOCATED_IN")
+    assert [(r.subject.name, r.object.name, r.object.type) for r in loc] == [
+        ("Stixenstein spring", "Lower Austria", "region")]
+    assert rel(g, "SOURCE_SUPPLIES_CITY", "Stixenstein").status == "VERIFIED"
+
+def test_a_distant_feature_without_a_link_to_the_city_supplies_nothing():
+    doc = chunk("https://www.example-dams.org/x", "The Katse Dam in Lesotho stores water for "
+                "irrigation.")
+    g = graph("Nairobi", [doc])
+    assert g.of_kind("SOURCE_SUPPLIES_CITY") == [] and g.of_kind("SOURCE_SUPPLIES_UTILITY") == []
+    assert [r.object.name for r in g.of_kind("SOURCE_LOCATED_IN")] == ["Lesotho"]

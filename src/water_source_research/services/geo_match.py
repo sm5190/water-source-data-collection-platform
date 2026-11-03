@@ -187,6 +187,47 @@ def _blank(text: str, spans: list[tuple[int, int]]) -> str:
                 chars[i] = " "
     return "".join(chars)
 
+# --- feature location ------------------------------------------------------------------------
+# A phrase locating a water feature or its infrastructure: the place is the feature's location
+# (a third geographic dimension next to the target city and the passage's subject), never a
+# sign that the passage is about another place: "springs in Styria", "a dam in Lesotho",
+# "Lesotho's dams", "the Katse Dam (Lesotho)", "aquifer located in the X Basin".
+_FEATURE_WORD = (r"(?:springs?|wells?|wellfields?|well\s+fields?|aquifers?|dams?|reservoirs?|"
+                 r"lakes?|rivers?|intakes?|catchments?|watersheds?|headwaters|basins?|sources?|"
+                 r"plants?|pipelines?|aqueducts?|tunnels?|quellen?|quellgebiet\w*|"
+                 r"manantial(?:es)?|vertientes?|embalses?|presas?|r[ií]os?|lagos?|"
+                 r"acu[ií]feros?|captaci[oó]n(?:es)?|cuencas?|barrages?|nappes?|"
+                 r"represas?|mananciais|nascentes?)")
+_PLACE = (r"(?-i:((?:[A-ZÀ-ÖØ-Þ][\w'’\-]+)(?:\s+(?:of\s+|de\s+|del\s+)?"
+          r"[A-ZÀ-ÖØ-Þ][\w'’\-]+){0,3}))")
+_LOCATED = re.compile(
+    rf"\b{_FEATURE_WORD}\b[^.;\n]{{0,40}}?\b(?:located\s+in|situated\s+in|in\s+the\s+|in|im|"
+    rf"near|upstream\s+(?:of|from)|across\s+the\s+border\s+in|en\s+la|en\s+el|en|dans\s+le|"
+    rf"dans\s+la|dans|em|na|no|nel|nella)\s+(?:the\s+|la\s+|el\s+|den\s+|der\s+|le\s+|les\s+)?"
+    rf"{_PLACE}", re.IGNORECASE)
+_POSSESSIVE = re.compile(rf"\b{_PLACE}['’]s\s+(?:\w+\s+){{0,2}}(?i:{_FEATURE_WORD})\b")
+_PARENTHESIS = re.compile(rf"\b{_FEATURE_WORD}\b[^.;\n()]{{0,40}}\(\s*{_PLACE}\s*\)",
+                          re.IGNORECASE)
+
+@dataclass(frozen=True, slots=True)
+class FeatureLocation:
+    place: str
+    span: tuple[int, int]  # the place name in the text
+    phrase: str  # the whole locating phrase
+
+def _feature_locations(text: str) -> list[FeatureLocation]:
+    out, seen = [], set()
+    for pattern in (_LOCATED, _POSSESSIVE, _PARENTHESIS):
+        for m in pattern.finditer(text):
+            g = next(i for i in range(1, (m.lastindex or 0) + 1) if m.group(i)
+                     and m.group(i)[0].isupper())
+            span = m.span(g)
+            if span in seen:
+                continue
+            seen.add(span)
+            out.append(FeatureLocation(m.group(g), span, " ".join(m.group(0).split())))
+    return sorted(out, key=lambda f: f.span)
+
 def _section_heading(line: str, before: str, after: str) -> bool:
     """A section or table heading, not a wrapped line of prose (PDF text layers wrap lines):
     short, not ending like a sentence part, standing apart from the text above (blank line,
@@ -356,6 +397,25 @@ class GeoMatcher:
             return f"government host {host} of the city"
         return None
 
+    # --- feature location ----------------------------------------------------------------
+
+    def feature_locations(self, text: str) -> list[FeatureLocation]:
+        """Places that locate a water feature in ``text`` (not the target city, region or
+        country: those stay mentions of the target)."""
+        out = []
+        for f in _feature_locations(text):
+            if self.city_re.fullmatch(f.place) or self.country_re.fullmatch(f.place) or (
+                    self.region_re is not None and self.region_re.fullmatch(f.place)):
+                continue
+            out.append(f)
+        return out
+
+    def mask_feature_locations(self, text: str) -> str:
+        """``text`` (same length) with the places that locate water features blanked, so a
+        source's location never makes a passage or document about another place."""
+        spans = [f.span for f in self.feature_locations(text)]
+        return _blank(text, spans) if spans else text
+
     # --- document scope ------------------------------------------------------------------
 
     def host_scope(self, url: str) -> DocumentScope:
@@ -449,7 +509,8 @@ class GeoMatcher:
         body = "\n".join([title or "", *texts])
         title_text = title or ""
         mine = len(self.country_re.findall(body))
-        theirs = len(self.other_country_re.findall(body))
+        located = self.mask_feature_locations(body)  # a source's location is not the subject
+        theirs = len(self.other_country_re.findall(located))
         admin = len(self.region_admin_re.findall(body)) if self.region_admin_re else 0
         reasons = [f"publisher {pub.label().lower()} ({'; '.join(pub.reasons) or 'no signal'})",
                    f"country names: target {mine}, other {theirs}"]
@@ -549,12 +610,16 @@ class GeoMatcher:
                                               f"{m.group(0)!r}", _snippet(work, *m.span())))
             work = _blank(work, context_spans)
         bare: list[tuple[int, int]] = []
+        # Places that locate a water feature ("springs in Styria", "a dam in Lesotho") are the
+        # source's location, not another place next to the city (found on the original text:
+        # the water-body names are blanked in ``work``).
+        located = _blank(work, [f.span for f in self.feature_locations(text)])
         for m in self.city_re.finditer(work):
             a, b = m.span()
             near = work[max(0, a - WINDOW):b + WINDOW]
             strong = self.strong_re is not None and self.strong_re.fullmatch(m.group(0))
             target = "verified name" if strong else self._target_signal(near)
-            other = self._other_signal(near)
+            other = self._other_signal(located[max(0, a - WINDOW):b + WINDOW])
             snip = _snippet(work, a, b)
             if target and not other:
                 decisions.append(Decision("CONFIRMED", f"{target} nearby", snip))

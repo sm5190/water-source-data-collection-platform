@@ -122,11 +122,6 @@ SYSTEM = re.compile(
     r"(?:Pipeline|Aqueduct|Water\s+Supply\s+System|Water\s+System|Supply\s+Scheme|"
     r"Spring\s+(?:Water\s+)?(?:Pipeline|Main)|Acueducto|Aqueduc)\b"
     r"|\b(?:[IVX]+\.\s+)?(?:[A-ZÀ-ÖØ-Þ][\w'’\-]+\s+){0,3}[A-ZÀ-ÖØ-Þ]\w*leitung\b")
-# A phrase locating a source ("in the X Alps", "en la cordillera de Y"): removed before the
-# city check, so the source's location never decides the passage's place.
-FEATURE_LOCATION = re.compile(
-    r"\b(?:in|im|en|dans|near|above|upstream\s+(?:of|from))\s+(?:the\s+|la\s+|el\s+|den\s+|"
-    r"der\s+|le\s+|les\s+)?(?:[A-ZÀ-ÖØ-Þ][\w'’\-]+\s*){1,3}")
 _KIND_WORDS = [("spring", r"spring|quelle|manantial|vertiente|source\b"),
                ("aquifer", r"aquifer|acu[ií]fero|grundwasser"),
                ("wellfield", r"wellfield|well\s+field|wells\b"),
@@ -411,10 +406,12 @@ class _Builder:
     def _place(self, sentence: str, chunk: EvidenceChunk, start: int, spans) -> tuple:
         """The city's place in this sentence with the entity names and the source-locating
         phrases removed; else its section heading."""
+        # the places locating a source ("springs in Styria") are found on the sentence
+        # itself (geo_match.feature_locations), then blanked with the entity names
+        located = [f.span for f in self.matcher.feature_locations(sentence)]
         text = sentence
-        for a, b in sorted(spans, reverse=True):
+        for a, b in sorted([*spans, *located], reverse=True):
             text = text[:a] + " " * (b - a) + text[b:]
-        text = FEATURE_LOCATION.sub(lambda m: " " * len(m.group(0)), text)
         scope = self.scopes.get(chunk.url, UNKNOWN_SCOPE)
         place = self.matcher.match_place(text, scope)
         if place.status in ("NONE", "AMBIGUOUS"):
@@ -434,14 +431,16 @@ class _Builder:
                 offset = max(offset, start)
                 if len(sentence) < 12:
                     continue
+                features = self.matcher.feature_locations(sentence)
                 if not (CONSUMER_FIRST.search(sentence) or SOURCE_FIRST.search(sentence)
                         or PART_OF.search(sentence) or CONTAINS.search(sentence)
-                        or ALIAS.search(sentence)):
+                        or ALIAS.search(sentence) or features):
                     continue
                 sources, utilities, city = self._mentions(sentence)
                 if not sources and not utilities:
                     continue
                 self._statements(chunk, sentence, start, sources, utilities, city)
+                self._locations(chunk, sentence, sources, features)
 
     def _statements(self, chunk, sentence, start, sources, utilities, city) -> None:
         consumers = utilities + city
@@ -524,6 +523,28 @@ class _Builder:
                 ev = self.evidence(chunk, chunk.url, quote, pm.group(0), "NONE",
                                    "equivalence statement", True, "SUPPORTING", [])
                 self.add("ALIAS_OF", a[2], b[2], ev)
+
+    def _locations(self, chunk, sentence, sources, features) -> None:
+        """SOURCE_LOCATED_IN: a source and the place its locating phrase names, when the
+        phrase starts at (or within 40 characters after) the source's name. The location is
+        recorded, never used to judge whether the passage is about the city."""
+        quote = " ".join(sentence.split())
+        for f in features:
+            phrase_start = sentence.find(f.phrase.split()[0], max(0, f.span[0] - 60))
+            src = next((s for s in reversed(sources) if s[1] <= f.span[0]
+                        and (phrase_start - s[1] <= 40 or s[0] <= phrase_start < s[1])), None)
+            if src is None or src[2].type not in ("source", "system"):
+                continue
+            place = self.place_entity(f.place)
+            ev = self.evidence(chunk, chunk.url, quote, f.phrase, "NONE",
+                               "the source's location (not the passage's place)", True,
+                               "SUPPORTING", [])
+            self.add("SOURCE_LOCATED_IN", src[2], place, ev)
+
+    def place_entity(self, name: str) -> Entity:
+        eid = f"region:place:{name_key(name)}"
+        return self.entities.setdefault(eid, Entity(entity_id=eid, type="region", name=name,
+                                                    kind="place"))
 
     def _composition(self, chunk, quote, predicate, part: Entity, whole: Entity) -> None:
         scope = self.scopes.get(chunk.url, UNKNOWN_SCOPE)

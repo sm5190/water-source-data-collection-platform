@@ -95,7 +95,9 @@ def test_a_multi_country_report_is_mixed_and_judged_passage_by_passage(luanda):
 def test_a_transboundary_source_named_with_the_city_is_kept(nairobi):
     text = "Nairobi, Kenya imports bulk water from a dam upstream in Uganda, per the treaty."
     s = nairobi.document_scope("https://www.mwe.go.ug/x", "Transboundary water", [text])
-    assert not s.elsewhere and s.label() == "MIXED"
+    # "a dam upstream in Uganda": Uganda is the source's location (feature location), so the
+    # document is about Kenya, not a multi-country one
+    assert not s.elsewhere and s.label() == "TARGET_COUNTRY"
     assert nairobi.match_place(text, s).status == "CONFIRMED"
 
 def test_region_in_administrative_form_places_the_country(houston):
@@ -233,3 +235,33 @@ def test_registry_statement_placed_by_its_section_in_a_mixed_document(monkeypatc
     nwsc = reg.find("National Water and Sewerage Corporation")
     assert nwsc is None or not any(e.relationship == "SERVES" and e.geo_status in (
         "CONFIRMED", "PROBABLE") for e in nwsc.evidence)
+
+
+# --- feature location: the source's place is a third dimension -------------------------------
+
+def test_a_source_located_abroad_does_not_make_the_city_uncertain(nairobi):
+    text = "Nairobi draws water from the Sasumua dam in Uganda."  # synthetic geography
+    assert nairobi.match_place(text).status != "AMBIGUOUS"
+    assert [f.place for f in nairobi.feature_locations(text)] == ["Uganda"]
+    # without the locating phrase, the same country next to the city stays uncertain
+    assert nairobi.match_place("Officials from Nairobi met in Uganda.").status == "AMBIGUOUS"
+
+def test_springs_in_another_region_and_a_reservoir_in_a_county(vienna, houston):
+    s = vienna.document_scope("https://www.wien.gv.at/q", "Springs",
+                              ["The springs in Styria supply Vienna."])
+    assert not s.elsewhere
+    assert [f.place for f in houston.feature_locations(
+        "Lake Livingston in Polk County feeds Houston.")] == ["Polk County"]
+
+def test_the_target_itself_is_never_masked_as_a_feature_location(houston):
+    assert houston.feature_locations("the reservoirs in Houston, Texas") == []
+
+def test_a_document_about_another_country_stays_elsewhere(nairobi):
+    s = nairobi.document_scope("https://example.org/u", "Water in Uganda",
+                               ["Uganda's utilities expanded. Uganda metered all users."])
+    assert s.elsewhere  # possessive "Uganda's utilities" is not a water-feature location
+
+def test_a_homonym_host_stays_a_homonym(vienna):
+    va = vienna.document_scope("https://www.viennava.gov/water", "Town water",
+                               ["The Town of Vienna buys water from springs in Fairfax."])
+    assert va.elsewhere
