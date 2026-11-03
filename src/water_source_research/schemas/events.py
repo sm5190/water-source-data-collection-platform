@@ -25,10 +25,14 @@ class EventKind(StrEnum):
     UTILITY_STATUS = "UTILITY_STATUS"
     # A host was suppressed for the run (agents/nodes.py::suppressed_hosts), or released.
     HOST_SUPPRESSED = "HOST_SUPPRESSED"
+    # A host (or DOI prefix) skipped for the rest of the run after repeated failed fetches
+    # (bot checks, 401/403, empty pages): acquisition/service.py::failing_hosts.
+    HOST_SKIPPED = "HOST_SKIPPED"
 
 # Outcome bookkeeping, not research strategy: not part of distillation trajectories' steps.
 NON_PLANNING_KINDS = frozenset({EventKind.VALIDATION, EventKind.RESOLUTION,
-                                EventKind.UTILITY_STATUS, EventKind.HOST_SUPPRESSED})
+                                EventKind.UTILITY_STATUS, EventKind.HOST_SUPPRESSED,
+                                EventKind.HOST_SKIPPED})
 
 class EventResult(StrEnum):
     SUCCESS = "SUCCESS"

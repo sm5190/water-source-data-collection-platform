@@ -387,6 +387,14 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]
     chunks.extend(c.model_dump(mode="json") for c in new_chunks)
     events = list(state.get("events", []))
+    already = {(e.get("attrs") or {}).get("host") for e in events
+               if e.get("kind") == EventKind.HOST_SKIPPED.value}
+    for key, reason in sorted(outcome.skipped_failing.items()):
+        if key not in already:
+            events = append_event(events, kind=EventKind.HOST_SKIPPED, node="acquire",
+                                  strategy="repeated_failures",
+                                  attrs={"host": key, "reason_code": reason,
+                                         "discovery_round": state.get("discovery_rounds", 1)})
     for rec in outcome.records:
         attrs: dict[str, object] = {"url": rec["requested_url"],
                                     "chunks": rec.get("chunks") or 0,

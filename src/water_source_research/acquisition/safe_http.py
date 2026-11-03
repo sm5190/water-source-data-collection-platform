@@ -31,6 +31,10 @@ class FetchErrorKind(StrEnum):
     INVALID_URL = "INVALID_URL"
     BLOCKED_ADDRESS = "BLOCKED_ADDRESS"
     ROBOTS_DISALLOWED = "ROBOTS_DISALLOWED"
+    # robots.txt couldn't be read (timeout, network, 5xx): still not fetched, but not a refusal.
+    ROBOTS_UNREACHABLE = "ROBOTS_UNREACHABLE"
+    # A bot-check / challenge page instead of the document (never bypassed).
+    BOT_CHECK = "BOT_CHECK"
     TOO_LARGE = "TOO_LARGE"
     HTTP_STATUS = "HTTP_STATUS"
     AUTH_REQUIRED = "AUTH_REQUIRED"
@@ -125,8 +129,12 @@ class SafeFetcher:
         requested = url
         for _ in range(self.s.max_redirects + 1):
             await self._check_host(url)
-            if self.s.respect_robots and not await self._robots_allow(url):
-                raise FetchError(FetchErrorKind.ROBOTS_DISALLOWED, url)
+            if self.s.respect_robots:
+                allowed = await self._robots_allow(url)
+                if allowed is None:
+                    raise FetchError(FetchErrorKind.ROBOTS_UNREACHABLE, url)
+                if not allowed:
+                    raise FetchError(FetchErrorKind.ROBOTS_DISALLOWED, url)
             status, headers, body, final = await self._get(url, max_bytes)
             if status in (301, 302, 303, 307, 308):
                 location = headers.get("location")
@@ -193,7 +201,8 @@ class SafeFetcher:
             except httpx.HTTPError as exc:
                 raise FetchError(FetchErrorKind.NETWORK, f"{type(exc).__name__}") from None
 
-    async def _robots_allow(self, url: str) -> bool:
+    async def _robots_allow(self, url: str) -> bool | None:
+        """Allowed by robots.txt; None when robots.txt couldn't be read (stay away)."""
         parts = urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
         lock = self._robots_locks.setdefault(origin, asyncio.Lock())
@@ -201,8 +210,8 @@ class SafeFetcher:
             if origin not in self._robots:
                 self._robots[origin] = await self._load_robots(origin)
         parser = self._robots[origin]
-        if parser is None:  # robots.txt unreachable with a server error: stay away
-            return False
+        if parser is None:  # robots.txt unreachable (timeout, network, 5xx): stay away
+            return None
         return parser.can_fetch(self.s.user_agent, url)
 
     async def _load_robots(self, origin: str) -> RobotFileParser | None:

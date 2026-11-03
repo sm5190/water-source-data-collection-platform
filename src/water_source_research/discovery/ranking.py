@@ -146,6 +146,14 @@ def _merge(group: list[SearchResult]) -> SearchResult:
             merged.published_date = r.published_date
         if r.rank is not None and (merged.rank is None or r.rank < merged.rank):
             merged.rank = r.rank
+    # One provider's open copy makes the work fetchable at that URL.
+    open_copy = next((r for r in group if r.open_access), None)
+    if open_copy is not None:
+        if not merged.open_access:
+            merged.url = open_copy.url
+        merged.open_access = True
+    elif any(r.open_access is False for r in group):
+        merged.open_access = False
     if crossref:  # Crossref is the authority for citation metadata
         merged.doi = normalize_doi(crossref.doi) or merged.doi
         merged.published_date = crossref.published_date or merged.published_date

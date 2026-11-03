@@ -97,7 +97,9 @@ def test_robots_server_error_skips_host():
         UTIL, html_page("x", WATER_TEXT))
     with pytest.raises(FetchError) as e:
         run(make_fetcher(site).fetch(UTIL, 100_000))
-    assert e.value.kind is FetchErrorKind.ROBOTS_DISALLOWED
+    # still not fetched, but labelled for what it is (F9: not a refusal)
+    assert e.value.kind is FetchErrorKind.ROBOTS_UNREACHABLE
+    assert UTIL not in site.requests
 
 def test_robots_fetched_once_per_host():
     site = Site().html(UTIL, html_page("a", WATER_TEXT)).html(

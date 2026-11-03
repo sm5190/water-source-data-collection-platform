@@ -10,6 +10,7 @@ content hash) are not processed again.
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -58,11 +59,56 @@ class DocStatus:
 class AcquisitionOutcome:
     records: list[dict[str, Any]] = field(default_factory=list)  # one per attempted URL
     chunks: list[EvidenceChunk] = field(default_factory=list)
+    skipped_failing: dict[str, str] = field(default_factory=dict)  # key -> reason, this round
 
 def doc_key(url: str | None) -> str:
     return canonical_url(url) or (url or "")
 
 ELSEWHERE_PER_ROUND = 1
+
+# Challenge pages served instead of documents (Incapsula, Cloudflare, captchas, DataDome).
+# Detected, recorded as FAILED BOT_CHECK, never bypassed. Only short pages count: a document
+# that merely mentions "captcha" is a document.
+_BOT_MARKERS = re.compile(
+    r"incapsula|_incapsula_resource|request unsuccessful\. incapsula|cf-browser-verification|"
+    r"cf-chl-|challenge-platform|attention required! \| cloudflare|just a moment\.\.\.|"
+    r"g-recaptcha|h-captcha|hcaptcha|captcha-delivery|please enable js and disable any ad "
+    r"blocker|checking your browser before accessing|access denied - sucuri", re.IGNORECASE)
+BOT_CHECK_MAX_TEXT = 1500
+
+def is_bot_check(body: bytes, text: str) -> bool:
+    if len(text.strip()) > BOT_CHECK_MAX_TEXT:
+        return False
+    return bool(_BOT_MARKERS.search(body[:200_000].decode("utf-8", errors="replace"))
+                or _BOT_MARKERS.search(text))
+
+# A host that answered like this twice is skipped for the rest of the run (HOST_SKIPPED).
+FAILING_KINDS = frozenset({"AUTH_REQUIRED", "BOT_CHECK"})
+FAILURES_BEFORE_SKIP = 2
+_DOI_PREFIX = re.compile(r"^/?(10\.\d{4,9})/", re.IGNORECASE)
+
+def failure_key(url: str | None) -> str:
+    """The unit a fetch failure counts against: the host, or for doi.org links the DOI
+    prefix (one publisher's bot wall, whatever doi.org redirects to)."""
+    parts = urlsplit(url or "")
+    host = (parts.hostname or "").casefold().removeprefix("www.")
+    if host in ("doi.org", "dx.doi.org"):
+        m = _DOI_PREFIX.match(parts.path)
+        if m:
+            return f"doi:{m.group(1)}"
+    return host
+
+def failing_hosts(previous: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    """failure key -> reason, for keys whose fetches failed this way twice in the run."""
+    counts: dict[str, list[str]] = {}
+    for r in previous:
+        kind = r.get("error_kind")
+        if r.get("status") == DocStatus.EMPTY:
+            kind = "EMPTY"
+        if kind in FAILING_KINDS or kind == "EMPTY":
+            counts.setdefault(failure_key(r.get("requested_url")), []).append(kind)
+    return {k: f"{len(v)} fetches failed ({', '.join(sorted(set(v)))})"
+            for k, v in counts.items() if k and len(v) >= FAILURES_BEFORE_SKIP}
 
 def _elsewhere(c: Mapping[str, Any], features: Sequence[str]) -> bool:
     """About another place sharing the city's name (approved identity; discovery ranking),
@@ -135,10 +181,13 @@ def select_candidates(candidates: list[Mapping[str, Any]],
         parts = urlsplit(url)
         if parts.scheme not in ("http", "https"):
             continue
+        if c.get("open_access") is False:  # scholarly metadata only, no open copy
+            continue
         if parts.path.lower().endswith(SKIP_EXTENSIONS):
             continue
         host = (parts.hostname or "").removeprefix("www.")
-        if host in skipped or per_host.get(host, 0) >= settings.max_per_host:
+        if host in skipped or failure_key(url) in skipped or per_host.get(
+                host, 0) >= settings.max_per_host:
             continue
         if groups[index] == G_ELSEWHERE:
             if elsewhere_taken >= ELSEWHERE_PER_ROUND:
@@ -184,9 +233,11 @@ class AcquisitionService:
         outcome = AcquisitionOutcome()
         if budget <= 0:
             return outcome
+        failing = failing_hosts(previous)
+        outcome.skipped_failing = failing
         chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts,
-                                   skip_hosts, features, candidate_hosts=candidate_hosts,
-                                   city=city)
+                                   [*skip_hosts, *failing], features,
+                                   candidate_hosts=candidate_hosts, city=city)
         results = await asyncio.gather(*(self._fetch_one(c) for c in chosen))
 
         # Sequential, in selection order: deterministic de-duplication and chunking.
@@ -264,6 +315,9 @@ class AcquisitionService:
                           byte_size=len(response.body), media_type=response.content_type)
             doc = await asyncio.to_thread(self._parse, response)
             doc.retrieved_at = response.fetched_at
+            if is_bot_check(response.body, doc.text):
+                raise FetchError(FetchErrorKind.BOT_CHECK, "challenge page instead of the "
+                                 "document")
             record.update(title=doc.title or record["title"],
                           acquisition_method=doc.acquisition_method,
                           content_sha256=doc.content_sha256,

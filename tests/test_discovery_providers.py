@@ -63,7 +63,8 @@ def test_semantic_scholar_normalizes_paper_and_sends_header():
     assert req.headers["x-api-key"] == "s2-key"
     assert req.url.path == "/graph/v1/paper/search" and "externalIds" in req.url.params["fields"]
     assert r.doi == "10.1016/j.watres.2019.01.001" and r.published_date == "2019"
-    assert r.url == "https://www.semanticscholar.org/paper/649def34"
+    # Milestone 3.1 (F8): the DOI, never the S2 paper page (a JavaScript shell)
+    assert r.url == "https://doi.org/10.1016/j.watres.2019.01.001" and r.open_access is False
     assert r.provider_ids == {"semantic_scholar": "649def34f8be52c8b66281af98ae884c09aef38b"}
     assert r.authors == ["A. Smith"] and r.venue == "Water Research"
 
@@ -167,3 +168,47 @@ def test_searxng_timeout():
 def test_publications_module_still_exports_adapters():
     from water_source_research.discovery import publications
     assert publications.OpenAlexDiscovery is OpenAlexDiscovery
+
+
+# --- Milestone 3.1 (F8): open-access copies first; closed works are metadata ---------------
+
+def test_semantic_scholar_prefers_the_open_pdf():
+    paper = {**S2_SEARCH["data"][0], "openAccessPdf": {"url": "https://repo.example/p.pdf"}}
+    [r] = run(SemanticScholarDiscovery("", SETTINGS, **http_kwargs(Recorder(ok(
+        {"data": [paper]})))).search("x"))
+    assert r.url == "https://repo.example/p.pdf" and r.open_access is True
+
+def test_openalex_uses_the_best_open_location():
+    work = {**OPENALEX_WORKS["results"][0], "open_access": {"is_oa": True},
+            "best_oa_location": {"pdf_url": "https://scielo.example/a.pdf",
+                                 "landing_page_url": "https://scielo.example/a"}}
+    handler = Recorder(ok({"results": [work]}))
+    [r] = run(OpenAlexDiscovery("", SETTINGS, **http_kwargs(handler)).search("x"))
+    assert "best_oa_location" in handler.requests[0].url.params["select"]
+    assert r.url == "https://scielo.example/a.pdf" and r.open_access is True
+    closed = {**OPENALEX_WORKS["results"][0], "open_access": {"is_oa": False}}
+    [c] = run(OpenAlexDiscovery("", SETTINGS, **http_kwargs(Recorder(ok(
+        {"results": [closed]})))).search("x"))
+    assert c.open_access is False  # kept as metadata
+
+def test_merged_duplicates_take_the_open_copy():
+    from water_source_research.discovery.base import SearchResult
+    from water_source_research.discovery.ranking import merge_and_rank
+    closed = SearchResult(title="Groundwater of Santiago", url="https://doi.org/10.1/x",
+                          provider="semantic_scholar", doi="10.1/x", source_type="ACADEMIC",
+                          open_access=False)
+    open_ = SearchResult(title="Groundwater of Santiago", url="https://repo.example/x.pdf",
+                         provider="openalex", doi="10.1/x", source_type="ACADEMIC",
+                         open_access=True)
+    [m] = merge_and_rank([closed, open_])
+    assert m.url == "https://repo.example/x.pdf" and m.open_access is True
+
+def test_closed_works_are_never_fetched():
+    from water_source_research.acquisition.config import AcquisitionSettings
+    from water_source_research.acquisition.service import select_candidates
+    cands = [{"url": "https://doi.org/10.1/closed", "source_type": "ACADEMIC",
+              "open_access": False},
+             {"url": "https://repo.example/open.pdf", "source_type": "ACADEMIC",
+              "open_access": True}]
+    chosen = select_candidates(cands, set(), AcquisitionSettings(), budget=5)
+    assert [c["url"] for c in chosen] == ["https://repo.example/open.pdf"]

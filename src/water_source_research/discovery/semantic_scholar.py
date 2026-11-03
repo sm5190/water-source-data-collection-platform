@@ -13,7 +13,8 @@ from .http import ProviderHttpClient, expect_items, text
 from .normalize import normalize_doi
 
 BASE_URL = "https://api.semanticscholar.org"
-FIELDS = "title,url,abstract,externalIds,publicationDate,year,venue,authors,openAccessPdf"
+FIELDS = ("title,url,abstract,externalIds,publicationDate,year,venue,authors,openAccessPdf,"
+          "isOpenAccess")
 MAX_AUTHORS = 10
 MAX_SNIPPET_CHARS = 500
 
@@ -60,8 +61,10 @@ def _to_result(paper: dict, query: str, rank: int) -> SearchResult | None:
     doi = normalize_doi(text(ids.get("DOI")))
     pdf = paper.get("openAccessPdf") if isinstance(paper.get("openAccessPdf"), dict) else {}
     paper_id = text(paper.get("paperId"))
-    url = (text(paper.get("url")) or (f"https://doi.org/{doi}" if doi else None)
-           or text(pdf.get("url")))
+    # The open-access PDF, else the DOI, never the paper page (a JavaScript shell that came
+    # back EMPTY in every fetch); a work without an open PDF is metadata only.
+    pdf_url = text(pdf.get("url"))
+    url = (pdf_url or (f"https://doi.org/{doi}" if doi else None) or text(paper.get("url")))
     title = text(paper.get("title"))
     if not url or not title:
         return None
@@ -76,4 +79,5 @@ def _to_result(paper: dict, query: str, rank: int) -> SearchResult | None:
         provider="semantic_scholar", rank=rank, doi=doi, published_date=published,
         authors=authors, venue=text(paper.get("venue")), source_type="ACADEMIC",
         provider_ids={"semantic_scholar": paper_id} if paper_id else {}, query=query,
+        open_access=bool(pdf_url),
     )

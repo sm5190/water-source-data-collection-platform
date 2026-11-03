@@ -34,6 +34,10 @@ class SearchResult:
     # Crossref check: True = registered with Crossref (metadata verified); False = not a
     # Crossref DOI (may still be valid, e.g. DataCite for datasets/theses); None = not checked.
     doi_verified: bool | None = None
+    # Scholarly works: True = an open-access copy is the URL; False = no open copy known (kept
+    # as discovery metadata, never fetched: publisher pages answer crawlers with bot walls or
+    # paywalls); None = not a scholarly record / unknown.
+    open_access: bool | None = None
 
     def __post_init__(self) -> None:
         if self.provider and self.provider not in self.providers:

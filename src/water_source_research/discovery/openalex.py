@@ -11,8 +11,8 @@ from .normalize import normalize_doi
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://api.openalex.org"
-SELECT = ("id,doi,display_name,publication_date,primary_location,open_access,authorships,"
-          "abstract_inverted_index")
+SELECT = ("id,doi,display_name,publication_date,primary_location,open_access,"
+          "best_oa_location,authorships,abstract_inverted_index")
 MAX_SNIPPET_WORDS = 60
 MAX_AUTHORS = 10
 
@@ -49,8 +49,14 @@ def _to_result(work: dict, query: str, rank: int) -> SearchResult | None:
                                                           dict) else {}
     source = location.get("source") if isinstance(location.get("source"), dict) else {}
     open_access = work.get("open_access") if isinstance(work.get("open_access"), dict) else {}
+    best = work.get("best_oa_location") if isinstance(work.get("best_oa_location"),
+                                                      dict) else {}
     work_id = text(work.get("id"))
-    url = (text(location.get("landing_page_url")) or text(open_access.get("oa_url"))
+    is_oa = bool(open_access.get("is_oa"))
+    # The open copy first (its PDF, then its landing page); otherwise the work is metadata.
+    oa_url = (text(best.get("pdf_url")) or text(best.get("landing_page_url"))
+              or text(open_access.get("oa_url"))) if is_oa else None
+    url = (oa_url or text(location.get("landing_page_url"))
            or (f"https://doi.org/{doi}" if doi else None) or work_id)
     title = text(work.get("display_name")) or text(work.get("title"))
     if not url or not title:
@@ -64,7 +70,7 @@ def _to_result(work: dict, query: str, rank: int) -> SearchResult | None:
         published_date=text(work.get("publication_date")), authors=authors,
         venue=text(source.get("display_name")), source_type="ACADEMIC",
         provider_ids={"openalex": work_id.rsplit("/", 1)[-1]} if work_id else {},
-        query=query,
+        query=query, open_access=bool(oa_url),
     )
 
 def _abstract(index: Any) -> str | None:
