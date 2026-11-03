@@ -257,6 +257,9 @@ class GeoMatcher:
                 keys |= {fold(a) for a in _country_aliases().get(fold(h.country), [])}
         self.homonym_country_keys = keys
         self.homonym_region_keys = {fold(h.region) for h in identity.homonyms if h.region}
+        domestic = [h.region for h in identity.homonyms if h.region and h.iso2
+                    and h.iso2.casefold() == own_iso and fold(h.region) not in targets]
+        self.domestic_region_re = _names_regex(set(domestic)) if domestic else None
         own_city = {fold(n) for n in (*self.city_names, *identity.catalog_names())}
         gaz_cities = [c for c in gazetteer()[0] if fold(c) not in own_city]
         self.gazetteer_city_re = _names_regex(gaz_cities) if gaz_cities else None
@@ -435,11 +438,14 @@ class GeoMatcher:
             elif named or theirs >= 2 or self.other_country_re.search(title_text):
                 country = "OTHER"  # every mention of the name is a homonym, or none at all
         region: Scope = "TARGET" if admin else "UNKNOWN"
-        if country != "OTHER" and self.other_region_re is not None:
+        # Another region of the target's own country (a same-country homonym's region, e.g.
+        # Mississippi for Houston); regions of homonyms abroad are a country matter, and a
+        # multi-country document is never "another region".
+        if country not in ("OTHER", "MIXED") and self.domestic_region_re is not None:
             own = len(self.region_re.findall(body)) if self.region_re else 0
-            other = len(self.other_region_re.findall(body))
+            other = len(self.domestic_region_re.findall(body))
             if other and not own and not admin and (
-                    other >= 2 or self.other_region_re.search(title_text)):
+                    other >= 2 or self.domestic_region_re.search(title_text)):
                 region = "OTHER"
             elif own and not other:
                 region = "TARGET"

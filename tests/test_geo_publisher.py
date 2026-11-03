@@ -110,6 +110,17 @@ def test_region_in_administrative_form_places_the_country(houston):
                                   ["Texas weather was hot this year."])
     assert bare.country == "UNKNOWN"  # a bare region word is not administrative
 
+def test_a_foreign_homonyms_region_never_makes_a_multi_country_report_elsewhere():
+    """A Sub-Saharan groundwater report naming "Luanda (Angola)" and Bissau (the region of a
+    Luanda homonym in Guinea-Bissau) is MIXED, not "another region"."""
+    m = make("Luanda", "Angola", "AO", "Luanda Province", "AO-LUA", "province", homonyms=[
+        {"name": "Luanda", "country": "Guinea-Bissau", "iso2": "GW", "region": "Bissau",
+         "population": 1_500}])
+    texts = ["Cities assessed: Nairobi (Kenya), Luanda (Angola), Lagos (Nigeria).",
+             "Bissau and Dakar rely on aquifers.", "Bissau's wells are shallow."]
+    s = m.document_scope("https://documents.worldbank.org/x", "Groundwater in Africa", texts)
+    assert not s.elsewhere and s.label() == "MIXED"
+
 # --- negative controls ----------------------------------------------------------------------
 
 def test_a_homonyms_own_regional_host_is_elsewhere(vienna, houston):
