@@ -159,3 +159,30 @@ def test_the_identity_build_reads_only_city_and_country_from_the_catalog():
             ).read_text(encoding="utf-8")
     assert 'entries = [{"city": e["city"], "country": e["country"]} for e in catalog]' in text
     assert "openpyxl" not in text and "xlsx" not in text.replace("cities.yaml", "")
+
+# --- official city hosts (municipal affiliation) ---------------------------------------------
+
+def test_official_hosts_need_the_identity_or_a_controlled_suffix():
+    from water_source_research.services.city_identity import CountryInfo, OfficialWebsite
+    from water_source_research.services.geo_match import GeoMatcher
+    site = OfficialWebsite(host="exampleville.ca", url="https://www.exampleville.ca/",
+                           sources=[NameSource(source="wikidata", id="Q1", property="P856")])
+    ca = GeoMatcher(CityIdentity(city="Exampleville", country="Canada", status="APPROVED",
+                                 country_info=CountryInfo(name="Canada", iso2="CA",
+                                                          cctld="ca"),
+                                 official_websites=[site]))
+    assert ca.official_host("https://www.exampleville.ca/water")
+    assert ca.official_host("maps.exampleville.ca")  # a subdomain of the official site
+    assert ca.official_host("exampleville-city.com") is None  # spelling on an open suffix
+    us = GeoMatcher(CityIdentity(
+        city="Exampleton", country="United States of America", status="APPROVED",
+        region=Region(name="Texas", iso_3166_2="US-TX", verified=True),
+        country_info=CountryInfo(name="United States of America", iso2="US", cctld="us")))
+    assert us.official_host("https://www.exampletontx.gov/")
+    assert us.official_host("cityofexampleton.gov")
+    assert us.official_host("exampletonms.gov") is None  # another state's place
+    ke = GeoMatcher(CityIdentity(city="Samplecity", country="Kenya", status="APPROVED",
+                                 country_info=CountryInfo(name="Kenya", iso2="KE", cctld="ke")))
+    assert ke.official_host("samplecity.go.ke") and ke.official_host("x.samplecity.go.ke")
+    assert ke.official_host("samplecity.co.ke") is None  # not a government suffix
+    assert ke.official_host("samplecity.go.tz") is None

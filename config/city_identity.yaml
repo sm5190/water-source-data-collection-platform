@@ -310,6 +310,19 @@ cities:
     - de
     - hr
     - hu
+  official_websites:
+  - host: wien.gv.at
+    url: https://www.wien.gv.at/
+    sources:
+    - source: wikidata
+      id: Q1741
+      property: P856
+  - host: wien.at
+    url: https://www.wien.at/
+    sources:
+    - source: wikidata
+      id: Q1741
+      property: P856
   ids:
     geonames: '2761369'
     wikidata: Q1741
@@ -451,6 +464,13 @@ cities:
     - pt
     - es
     - en
+  official_websites:
+  - host: belem.pa.gov.br
+    url: http://www.belem.pa.gov.br/
+    sources:
+    - source: wikidata
+      id: Q12829733
+      property: P856
   ids:
     geonames: '3405870'
     wikidata: Q12829733
@@ -671,6 +691,13 @@ cities:
     - pt
     - es
     - en
+  official_websites:
+  - host: brasilia.df.gov.br
+    url: http://www.brasilia.df.gov.br
+    sources:
+    - source: wikidata
+      id: Q2844
+      property: P856
   ids:
     geonames: '3469058'
     wikidata: Q2844
@@ -761,6 +788,13 @@ cities:
     languages:
     - en
     - fr
+  official_websites:
+  - host: douala.cm
+    url: https://douala.cm/
+    sources:
+    - source: wikidata
+      id: Q132830
+      property: P856
   ids:
     geonames: '2232593'
     wikidata: Q132830
@@ -825,6 +859,13 @@ cities:
     - en
     - fr
     - iu
+  official_websites:
+  - host: toronto.ca
+    url: https://www.toronto.ca/
+    sources:
+    - source: wikidata
+      id: Q172
+      property: P856
   ids:
     geonames: '6167865'
     wikidata: Q172
@@ -1015,6 +1056,13 @@ cities:
     cctld: cl
     languages:
     - es
+  official_websites:
+  - host: gobiernosantiago.cl
+    url: https://www.gobiernosantiago.cl/
+    sources:
+    - source: wikidata
+      id: Q2887
+      property: P856
   ids:
     geonames: '3871336'
     wikidata: Q2887
@@ -1517,6 +1565,13 @@ cities:
     cctld: co
     languages:
     - es
+  official_websites:
+  - host: bogota.gov.co
+    url: https://bogota.gov.co
+    sources:
+    - source: wikidata
+      id: Q2841
+      property: P856
   ids:
     geonames: '3688689'
     wikidata: Q2841
@@ -1616,6 +1671,13 @@ cities:
     cctld: co
     languages:
     - es
+  official_websites:
+  - host: cali.gov.co
+    url: https://www.cali.gov.co/
+    sources:
+    - source: wikidata
+      id: Q51103
+      property: P856
   ids:
     geonames: '3687925'
     wikidata: Q51103
@@ -1738,6 +1800,13 @@ cities:
     languages:
     - cs
     - sk
+  official_websites:
+  - host: praha.eu
+    url: https://praha.eu/
+    sources:
+    - source: wikidata
+      id: Q1085
+      property: P856
   ids:
     geonames: '3067696'
     wikidata: Q1085
@@ -1964,6 +2033,13 @@ cities:
     cctld: sv
     languages:
     - es
+  official_websites:
+  - host: sansalvador.gob.sv
+    url: https://www.sansalvador.gob.sv/
+    sources:
+    - source: wikidata
+      id: Q3110
+      property: P856
   ids:
     geonames: '3583361'
     wikidata: Q3110
@@ -2108,6 +2184,19 @@ cities:
     - am
     - en
     - om
+  official_websites:
+  - host: cityaddisababa.gov.et
+    url: https://cityaddisababa.gov.et/
+    sources:
+    - source: wikidata
+      id: Q3624
+      property: P856
+  - host: addisababa.gov.et
+    url: http://www.addisababa.gov.et/
+    sources:
+    - source: wikidata
+      id: Q3624
+      property: P856
   ids:
     geonames: '344979'
     wikidata: Q3624
@@ -2256,6 +2345,19 @@ cities:
     languages:
     - fi
     - sv
+  official_websites:
+  - host: hel.fi
+    url: https://hel.fi
+    sources:
+    - source: wikidata
+      id: Q1757
+      property: P856
+  - host: helsinki.fi
+    url: https://helsinki.fi
+    sources:
+    - source: wikidata
+      id: Q1757
+      property: P856
   ids:
     geonames: '658225'
     wikidata: Q1757
@@ -2545,6 +2647,19 @@ cities:
     - fr
     - br
     - co
+  official_websites:
+  - host: paris.fr
+    url: https://www.paris.fr/
+    sources:
+    - source: wikidata
+      id: Q90
+      property: P856
+  - host: villedeparis.fr
+    url: http://www.villedeparis.fr/
+    sources:
+    - source: wikidata
+      id: Q90
+      property: P856
   ids:
     geonames: '2988507'
     wikidata: Q90
@@ -2784,6 +2899,19 @@ cities:
     - Deutschland
     languages:
     - de
+  official_websites:
+  - host: hamburg.de
+    url: https://www.hamburg.de/
+    sources:
+    - source: wikidata
+      id: Q1055
+      property: P856
+  - host: hamburg.com
+    url: https://www.hamburg.com/
+    sources:
+    - source: wikidata
+      id: Q1055
+      property: P856
   ids:
     geonames: '2911298'
     wikidata: Q1055
@@ -2945,6 +3073,13 @@ cities:
     - en
     - ak
     - ee
+  official_websites:
+  - host: kma.gov.gh
+    url: http://www.kma.gov.gh
+    sources:
+    - source: wikidata
+      id: Q182059
+      property: P856
   ids:
     geonames: '2298890'
     wikidata: Q182059
@@ -3035,6 +3170,13 @@ cities:
     - el
     - en
     - fr
+  official_websites:
+  - host: cityofathens.gr
+    url: https://www.cityofathens.gr
+    sources:
+    - source: wikidata
+      id: Q1524
+      property: P856
   ids:
     geonames: '264371'
     wikidata: Q1524
@@ -3281,6 +3423,13 @@ cities:
     - en
     - hi
     - bn
+  official_websites:
+  - host: agra.nic.in
+    url: https://agra.nic.in/
+    sources:
+    - source: wikidata
+      id: Q42941
+      property: P856
   ids:
     geonames: '1279259'
     wikidata: Q42941
@@ -3381,6 +3530,13 @@ cities:
     - en
     - hi
     - bn
+  official_websites:
+  - host: ghmc.gov.in
+    url: http://www.ghmc.gov.in/
+    sources:
+    - source: wikidata
+      id: Q1361
+      property: P856
   ids:
     geonames: '1269843'
     wikidata: Q1361
@@ -3557,6 +3713,13 @@ cities:
     - en
     - hi
     - bn
+  official_websites:
+  - host: jaipurmc.org
+    url: http://jaipurmc.org/
+    sources:
+    - source: wikidata
+      id: Q66485
+      property: P856
   ids:
     geonames: '1269515'
     wikidata: Q66485
@@ -3702,6 +3865,13 @@ cities:
     - en
     - hi
     - bn
+  official_websites:
+  - host: kozhikode.nic.in
+    url: http://www.kozhikode.nic.in/
+    sources:
+    - source: wikidata
+      id: Q28729
+      property: P856
   ids:
     geonames: '1265873'
     wikidata: Q28729
@@ -3837,6 +4007,13 @@ cities:
     - en
     - hi
     - bn
+  official_websites:
+  - host: pmc.gov.in
+    url: https://www.pmc.gov.in
+    sources:
+    - source: wikidata
+      id: Q1538
+      property: P856
   ids:
     geonames: '1259229'
     wikidata: Q1538
@@ -4020,6 +4197,13 @@ cities:
     - id
     - en
     - nl
+  official_websites:
+  - host: bekasikota.go.id
+    url: http://bekasikota.go.id
+    sources:
+    - source: wikidata
+      id: Q10392
+      property: P856
   ids:
     geonames: '1649378'
     wikidata: Q10392
@@ -4186,6 +4370,13 @@ cities:
     - ar
     - ku
     - hy
+  official_websites:
+  - host: amanatbaghdad.gov.iq
+    url: https://amanatbaghdad.gov.iq
+    sources:
+    - source: wikidata
+      id: Q1530
+      property: P856
   ids:
     geonames: '98182'
     wikidata: Q1530
@@ -4318,6 +4509,13 @@ cities:
     languages:
     - en
     - ga
+  official_websites:
+  - host: dublincity.ie
+    url: http://www.dublincity.ie
+    sources:
+    - source: wikidata
+      id: Q1761
+      property: P856
   ids:
     geonames: '2964574'
     wikidata: Q1761
@@ -4498,6 +4696,13 @@ cities:
     - it
     - de
     - fr
+  official_websites:
+  - host: comune.milano.it
+    url: https://www.comune.milano.it/
+    sources:
+    - source: wikidata
+      id: Q490
+      property: P856
   ids:
     geonames: '3173435'
     wikidata: Q490
@@ -4687,6 +4892,13 @@ cities:
     - it
     - de
     - fr
+  official_websites:
+  - host: comune.roma.it
+    url: https://www.comune.roma.it/
+    sources:
+    - source: wikidata
+      id: Q220
+      property: P856
   ids:
     geonames: '3169070'
     wikidata: Q220
@@ -4945,6 +5157,13 @@ cities:
     - 日本
     languages:
     - ja
+  official_websites:
+  - host: city.sapporo.jp
+    url: https://www.city.sapporo.jp/
+    sources:
+    - source: wikidata
+      id: Q37951
+      property: P856
   ids:
     geonames: '2128295'
     wikidata: Q37951
@@ -5158,6 +5377,13 @@ cities:
     - 日本
     languages:
     - ja
+  official_websites:
+  - host: city.sendai.jp
+    url: https://www.city.sendai.jp/
+    sources:
+    - source: wikidata
+      id: Q46747
+      property: P856
   ids:
     geonames: '2111149'
     wikidata: Q46747
@@ -5374,6 +5600,13 @@ cities:
     languages:
     - en
     - sw
+  official_websites:
+  - host: nairobi.go.ke
+    url: https://nairobi.go.ke/
+    sources:
+    - source: wikidata
+      id: Q3870
+      property: P856
   ids:
     geonames: '184745'
     wikidata: Q3870
@@ -5539,6 +5772,13 @@ cities:
     - ms
     - en
     - zh
+  official_websites:
+  - host: dbkl.gov.my
+    url: http://www.dbkl.gov.my
+    sources:
+    - source: wikidata
+      id: Q1865
+      property: P856
   ids:
     geonames: '1735161'
     wikidata: Q1865
@@ -5656,6 +5896,13 @@ cities:
     cctld: mx
     languages:
     - es
+  official_websites:
+  - host: guadalajara.gob.mx
+    url: https://guadalajara.gob.mx/
+    sources:
+    - source: wikidata
+      id: Q9022
+      property: P856
   ids:
     geonames: '4005539'
     wikidata: Q9022
@@ -5844,6 +6091,13 @@ cities:
     cctld: mx
     languages:
     - es
+  official_websites:
+  - host: pueblacapital.gob.mx
+    url: https://www.pueblacapital.gob.mx/
+    sources:
+    - source: wikidata
+      id: Q125293
+      property: P856
   ids:
     geonames: '3521081'
     wikidata: Q125293
@@ -6071,6 +6325,13 @@ cities:
     languages:
     - nl
     - fy
+  official_websites:
+  - host: amsterdam.nl
+    url: https://amsterdam.nl
+    sources:
+    - source: wikidata
+      id: Q727
+      property: P856
   ids:
     geonames: '2759794'
     wikidata: Q727
@@ -6213,6 +6474,13 @@ cities:
     languages:
     - nl
     - fy
+  official_websites:
+  - host: rotterdam.nl
+    url: https://www.rotterdam.nl/
+    sources:
+    - source: wikidata
+      id: Q34370
+      property: P856
   ids:
     geonames: '2747891'
     wikidata: Q34370
@@ -6396,6 +6664,13 @@ cities:
     - Pertual
     languages:
     - pt
+  official_websites:
+  - host: lisboa.pt
+    url: https://www.lisboa.pt/
+    sources:
+    - source: wikidata
+      id: Q597
+      property: P856
   ids:
     geonames: '2267057'
     wikidata: Q597
@@ -6550,6 +6825,13 @@ cities:
     languages:
     - ro
     - hu
+  official_websites:
+  - host: pmb.ro
+    url: https://www.pmb.ro/
+    sources:
+    - source: wikidata
+      id: Q19660
+      property: P856
   ids:
     geonames: '683506'
     wikidata: Q19660
@@ -6713,6 +6995,13 @@ cities:
     - rw
     - en
     - fr
+  official_websites:
+  - host: kigalicity.gov.rw
+    url: https://www.kigalicity.gov.rw/
+    sources:
+    - source: wikidata
+      id: Q3859
+      property: P856
   ids:
     geonames: '202061'
     wikidata: Q3859
@@ -6833,6 +7122,13 @@ cities:
     languages:
     - fr
     - wo
+  official_websites:
+  - host: dakarville.com
+    url: https://dakarville.com/
+    sources:
+    - source: wikidata
+      id: Q3718
+      property: P856
   ids:
     geonames: '2253354'
     wikidata: Q3718
@@ -6933,6 +7229,13 @@ cities:
     languages:
     - ko
     - en
+  official_websites:
+  - host: busan.go.kr
+    url: https://www.busan.go.kr/
+    sources:
+    - source: wikidata
+      id: Q16520
+      property: P856
   ids:
     geonames: '1838524'
     wikidata: Q16520
@@ -7120,6 +7423,13 @@ cities:
     - es
     - ca
     - gl
+  official_websites:
+  - host: barcelona.cat
+    url: https://barcelona.cat
+    sources:
+    - source: wikidata
+      id: Q1492
+      property: P856
   ids:
     geonames: '3128760'
     wikidata: Q1492
@@ -7361,6 +7671,13 @@ cities:
     - es
     - ca
     - gl
+  official_websites:
+  - host: madrid.es
+    url: https://www.madrid.es/
+    sources:
+    - source: wikidata
+      id: Q2807
+      property: P856
   ids:
     geonames: '3117735'
     wikidata: Q2807
@@ -7496,6 +7813,13 @@ cities:
     - sv
     - se
     - fi
+  official_websites:
+  - host: start.stockholm
+    url: https://start.stockholm/
+    sources:
+    - source: wikidata
+      id: Q1754
+      property: P856
   ids:
     geonames: '2673730'
     wikidata: Q1754
@@ -7613,6 +7937,13 @@ cities:
     - tr
     - ku
     - az
+  official_websites:
+  - host: ankara.bel.tr
+    url: https://www.ankara.bel.tr/
+    sources:
+    - source: wikidata
+      id: Q3640
+      property: P856
   ids:
     geonames: '323786'
     wikidata: Q3640
@@ -7694,6 +8025,13 @@ cities:
     - uk
     - ru
     - pl
+  official_websites:
+  - host: kyivcity.gov.ua
+    url: https://kyivcity.gov.ua
+    sources:
+    - source: wikidata
+      id: Q1899
+      property: P856
   ids:
     geonames: '703448'
     wikidata: Q1899
@@ -7886,6 +8224,13 @@ cities:
     - en
     - cy
     - gd
+  official_websites:
+  - host: london.gov.uk
+    url: https://www.london.gov.uk/
+    sources:
+    - source: wikidata
+      id: Q84
+      property: P856
   ids:
     geonames: '2643743'
     wikidata: Q84
@@ -8413,6 +8758,13 @@ cities:
     - en
     - es
     - fr
+  official_websites:
+  - host: houstontx.gov
+    url: https://www.houstontx.gov/
+    sources:
+    - source: wikidata
+      id: Q16555
+      property: P856
   ids:
     geonames: '4699066'
     wikidata: Q16555
@@ -8671,6 +9023,13 @@ cities:
     - en
     - es
     - fr
+  official_websites:
+  - host: nyc.gov
+    url: https://www.nyc.gov/
+    sources:
+    - source: wikidata
+      id: Q60
+      property: P856
   ids:
     geonames: '5128581'
     wikidata: Q60
@@ -9050,6 +9409,13 @@ cities:
     - en
     - es
     - fr
+  official_websites:
+  - host: providenceri.gov
+    url: https://www.providenceri.gov/
+    sources:
+    - source: wikidata
+      id: Q18383
+      property: P856
   ids:
     geonames: '5224151'
     wikidata: Q18383
@@ -9173,6 +9539,13 @@ cities:
     - en
     - es
     - fr
+  official_websites:
+  - host: cityofsacramento.gov
+    url: https://www.cityofsacramento.gov/
+    sources:
+    - source: wikidata
+      id: Q18013
+      property: P856
   ids:
     geonames: '5389489'
     wikidata: Q18013
@@ -9360,6 +9733,13 @@ cities:
     - vi
     - en
     - fr
+  official_websites:
+  - host: hochiminhcity.gov.vn
+    url: http://www.hochiminhcity.gov.vn/
+    sources:
+    - source: wikidata
+      id: Q1854
+      property: P856
   ids:
     geonames: '1566083'
     wikidata: Q1854
@@ -9587,6 +9967,13 @@ cities:
     - vi
     - en
     - fr
+  official_websites:
+  - host: hanoi.gov.vn
+    url: https://hanoi.gov.vn/
+    sources:
+    - source: wikidata
+      id: Q1858
+      property: P856
   ids:
     geonames: '1581130'
     wikidata: Q1858

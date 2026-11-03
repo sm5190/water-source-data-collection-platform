@@ -44,7 +44,8 @@ import httpx
 import yaml
 from water_source_research.core.paths import CONFIG_DIR
 from water_source_research.services.city_identity import (
-    CityIdentity, ContextName, CountryInfo, Homonym, IdentityName, NameSource, Region, fold,
+    CityIdentity, ContextName, CountryInfo, Homonym, IdentityName, NameSource, OfficialWebsite,
+    Region, fold,
 )
 
 GEONAMES = "https://download.geonames.org/export/dump/"
@@ -493,6 +494,7 @@ def build_one(entry: dict, fetch: Fetcher, cities: list[dict], countries: dict, 
             n.ambiguous_with.append("country")
     ident.names, ident.unverified_names = names, unverified
     ident.context_names = context_names(fetch, entity, qid, langs)
+    ident.official_websites = official_websites(entity, qid)
     targets = {fold(n) for n in ident.unambiguous_city_names()}
     ident.homonyms = homonyms(cities, chosen, targets, countries, admin1)
     curate(ident, countries)
@@ -563,7 +565,22 @@ def curate(ident: CityIdentity, countries: dict[str, dict]) -> list[str]:
     ident.notes += [f"curation: {m}" for m in moved if f"curation: {m}" not in ident.notes]
     return moved
 
-def recurate_file(path: Path, countries: dict[str, dict]) -> list[tuple[str, list[str]]]:
+def official_websites(entity: dict, qid: str) -> list[OfficialWebsite]:
+    """The city item's official websites (Wikidata P856), one per host."""
+    from urllib.parse import urlsplit
+    out, seen = [], set()
+    for v in claims(entity, "P856"):
+        if not isinstance(v, str):
+            continue
+        host = (urlsplit(v).hostname or "").casefold().removeprefix("www.")
+        if host and host not in seen:
+            seen.add(host)
+            out.append(OfficialWebsite(host=host, url=v, sources=[NameSource(
+                source="wikidata", id=qid, property="P856")]))
+    return out
+
+def recurate_file(path: Path, countries: dict[str, dict],
+                  fetch: "Fetcher | None" = None) -> list[tuple[str, list[str]]]:
     """Apply ``curate`` to every entry of an existing identity file; entries that don't
     change are written back untouched. Statuses are never changed."""
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -573,6 +590,15 @@ def recurate_file(path: Path, countries: dict[str, dict]) -> list[tuple[str, lis
             continue
         ident = CityIdentity.model_validate(entry)
         moved = curate(ident, countries)
+        qid = ident.ids.get("wikidata")
+        if fetch is not None and qid and not ident.official_websites:
+            try:
+                sites = official_websites(fetch.entity(qid), qid)
+            except SystemExit:  # offline and not cached: leave it empty
+                sites = []
+            if sites:
+                ident.official_websites = sites
+                moved.append("official websites: " + ", ".join(s.host for s in sites))
         if moved:
             changes.append((f"{ident.city}, {ident.country}", moved))
             doc["cities"][i] = {"city": ident.city, "country": ident.country,
@@ -635,7 +661,7 @@ def main() -> int:
     if args.recurate:
         sys.stdout.reconfigure(encoding="utf-8")
         countries = read_countries(fetch.file("countryInfo.txt", GEONAMES + "countryInfo.txt"))
-        for city, moved in recurate_file(args.out, countries):
+        for city, moved in recurate_file(args.out, countries, fetch):
             print(city)
             for m in moved:
                 print("   ", m)

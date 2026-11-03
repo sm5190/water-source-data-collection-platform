@@ -100,12 +100,20 @@ class Homonym(BaseModel):
     population: int | None = None
     sources: list[NameSource] = Field(min_length=1)
 
+class OfficialWebsite(BaseModel):
+    """The city government's own website (Wikidata P856 of the city item): the only hosts
+    whose pages can corroborate that an organisation is a city department."""
+    host: str  # lower case, without "www."
+    url: str
+    sources: list[NameSource] = Field(min_length=1)
+
 class CityIdentity(BaseModel):
     city: str  # the catalog's city name
     country: str  # the catalog's country name
     status: Status = "DRAFT"
     region: Region | None = None
     country_info: CountryInfo | None = None
+    official_websites: list[OfficialWebsite] = Field(default_factory=list)
     ids: dict[str, str] = Field(default_factory=dict)
     names: list[IdentityName] = Field(default_factory=list)
     unverified_names: list[IdentityName] = Field(default_factory=list)

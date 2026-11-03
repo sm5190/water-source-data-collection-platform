@@ -322,6 +322,40 @@ class GeoMatcher:
             return f"other region {m.group(0)!r}"
         return None
 
+    # --- the city government's own hosts ------------------------------------------------
+
+    def official_host(self, url_or_host: str) -> str | None:
+        """Why ``url_or_host`` belongs to the city government, or None. Either one of the
+        identity's official websites (Wikidata P856) or a subdomain of one, or a
+        government-controlled suffix whose label spells the city: a US ``.gov`` host
+        "<city>[<own state code>].gov" / "cityof<city>.gov", or "<city>.gv.at",
+        "<city>.go.ke", "<city>.gob.<cc>" ... for the identity's own country code. Spelling
+        alone on an open suffix (toronto-city.com) never counts."""
+        text = url_or_host or ""
+        host = ((urlsplit(text).hostname if "://" in text else text) or "").casefold()
+        host = host.removeprefix("www.")
+        if not host:
+            return None
+        for site in self.identity.official_websites:
+            if host == site.host or host.endswith("." + site.host):
+                return f"official website {site.host} (Wikidata P856)"
+        labels = host.split(".")
+        key = fold(self.identity.catalog_names()[0]).replace(" ", "").replace("-", "")
+        if len(labels) < 2 or len(key) < 3:
+            return None
+        tld, second = labels[-1], labels[-2]
+        state_codes = set(self.region_host_labels) & US_STATE_CODES
+        if tld == "gov" and (self.cctld == "us" or fold(self.identity.country) in _US_NAMES):
+            for prefix in ("", "cityof"):
+                rest = second.removeprefix(prefix)
+                if rest.startswith(key) and (rest[len(key):] in state_codes | {""}):
+                    return f"US government host {host}"
+            return None
+        if len(labels) >= 3 and tld == self.cctld and second in GOV_SECOND_LEVEL | {"gv"} \
+                and labels[-3] == key:
+            return f"government host {host} of the city"
+        return None
+
     # --- document scope ------------------------------------------------------------------
 
     def host_scope(self, url: str) -> DocumentScope:
