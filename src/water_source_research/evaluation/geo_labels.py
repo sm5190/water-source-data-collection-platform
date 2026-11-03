@@ -78,7 +78,10 @@ def geo_decision(doc: Mapping[str, Any]) -> tuple[str, str]:
         scope = m.document_scope(doc["url"], doc.get("title"), [t for _, t in doc["texts"]])
         return (EXCLUDED, f"DOCUMENT_{scope.label()}") if scope.elsewhere else (
             INCLUDED, f"DOCUMENT_{scope.label()}")
-    scope = m.host_scope(doc["url"])
+    # The scope discovery ranking and acquisition use for a search result (title as the
+    # subject, publisher apart); older code without it judged by the host.
+    scope = (m.search_scope(doc["url"], doc.get("title")) if hasattr(m, "search_scope")
+             else m.host_scope(doc["url"]))
     status = m.match_place(doc.get("title") or "", scope).status
     if scope.elsewhere or status in ("HOMONYM", "OTHER_PLACE"):
         return EXCLUDED, f"SEARCH_{scope.label()}_{status}"
