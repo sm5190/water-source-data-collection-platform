@@ -144,3 +144,40 @@ def test_the_slot_never_exceeds_the_round_or_run_budget():
     again = select_candidates(OFFICIAL + [WHOLESALER_PAGE], attempted, S, budget=18,
                               city=CITY, reserved=pages)
     assert WHOLESALER_PAGE["url"] not in [c["url"] for c in again] and len(again) == 6
+
+# --- precision lessons from the stored runs (counterfactual on Houston b13e0d1d) ---------------
+
+def test_a_city_named_claim_never_matches_a_longer_company_host():
+    """A "Houston Water" claim (the city's own utility system) must not reserve the slot for
+    houstonwatersolutions.net, a commercial company whose host only contains the name."""
+    page = cand("https://houstonwatersolutions.net/did-you-know/", "UTILITY",
+                "Did You Know Where Houston Water Comes From? - Houston Water Solutions")
+    research, st = state([], OFFICIAL + [page], claims=[(
+        "Houston Water", "https://www.houstontx.gov/x",
+        "Houston's combined utility system, Houston Water, serves Houston, Texas")])
+    pages, why = reserved_pages(st, research)
+    assert pages == [] and "no page" in why
+
+def test_the_utilitys_own_compact_host_matches():
+    from water_source_research.services.utility_registry import candidate_page
+    reg = {"key": "nairobi water company", "name": "Nairobi Water Company"}
+    assert candidate_page(reg, "https://www.nairobiwater.co.ke/plan.pdf",
+                          "Nairobi Water Company Strategic Plan", "Nairobi", "Kenya")
+    assert candidate_page(reg, "https://www.nairobiwaterservices.example/",
+                          "Nairobi Water Company", "Nairobi", "Kenya") is None
+
+def test_a_commercial_or_news_host_is_never_a_bootstrap_page():
+    page = {**WHOLESALER_PAGE, "publisher_kind": "NEWS"}
+    research, st = state([STATEMENT], OFFICIAL + [page])
+    pages, _ = reserved_pages(st, research)
+    assert pages == []
+
+def test_a_statement_placed_only_by_its_document_does_not_qualify():
+    """A first-person planning sentence that names no place, on a page that mentions the city
+    elsewhere, is not city-supply relationship evidence."""
+    own = chunk("https://www.northbendwater.example/projects",
+                "Houston, Texas area.\n\nNorth Bend Water Authority supplies drinking water "
+                "through 30 miles of new lines.", "UTILITY", "North Bend Water Authority")
+    _, st = state([own], OFFICIAL)
+    names = [c["name"] for c in reserved_candidates(st)]
+    assert "North Bend Water Authority" not in names

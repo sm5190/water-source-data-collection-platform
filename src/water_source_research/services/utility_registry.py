@@ -589,9 +589,31 @@ def candidate_page(cand: UtilityCandidate | Mapping, url: str, title: str | None
     city_words = frozenset(w for n in matcher.city_names for w in utility_key(n).split())
     pattern = _name_re(c.all_names())
     if pattern is not None and pattern.search(title or "") and _spells(
-            c, host, places, city_words, city):
+            c, host, places, city_words, city) and _host_is_the_name(c, host, places,
+                                                                      city_words):
         return "host spells the name and the title names it"
     return None
+
+def _host_is_the_name(cand: UtilityCandidate, host: str, places: frozenset[str],
+                      city_words: frozenset[str]) -> bool:
+    """Stricter than ``_spells`` for a host none of whose pages was acquired yet: a label holds
+    a distinctive word of the name (not the city, a place, a generic or descriptor word), or a
+    label *is* the name without its organisation-type words ("nairobiwater" for "Nairobi Water
+    Company"). "houstonwatersolutions" is not "Houston Water"."""
+    labels = [lab.replace("-", "") for lab in host.split(".")[:-1]
+              if lab not in ("www", "com", "org", "net", "co", "gov", "go", "ac")]
+    for n in cand.all_names():
+        words = utility_key(n).split()
+        distinct = [w for w in words if len(w) >= 4 and w not in _GENERIC
+                    and w not in _DESCRIPTORS and w not in places and w not in city_words
+                    and w not in ORG_TYPE_WORDS]
+        if any(w in lab for w in distinct for lab in labels):
+            return True
+        compact = "".join(w for w in words if w not in ORG_TYPE_WORDS and w not in (
+            "the", "of", "de", "del", "la", "and", "y"))
+        if compact and compact in labels:
+            return True
+    return False
 
 def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pattern | None],
                 docs: Mapping[str, _Doc], chunks: Sequence[EvidenceChunk],

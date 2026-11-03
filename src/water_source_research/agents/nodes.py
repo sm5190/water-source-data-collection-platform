@@ -254,7 +254,11 @@ def reserved_candidates(state: GraphState) -> list[dict]:
                                                    "SUPPLIES_WHOLESALE")
                       and e.get("role") in ("DRINKING_WATER_OPERATOR", "WHOLESALE_SUPPLIER")
                       and e.get("geo_status") in ("CONFIRMED", "PROBABLE")
-                      and e.get("strength") == "SUPPORTING"]
+                      and e.get("strength") == "SUPPORTING"
+                      # the sentence (or its section heading) places the city itself, not
+                      # "the document is about the city"
+                      and not (e.get("geo_reason") or "").startswith(
+                          "the document is about the city")]
         quote = (_claim_places_city(research, c["name"], scopes)
                  if "claim" in (c.get("origins") or []) else None)
         if not statements and quote is None:
@@ -285,6 +289,9 @@ def reserved_pages(state: GraphState, research: CityResearchState
         for d in state.get("discovery_candidates", []):
             how = candidate_page(cand, d.get("url") or "", d.get("title"),
                                  research.city_name, research.country)
+            if how and how != "bound host" and d.get("publisher_kind") in (
+                    "COMMERCIAL", "DIRECTORY", "NEWS"):
+                continue  # before its own pages are known, never a company/listing/news host
             if how:
                 pages.append({**d, "_reserved_for": cand["name"],
                               "_reserved_reason": f"{cand['_reason']} (page: {how})"})
