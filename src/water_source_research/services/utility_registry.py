@@ -54,7 +54,8 @@ from water_source_research.services.geo_match import (
     matcher_for,
 )
 
-UTILITY_POLICY_VERSION = "utility-3"  # 2: client vs contractor, untreated water, descriptor names
+UTILITY_POLICY_VERSION = "utility-4"  # 4: plant-name fragments (<X> Water Purification Plant)
+# 2: client vs contractor, untreated water, descriptor names
 # 3: publisher apart from subject, section context, a missing homonym is not evidence
 GOVERNMENT_TYPES = frozenset({"GOVERNMENT", "REGULATORY"})
 SERVING = frozenset({"SERVES", "SERVES_PART", "SUPPLIES_WHOLESALE"})
@@ -128,7 +129,9 @@ _AFTER_FRAGMENT = frozenset({
     "users", "rights", "bill", "bills", "tariff", "tariffs", "meter", "meters", "sampling",
     "policy", "strategy", "project", "projects", "program", "programme", "system", "systems",
     "network", "scheme", "station", "stations", "intake", "intakes", "dam", "basin",
-    "security", "demand", "levels", "level", "footprint", "cycle", "infrastructure"})
+    "security", "demand", "levels", "level", "footprint", "cycle", "infrastructure",
+    # "<X> Water Purification Plant", "<X> Water Pumping Station": plants, not organisations
+    "purification", "filtration", "pumping", "booster", "desalination"})
 # Government, research and finance bodies: named in the evidence, but not utilities.
 _NON_UTILITY_HEADS = frozenset({
     "direccion", "dirección", "ministerio", "ministry", "superintendencia", "secretaria",

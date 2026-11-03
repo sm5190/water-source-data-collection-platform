@@ -317,3 +317,15 @@ def test_descriptor_names_are_not_organisations_on_any_path():
     tw = chunk("https://www.toronto.ca/water", "Toronto Water supplies drinking water to "
                "Toronto, Ontario, Canada.", source_type="GOVERNMENT")
     assert registry([tw], "Toronto", "Canada").find("Toronto Water") is not None
+
+def test_a_plant_name_fragment_is_not_an_organisation():
+    """'East Water' from "the City's East Water Purification Plant" (a stored Houston run):
+    a plant, not a supplier. Organisation words still make organisations."""
+    text = ("The Lake Valley facilities transport water to the City's East Water Purification "
+            "Plant and provide untreated water to industries. North Water Pumping Station "
+            "lifts it. The Riverside Public Works department and the Riverside Waterworks "
+            "Department supply drinking water to Riverside.")
+    reg = registry([chunk("https://www.example.org/x", text)], city="Houston",
+                   country="United States of America")
+    names = {c.name for c in reg.candidates}
+    assert not any("East Water" == n or "North Water" == n for n in names)
