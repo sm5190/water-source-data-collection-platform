@@ -209,6 +209,90 @@ def candidate_hosts(state: GraphState) -> list[str]:
             out += [h for h in c.get("bound_hosts") or [] if h not in suppressed]
     return list(dict.fromkeys(out))
 
+def _claim_places_city(research: CityResearchState, name: str, scopes) -> str | None:
+    """A utility_name claim for ``name`` whose cited quote places the city (CONFIRMED or
+    PROBABLE, never a homonym): the claim's quote, else None."""
+    from water_source_research.services.places import names_city
+    from water_source_research.services.utility_registry import utility_key
+    fs = research.fields.get("utility_name")
+    if fs is None:
+        return None
+    key = utility_key(name)
+    for cl in fs.candidate_claims:
+        if cl.value is None or cl.review_status == "REJECTED" or utility_key(str(cl.value)) != key:
+            continue
+        for ref in cl.evidence:
+            if names_city(ref.passage or "", research.city_name, research.country,
+                          scopes.get(ref.url) if scopes else None) == "TARGET":
+                return ref.passage[:200]
+    return None
+
+def reserved_candidates(state: GraphState) -> list[dict]:
+    """Credible unverified utility candidates for the reserved acquisition slot, best first:
+    registry status CANDIDATE (never suppressed, non-serving, other-city, sanitation-only or
+    historical) with a placed service statement (SERVES / SERVES_PART / SUPPLIES_WHOLESALE,
+    potable role, geography CONFIRMED/PROBABLE, SUPPORTING strength) and/or a utility_name
+    claim whose quote places the city. A UTILITY classification, a water hostname or a name
+    merely mined from text never qualifies."""
+    registry = state.get("utility_registry") or {}
+    if not registry.get("candidates"):
+        return []
+    research = CityResearchState.model_validate(state["research_state"])
+    suppressed = set(state.get("suppressed_hosts") or [])
+    scopes = None
+    from water_source_research.services.geo_match import document_scopes, matcher_for
+    matcher = matcher_for(research.city_name, research.country)
+    if matcher is not None:
+        chunks = [EvidenceChunk.model_validate(c) for c in state.get("evidence_chunks", [])]
+        scopes = document_scopes(matcher, chunks)
+    out = []
+    for c in registry["candidates"]:
+        if c.get("status") != "CANDIDATE" or set(c.get("bound_hosts") or []) & suppressed:
+            continue
+        statements = [e for e in c.get("evidence") or []
+                      if e.get("relationship") in ("SERVES", "SERVES_PART",
+                                                   "SUPPLIES_WHOLESALE")
+                      and e.get("role") in ("DRINKING_WATER_OPERATOR", "WHOLESALE_SUPPLIER")
+                      and e.get("geo_status") in ("CONFIRMED", "PROBABLE")
+                      and e.get("strength") == "SUPPORTING"]
+        quote = (_claim_places_city(research, c["name"], scopes)
+                 if "claim" in (c.get("origins") or []) else None)
+        if not statements and quote is None:
+            continue
+        if statements:
+            s = statements[0]
+            reason = f"{s['relationship'].lower()} statement on {s['host']}: {s['quote'][:160]}"
+        else:
+            reason = f"utility_name claim placing the city: {quote}"
+        if statements and quote is not None:
+            reason = "claim and statement; " + reason
+        rank = (0 if statements and quote is not None else 1 if statements else 2,
+                -len(statements), c["name"].casefold())
+        out.append({**c, "_reason": reason, "_rank": rank})
+    out.sort(key=lambda c: c["_rank"])
+    return out
+
+def reserved_pages(state: GraphState, research: CityResearchState
+                   ) -> tuple[list[dict], str]:
+    """Discovery candidates for the reserved slot (the best qualifying utility's own pages,
+    in discovery order), and why the slot is (or isn't) used."""
+    from water_source_research.services.utility_registry import candidate_page
+    cands = reserved_candidates(state)
+    if not cands:
+        return [], "no qualifying utility candidate"
+    pages: list[dict] = []
+    for cand in cands:
+        for d in state.get("discovery_candidates", []):
+            how = candidate_page(cand, d.get("url") or "", d.get("title"),
+                                 research.city_name, research.country)
+            if how:
+                pages.append({**d, "_reserved_for": cand["name"],
+                              "_reserved_reason": f"{cand['_reason']} (page: {how})"})
+    if not pages:
+        names = ", ".join(c["name"] for c in cands[:3])
+        return [], f"qualifying candidate(s) {names}: no page among the discovery results"
+    return pages, ""
+
 # Publisher kinds whose hosts may be suppressed, and those that never are.
 SUPPRESSIBLE_KINDS = frozenset({"COMMERCIAL", "DIRECTORY"})
 PROTECTED_KINDS = frozenset({"GOVERNMENT", "REGULATOR", "ACADEMIC", "TECHNICAL",
@@ -386,13 +470,14 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
     from water_source_research.context_manager.relevance import _claim_values
     features = [v for key in ("water_source", "reservoir_names")
                 for v in _claim_values(research, key)]
+    reserved, unused_reason = reserved_pages(state, research)
     outcome = await acquisition.acquire_round(state.get("discovery_candidates", []), previous,
                                               round_no=state.get("discovery_rounds", 1),
                                               priority_hosts=utility_hosts(state),
                                               skip_hosts=state.get("suppressed_hosts") or [],
                                               features=features,
                                               candidate_hosts=candidate_hosts(state),
-                                              city=research.city_name)
+                                              city=research.city_name, reserved=reserved)
     chunks = list(state.get("evidence_chunks", []))
     known = {c["chunk_id"] for c in chunks}
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]
@@ -406,10 +491,27 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
                                   strategy="repeated_failures",
                                   attrs={"host": key, "reason_code": reason,
                                          "discovery_round": state.get("discovery_rounds", 1)})
+    slot = next((r for r in outcome.records if r.get("selection") == "RESERVED_UTILITY"), None)
+    round_no = state.get("discovery_rounds", 1)
+    if slot is not None:
+        events = append_event(events, kind=EventKind.UTILITY_SLOT, node="acquire",
+                              strategy="used", attrs={
+                                  "utility": slot.get("reserved_for"),
+                                  "url": slot["requested_url"],
+                                  "reason_code": (slot.get("reserved_reason") or "")[:300],
+                                  "discovery_round": round_no})
+    else:
+        why = unused_reason or "its pages were already fetched or cannot be fetched now"
+        events = append_event(events, kind=EventKind.UTILITY_SLOT, node="acquire",
+                              strategy="unused", attrs={"reason_code": why[:300],
+                                                        "discovery_round": round_no})
     for rec in outcome.records:
         attrs: dict[str, object] = {"url": rec["requested_url"],
                                     "chunks": rec.get("chunks") or 0,
                                     "duration_ms": rec.get("duration_ms") or 0.0}
+        if rec.get("selection"):
+            attrs["selection"] = rec["selection"]
+            attrs["candidate"] = rec.get("reserved_for")
         if rec.get("source_type"):
             attrs["source_type"] = rec["source_type"]
         ok = rec["status"] == DocStatus.OK

@@ -39,6 +39,9 @@ OTHER_TIER = 5
 G_VERIFIED, G_OFFICIAL, G_CANDIDATE, G_UTILITY_UNVERIFIED, G_SECONDARY, G_OTHER, G_ELSEWHERE = (
     range(7))
 UNVERIFIED_UTILITY_PER_ROUND = 2
+# At most one of the round's slots goes to a credible unverified utility candidate's own page
+# (agents/nodes.py::reserved_pages); unused, it is filled normally. Inside the round's cap.
+RESERVED_UTILITY_PER_ROUND = 1
 SKIP_EXTENSIONS = (".xls", ".xlsx", ".csv", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".gz",
                    ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4", ".kmz", ".kml",
                    ".shp", ".exe", ".dwg")
@@ -148,11 +151,14 @@ def select_candidates(candidates: list[Mapping[str, Any]],
                       skip_hosts: Sequence[str] = (),
                       features: Sequence[str] = (), *,
                       candidate_hosts: Sequence[str] = (),
-                      city: str | None = None) -> list[Mapping[str, Any]]:
+                      city: str | None = None,
+                      reserved: Sequence[Mapping[str, Any]] = ()) -> list[Mapping[str, Any]]:
     """Up to ``budget`` (<= per-round cap) unattempted candidates by ``selection_group``,
     keeping discovery's ranking within a group (tier order breaks ties), at most
     ``max_per_host`` per host and UNVERIFIED_UTILITY_PER_ROUND unverified UTILITY pages;
-    ``skip_hosts`` (hosts suppressed or failing for this run) are never fetched."""
+    ``skip_hosts`` (hosts suppressed or failing for this run) are never fetched.
+    ``reserved``: pages of a credible unverified utility candidate, best first; the first one
+    that passes the same checks takes one slot (marked ``selection = RESERVED_UTILITY``)."""
     preferred = {h.removeprefix("www.") for h in priority_hosts}
     skipped = {h.removeprefix("www.") for h in skip_hosts}
     named = {h.removeprefix("www.") for h in candidate_hosts}
@@ -171,23 +177,45 @@ def select_candidates(candidates: list[Mapping[str, Any]],
     per_host: dict[str, int] = {}
     keys: set[str] = set()
     limit = min(budget, settings.max_documents_per_round)
-    for index, c in ordered:
-        if len(chosen) >= limit:
-            break
+
+    def eligible(c: Mapping[str, Any]) -> str | None:
+        """The candidate's dedupe key if it may be fetched now, else None."""
         url = c.get("url") or ""
         key = doc_key(url)
         if not key or key in attempted or key in keys:
-            continue
+            return None
         parts = urlsplit(url)
         if parts.scheme not in ("http", "https"):
-            continue
+            return None
         if c.get("open_access") is False:  # scholarly metadata only, no open copy
-            continue
+            return None
         if parts.path.lower().endswith(SKIP_EXTENSIONS):
-            continue
+            return None
         host = (parts.hostname or "").removeprefix("www.")
         if host in skipped or failure_key(url) in skipped or per_host.get(
                 host, 0) >= settings.max_per_host:
+            return None
+        return key
+
+    def take(c: Mapping[str, Any], key: str) -> None:
+        host = (urlsplit(c.get("url") or "").hostname or "").removeprefix("www.")
+        per_host[host] = per_host.get(host, 0) + 1
+        keys.add(key)
+        chosen.append(c)
+
+    for c in reserved[:50]:
+        if len(chosen) >= min(limit, RESERVED_UTILITY_PER_ROUND):
+            break
+        if _elsewhere(c, features):
+            continue
+        key = eligible(c)
+        if key is not None:
+            take({**c, "selection": "RESERVED_UTILITY"}, key)
+    for index, c in ordered:
+        if len(chosen) >= limit:
+            break
+        key = eligible(c)
+        if key is None:
             continue
         if groups[index] == G_ELSEWHERE:
             if elsewhere_taken >= ELSEWHERE_PER_ROUND:
@@ -197,9 +225,7 @@ def select_candidates(candidates: list[Mapping[str, Any]],
             if unverified_taken >= UNVERIFIED_UTILITY_PER_ROUND:
                 continue
             unverified_taken += 1
-        per_host[host] = per_host.get(host, 0) + 1
-        keys.add(key)
-        chosen.append(c)
+        take(c, key)
     return chosen
 
 class AcquisitionService:
@@ -217,7 +243,8 @@ class AcquisitionService:
                             skip_hosts: Sequence[str] = (),
                             features: Sequence[str] = (), *,
                             candidate_hosts: Sequence[str] = (),
-                            city: str | None = None) -> AcquisitionOutcome:
+                            city: str | None = None,
+                            reserved: Sequence[Mapping[str, Any]] = ()) -> AcquisitionOutcome:
         """Acquire new documents for one round. ``previous`` are earlier document records
         (any status), used for de-duplication and the per-run budget. Never raises."""
         attempted = set()
@@ -237,7 +264,8 @@ class AcquisitionService:
         outcome.skipped_failing = failing
         chosen = select_candidates(candidates, attempted, self.s, budget, priority_hosts,
                                    [*skip_hosts, *failing], features,
-                                   candidate_hosts=candidate_hosts, city=city)
+                                   candidate_hosts=candidate_hosts, city=city,
+                                   reserved=reserved)
         results = await asyncio.gather(*(self._fetch_one(c) for c in chosen))
 
         # Sequential, in selection order: deterministic de-duplication and chunking.
@@ -306,6 +334,10 @@ class AcquisitionService:
             "discovery_provider": c.get("provider"), "discovery_query": c.get("query"),
             "duration_ms": 0.0,
         }
+        if c.get("selection"):
+            record["selection"] = c["selection"]
+            record["reserved_for"] = c.get("_reserved_for")
+            record["reserved_reason"] = c.get("_reserved_reason")
         started = time.perf_counter()
         response = doc = None
         try:

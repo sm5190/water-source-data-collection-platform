@@ -53,7 +53,8 @@ class ReplayAcquisition:
                             previous: list[Mapping[str, Any]],
                             round_no: int = 1, priority_hosts: Any = (),
                             skip_hosts: Any = (), features: Any = (), *,
-                            candidate_hosts: Any = (), city: Any = None) -> AcquisitionOutcome:
+                            candidate_hosts: Any = (), city: Any = None,
+                            reserved: Any = ()) -> AcquisitionOutcome:
         """The parent's documents of ``round_no`` (candidates are ignored: nothing is
         discovered or fetched in a replay)."""
         self.served.append(round_no)

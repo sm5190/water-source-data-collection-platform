@@ -570,6 +570,29 @@ def _spells(cand: UtilityCandidate, host: str, places: frozenset[str],
     return hit and any(host_names_org(n, host) for n in cand.all_names()) or (
         hit and bool(acronyms))
 
+def candidate_page(cand: UtilityCandidate | Mapping, url: str, title: str | None,
+                   city: str, country: str | None) -> str | None:
+    """Is this discovery result the candidate's own page? "bound host" when the host is
+    already bound to it; before any of its pages was acquired (bootstrap), "host and title"
+    when the host spells its name (``_spells``) and the title names it. Else None. Used to
+    pick a page for the reserved acquisition slot only, never as evidence."""
+    c = cand if isinstance(cand, UtilityCandidate) else UtilityCandidate.model_validate(cand)
+    host = _host(url)
+    if not host:
+        return None
+    if host in c.bound_hosts:
+        return "bound host"
+    matcher = matcher_for(city, country) or GeoMatcher(catalog_only(city, country or ""))
+    from water_source_research.services.places import gazetteer
+    places = frozenset(w for n in (*gazetteer()[1], *matcher.country_names)
+                       for w in utility_key(n).split())
+    city_words = frozenset(w for n in matcher.city_names for w in utility_key(n).split())
+    pattern = _name_re(c.all_names())
+    if pattern is not None and pattern.search(title or "") and _spells(
+            c, host, places, city_words, city):
+        return "host spells the name and the title names it"
+    return None
+
 def _bind_hosts(found: dict[str, UtilityCandidate], patterns: Mapping[str, re.Pattern | None],
                 docs: Mapping[str, _Doc], chunks: Sequence[EvidenceChunk],
                 places: frozenset[str] = frozenset(),
