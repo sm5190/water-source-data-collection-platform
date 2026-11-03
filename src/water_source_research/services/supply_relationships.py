@@ -162,7 +162,8 @@ def _temporal(text: str) -> tuple[str, str | None, list[int], bool]:
 class _Builder:
     def __init__(self, research: CityResearchState, chunks: Sequence[EvidenceChunk],
                  documents: Mapping[str, Mapping[str, Any]], registry: UtilityRegistry,
-                 document_ids: Mapping[str, int]):
+                 document_ids: Mapping[str, int],
+                 links: Mapping[str, Sequence[Mapping[str, Any]]] | None = None):
         self.research, self.chunks, self.registry = research, list(chunks), registry
         self.documents, self.document_ids = documents, document_ids
         city, country = research.city_name, research.country
@@ -178,6 +179,12 @@ class _Builder:
                           if c.status not in ("NON_SERVING", "OTHER_CITY", "SANITATION_ONLY")}
         self.utility_res = {k: _name_re(c.all_names()) for k, c in self.utilities.items()}
         self.sources = self._known_sources()
+        from water_source_research.services.affiliation import assess
+        self.affiliations = assess(self.matcher, registry.candidates, self.chunks, links or {},
+                                   city, documents)
+        self.department_hosts = {h for a in self.affiliations if a.verified
+                                 for c in [registry.get(a.candidate_key)] if c
+                                 for h in c.bound_hosts}
 
     # entities ---------------------------------------------------------------------------
 
@@ -224,7 +231,10 @@ class _Builder:
         host = _host(url)
         stype = (self._doc(url).get("source_type") or (chunk.source_type if chunk else None)
                  or "").upper() or None
-        basis = ("SELF_DESCRIPTION" if host in self_hosts else "GOVERNMENT_OR_REGULATOR"
+        official = self.matcher.official_host(host)  # the city government's own site
+        basis = ("GOVERNMENT_OR_REGULATOR" if official else
+                 "MUNICIPAL_DEPARTMENT" if host in self.department_hosts else
+                 "SELF_DESCRIPTION" if host in self_hosts else "GOVERNMENT_OR_REGULATOR"
                  if stype in GOVERNMENT_TYPES else "INDEPENDENT")
         span = None
         if chunk is not None:
@@ -339,8 +349,11 @@ class _Builder:
                 e.quote[:60])), scope)
             if local is not None:
                 return True, local.reason
-        if (e.source_type or "").upper() in GOVERNMENT_TYPES and not scope.elsewhere:
+        if ((e.source_type or "").upper() in GOVERNMENT_TYPES
+                or self.matcher.official_host(e.url)) and not scope.elsewhere:
             return True, f"government document about the city ({e.geo_reason})"
+        if _host(e.url) in self.department_hosts and not scope.elsewhere:
+            return True, f"page of a verified city department ({e.geo_reason})"
         return False, f"only the page title or document places the city ({e.geo_reason})"
 
     def _wholesale_object(self, subject_key: str, quote: str) -> Entity:
@@ -523,6 +536,26 @@ class _Builder:
                            [])
         self.add("SOURCE_PART_OF_SYSTEM", part, whole, ev)
 
+    def from_affiliations(self) -> None:
+        """DEPARTMENT_OF: VERIFIED only from the city's official host (statement or
+        departments list); every other signal leaves it CANDIDATE."""
+        for a in self.affiliations:
+            subject = self.utility_entity(a.candidate_key)
+            for e in a.evidence:
+                chunk = self.by_chunk.get(e.chunk_id or "")
+                official = e.basis in ("OFFICIAL_STATEMENT", "OFFICIAL_DEPARTMENTS_LINK",
+                                       "OFFICIAL_LINK_NO_CONTEXT")
+                ev = self.evidence(chunk, e.url, e.quote, e.basis.lower().replace("_", " "),
+                                   "NONE", e.official_reason or "", e.verifies,
+                                   "AUTHORITATIVE" if e.verifies else "NONE", [])
+                ev = ev.model_copy(update={
+                    "affiliation_basis": e.basis, "target_url": e.target_url,
+                    "heading": e.heading or None, "observed_at": e.observed_at,
+                    "basis": "GOVERNMENT_OR_REGULATOR" if official else
+                    "SELF_DESCRIPTION" if e.basis in ("SELF_DECLARATION", "COPYRIGHT_FOOTER",
+                                                       "HOSTNAME_HINT") else "INDEPENDENT"})
+                self.add("DEPARTMENT_OF", subject, self.city, ev)
+
     def from_claim_relations(self) -> None:
         """The extraction's grounded part_of_system relations (quote verified in the run's
         evidence when the claim was made)."""
@@ -571,6 +604,15 @@ def _status(rel: SupplyRelationship) -> tuple[str | None, str, str]:
     negations = [e for e in evs if e.negated and e.temporal != "HISTORICAL"]
     historical = [e for e in evs if e.temporal == "HISTORICAL"]
     current = [e for e in evs if not e.negated and e.temporal != "HISTORICAL"]
+    if rel.kind == "DEPARTMENT_OF":
+        verifying = [e for e in evs if e.affiliation_basis in ("OFFICIAL_STATEMENT",
+                                                               "OFFICIAL_DEPARTMENTS_LINK")]
+        if verifying:
+            where = verifying[0].geo_reason or verifying[0].host
+            return ("VERIFIED", f"corroborated on the city's official host ({where})",
+                    "UNKNOWN")
+        return ("CANDIDATE", "MUNICIPAL_CANDIDATE: " + ", ".join(sorted(
+            {(e.affiliation_basis or "").lower() for e in evs})), "UNKNOWN")
     if rel.kind == "PREDECESSOR_OF":
         placed = [e for e in evs if e.placed]
         return ("SUPPORTED" if placed else "CANDIDATE",
@@ -590,12 +632,14 @@ def _status(rel: SupplyRelationship) -> tuple[str | None, str, str]:
             sorted({e.temporal_marker or "" for e in historical}))[:120] + ")", "HISTORICAL"
     placed = [e for e in current if e.placed]
     temporal = "CURRENT" if any(e.temporal == "CURRENT" for e in current) else "UNKNOWN"
-    gov = [e for e in placed if e.basis == "GOVERNMENT_OR_REGULATOR"]
+    gov = [e for e in placed if e.basis in ("GOVERNMENT_OR_REGULATOR",
+                                            "MUNICIPAL_DEPARTMENT")]
     independent = {e.host for e in placed if e.basis in ("INDEPENDENT",
                                                           "GOVERNMENT_OR_REGULATOR")}
     if gov:
-        return "VERIFIED", f"stated by a government/regulatory document ({gov[0].host})", \
-            temporal
+        what = ("a verified city department's page" if gov[0].basis == "MUNICIPAL_DEPARTMENT"
+                else "a government/regulatory document")
+        return "VERIFIED", f"stated by {what} ({gov[0].host})", temporal
     if len(independent) >= 2 and any(e.document_scope == "TARGET_COUNTRY" for e in placed):
         return "VERIFIED", f"stated independently by {', '.join(sorted(independent)[:3])}", \
             temporal
@@ -610,13 +654,16 @@ def _status(rel: SupplyRelationship) -> tuple[str | None, str, str]:
 def build_relationships(research: CityResearchState, chunks: Sequence[EvidenceChunk],
                         documents: Mapping[str, Mapping[str, Any]] | None = None,
                         registry: UtilityRegistry | None = None,
-                        document_ids: Mapping[str, int] | None = None) -> RelationshipGraph:
+                        document_ids: Mapping[str, int] | None = None,
+                        links: Mapping[str, Sequence[Mapping[str, Any]]] | None = None
+                        ) -> RelationshipGraph:
     """The relationship graph for the run's stored evidence (deterministic; rebuilding on the
     same evidence gives the same graph)."""
     documents = documents or {}
     if registry is None:
         registry = build_registry(research, list(chunks), documents)
-    b = _Builder(research, chunks, documents, registry, document_ids or {})
+    b = _Builder(research, chunks, documents, registry, document_ids or {}, links)
+    b.from_affiliations()
     b.from_registry()
     b.from_sentences()
     b.from_claim_relations()

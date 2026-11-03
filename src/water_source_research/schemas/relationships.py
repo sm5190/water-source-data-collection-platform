@@ -33,14 +33,17 @@ RelationshipKind = Literal[
     "SOURCE_PART_OF_SYSTEM",    # a source is a stated component of a larger system
     "PREDECESSOR_OF",           # an operator preceded another
     "ALIAS_OF",                 # explicit equivalence ("also known as", "formerly")
-    "DEPARTMENT_OF",            # reserved: needs municipal affiliation (not built; never produced)
+    "DEPARTMENT_OF",            # an organisation is a department of the city (affiliation)
 ]
 RelationshipStatus = Literal["VERIFIED", "SUPPORTED", "CANDIDATE", "HISTORICAL", "CONTRADICTED"]
 Temporal = Literal["CURRENT", "HISTORICAL", "UNKNOWN"]
 EntityType = Literal["city", "utility", "source", "system"]
 # Who says it: the subject about itself (own site), a government/regulator, another document,
 # or only a research claim (extraction output).
-Basis = Literal["SELF_DESCRIPTION", "GOVERNMENT_OR_REGULATOR", "INDEPENDENT", "CLAIM"]
+# MUNICIPAL_DEPARTMENT: a page of an organisation verified as a city department
+# (services/affiliation.py); weighed like a government document in the graph only.
+Basis = Literal["SELF_DESCRIPTION", "GOVERNMENT_OR_REGULATOR", "MUNICIPAL_DEPARTMENT",
+                "INDEPENDENT", "CLAIM"]
 
 class Entity(BaseModel):
     entity_id: str  # "<type>:<key>" (sources: "source:<kind>:<key>")
@@ -68,6 +71,12 @@ class RelationshipEvidence(BaseModel):
     temporal_marker: str | None = None
     years: list[int] = Field(default_factory=list)
     negated: bool = False  # "does not supply", "no longer supplies", "ya no abastece"
+    # DEPARTMENT_OF evidence (services/affiliation.py): what kind of signal, the link target,
+    # the heading the link sits under, and when the page was observed.
+    affiliation_basis: str | None = None
+    target_url: str | None = None
+    heading: str | None = None
+    observed_at: str | None = None
 
 class SupplyRelationship(BaseModel):
     key: str  # kind|subject_id|object_id

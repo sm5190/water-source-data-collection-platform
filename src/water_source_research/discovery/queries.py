@@ -83,6 +83,9 @@ class DiscoveryPlan:
     fallback: bool = False  # no verified utility: government/regulator searches
     skip_topics: frozenset[str] = frozenset()  # topics that twice retained nothing
     local_language: str | None = None  # the city's local language code, if configured
+    # site:<official city host> "<organisation>": corroborate a municipal-department candidate
+    # (services/affiliation.py::bootstrap_queries); takes one of the round's web slots.
+    affiliation_checks: tuple[str, ...] = ()
 QUERY_LANGUAGES = CONFIG_DIR / "query_languages.yaml"
 
 @lru_cache
@@ -313,12 +316,16 @@ def build_queries(
     # The reserved verification slot; the utility field type (when planned) may take one
     # more of the verification queries through the round-robin.
     reserved = next((q for q in verify if take(q)), None)
+    affiliation = next((q for q in (PlannedQuery("web", a, "utility", utility_key)
+                                    for a in (plan.affiliation_checks if plan else ()))
+                        if take(q)), None)
     remaining = [q for q in verify if " ".join(q.query.split()).casefold() not in seen]
     if "utility" in groups and candidates["web"]:
         utility_index = list(groups).index("utility")
         candidates["web"][utility_index] += remaining[:MAX_VERIFICATION_QUERIES - 1]
     for kind in ("web", "academic"):
-        picked = 1 if kind == "web" and reserved is not None else 0
+        picked = (int(reserved is not None) + int(affiliation is not None)
+                  if kind == "web" else 0)
         # Round-robin across field types so one type can't use the whole budget.
         queues = [list(g) for g in candidates[kind]]
         while picked < max_per_kind and any(queues):

@@ -382,7 +382,29 @@ def discovery_plan(state: GraphState, research: CityResearchState, events: list[
         predecessor_names=tuple(c["name"] for c in cands if c.get("status") == "HISTORICAL"),
         features=tuple(dict.fromkeys(features)),
         fallback=bool(registry) and not verified,  # once there is evidence
-        skip_topics=frozenset(ineffective_topics(events, all_topics())))
+        skip_topics=frozenset(ineffective_topics(events, all_topics())),
+        affiliation_checks=tuple(affiliation_checks(state, research, matcher, events)))
+
+def affiliation_checks(state: GraphState, research: CityResearchState, matcher,
+                       events: list[dict]) -> list[str]:
+    """At most one ``site:<official city host> "<organisation>"`` search for a
+    MUNICIPAL_CANDIDATE when no page from an official city host was acquired yet
+    (services/affiliation.py). Approved identity only."""
+    if matcher is None or not matcher.identity.official_websites:
+        return []
+    from water_source_research.discovery.queries import previous_queries
+    from water_source_research.schemas.utility import UtilityCandidate
+    from water_source_research.services.affiliation import assess, bootstrap_queries
+    registry = state.get("utility_registry") or {}
+    cands = [UtilityCandidate.model_validate(c) for c in registry.get("candidates", [])
+             if c.get("status") in ("CANDIDATE", "VERIFIED", "AMBIGUOUS_GEOGRAPHY")]
+    if not cands:
+        return []
+    chunks = [EvidenceChunk.model_validate(c) for c in state.get("evidence_chunks", [])]
+    found = assess(matcher, cands, chunks, {}, research.city_name)
+    acquired = [d.get("final_url") or d.get("requested_url") or ""
+                for d in state.get("acquired_documents", []) if d.get("status") == "OK"]
+    return bootstrap_queries(matcher, found, acquired, previous_queries(events))
 
 async def _discover(discovery: DiscoveryService, fields: Mapping[str, FieldDefinition],
                     state: GraphState) -> GraphState:
@@ -1109,7 +1131,8 @@ def save_relationship_graph(state: GraphState, evidence_store: EvidenceRepositor
             if u:
                 ids.setdefault(u, d["document_id"])
     # the registry is rebuilt from the same evidence: the graph depends on nothing else
-    graph = build_relationships(research, chunks, _documents_by_url(state), None, ids)
+    graph = build_relationships(research, chunks, _documents_by_url(state), None, ids,
+                                evidence_store.document_links(state["run_id"]))
     return evidence_store.save_relationships(state["run_id"], graph.model_dump(mode="json"))
 
 def make_finalize_node(
