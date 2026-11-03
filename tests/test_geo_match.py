@@ -54,8 +54,12 @@ def test_a_colombian_government_document_is_not_about_santiago_chile(santiago):
                text="Informe nacional de calidad del agua. Santiago, municipio de Colombia.")
     assert co.label() == "OTHER_COUNTRY"
     assert santiago.match_place("Santiago registró IRCA bajo.", co).status == "HOMONYM"
+    # Publisher alone is not the subject (Milestone 3.1 P2): a Mexican host with no text is
+    # uncertain, not "about Mexico"; a homonym is listed in Mexico, so bare mentions there
+    # are AMBIGUOUS (support nothing) rather than the city or a homonym.
     mx = scope(santiago, "https://sinav30.conagua.gob.mx/x")
-    assert mx.label() == "OTHER_COUNTRY"
+    assert mx.label() == "UNKNOWN" and mx.homonym_publisher and not mx.elsewhere
+    assert santiago.match_place("Santiago registró IRCA bajo.", mx).status == "AMBIGUOUS"
 
 def test_text_decides_the_scope_of_a_generic_host(santiago):
     colombia = scope(santiago, "https://example.org/report", "Agua en Colombia",
@@ -107,7 +111,7 @@ def test_houston_mississippi_state_site_is_another_region(houston):
     assert houston.match_place("Houston water system, Chickasaw County.", ms).status \
         == "HOMONYM"
     tx = scope(houston, "https://www.twdb.texas.gov/surfacewater/rivers/reservoirs/houston/")
-    assert tx.region == "TARGET" and tx.country == "TARGET"
+    assert tx.region == "TARGET" and tx.target_country  # the publisher places it; subject silent
     assert houston.match_place("Houston, Mississippi water").status == "HOMONYM"
 
 def test_lake_houston_is_not_houston(houston):

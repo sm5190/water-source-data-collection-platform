@@ -11,8 +11,19 @@ A city name alone never establishes the place:
   homonym (>= LARGE_HOMONYM people), when it is AMBIGUOUS and blanked;
 - a metropolitan-area name alone is at most PROBABLE; a region name alone is not the city.
 
-Document scope (``document_scope``) weighs the host (country-code TLD, government second level,
-US state government hosts) and the country/region names in the title and text.
+Document scope (``document_scope``) is the document's *subject*, from its text: the country and
+region names in the title and text, the target region in administrative form ("Houston,
+Texas", "State of Texas", "TX 77002") and the city mentions that survive. A multi-country
+document that names the target is MIXED (not elsewhere). The *publisher* (host: country-code
+TLD, government second level, US state hosts) is kept apart: a domestic publisher helps place a
+bare mention; a foreign one is a signal only when the identity lists a homonym there (its
+region's host: elsewhere; its country: bare mentions AMBIGUOUS). A report hosted abroad can be
+about the target city.
+
+A bare name next to another country is a homonym only when a listed homonym lies there;
+otherwise it is AMBIGUOUS (homonym lists may be incomplete), never PROBABLE on that account.
+A passage that names no place may take its place from its local section (``section_place``):
+the governing heading names the city, nothing in between conflicts, same page/chunk only.
 
 Without an approved identity (``matcher_for`` returns None) callers keep their earlier,
 name-only behaviour, so nothing changes until a person approves the identity.
@@ -35,7 +46,7 @@ from water_source_research.services.city_identity import CityIdentity, fold, ide
 from water_source_research.services.places import HYDRONYM, gazetteer
 
 GeoStatus = Literal["CONFIRMED", "PROBABLE", "HOMONYM", "OTHER_PLACE", "AMBIGUOUS", "NONE"]
-Scope = Literal["TARGET", "OTHER", "UNKNOWN"]
+Scope = Literal["TARGET", "MIXED", "OTHER", "UNKNOWN"]
 TARGET_STATUSES = frozenset({"CONFIRMED", "PROBABLE"})
 LARGE_HOMONYM = 100_000
 WINDOW = 100  # characters either side of a mention that count as "nearby"
@@ -49,6 +60,26 @@ US_STATE_CODES = frozenset({"al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl"
     "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd",
     "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc"})
 _US_NAMES = frozenset({"united states", "united states of america", "usa", "us", "u.s."})
+US_STATE_NAMES = {
+    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas", "ca": "California",
+    "co": "Colorado", "ct": "Connecticut", "de": "Delaware", "fl": "Florida", "ga": "Georgia",
+    "hi": "Hawaii", "id": "Idaho", "il": "Illinois", "in": "Indiana", "ia": "Iowa",
+    "ks": "Kansas", "ky": "Kentucky", "la": "Louisiana", "me": "Maine", "md": "Maryland",
+    "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota", "ms": "Mississippi",
+    "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada", "nh": "New Hampshire",
+    "nj": "New Jersey", "nm": "New Mexico", "ny": "New York", "nc": "North Carolina",
+    "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma", "or": "Oregon", "pa": "Pennsylvania",
+    "ri": "Rhode Island", "sc": "South Carolina", "sd": "South Dakota", "tn": "Tennessee",
+    "tx": "Texas", "ut": "Utah", "vt": "Vermont", "va": "Virginia", "wa": "Washington",
+    "wv": "West Virginia", "wi": "Wisconsin", "wy": "Wyoming", "dc": "District of Columbia"}
+_STATE_BY_NAME = {n.casefold().replace(" ", ""): c for c, n in US_STATE_NAMES.items()}
+# Administrative forms of a region name (region inference): "State of X", "X Province", ...
+_ADMIN_BEFORE = (r"(?:state|province|region|county|department|prefecture|canton|oblast|"
+                 r"estado|provincia|regi[oó]n|departamento|prov[ií]ncia|d[eé]partement|"
+                 r"r[eé]gion|bundesland|governorate)\s+(?:of\s+|de\s+la\s+|de\s+|do\s+|da\s+|"
+                 r"del\s+|du\s+)?")
+_ADMIN_AFTER = (r"\s+(?:state|province|region|county|department|prefecture|oblast|"
+                r"governorate)\b")
 _QUALIFIER = r"(?:de|del|de la|de los|de las|do|da|dos|das|di|of)"
 _CAP_WORD = r"[A-ZÀ-ÖØ-Þ][\w'’\-]+"
 _ACCENTS = {"a": "aáàâãäåā", "e": "eéèêëē", "i": "iíìîïī", "o": "oóòôõöøō", "u": "uúùûüū",
@@ -100,20 +131,34 @@ class GeoMatch:
 
 @dataclass(frozen=True, slots=True)
 class DocumentScope:
+    """The document's subject (``country``/``region``, from its text; see document_scope),
+    kept apart from its ``publisher`` (the host's country: TARGET / OTHER / UNKNOWN)."""
     country: Scope = "UNKNOWN"
     region: Scope = "UNKNOWN"
     reasons: tuple[str, ...] = ()
+    publisher: Scope = "UNKNOWN"
+    # The host lies in a listed homonym's country (not its region): bare mentions AMBIGUOUS.
+    homonym_publisher: bool = False
 
     @property
     def elsewhere(self) -> bool:
         return self.country == "OTHER" or self.region == "OTHER"
+
+    @property
+    def target_country(self) -> bool:
+        """The target country is established: by the subject, or (subject silent) by a
+        domestic publisher. Places a bare mention; never makes a document relevant alone."""
+        return self.country == "TARGET" or (self.country == "UNKNOWN"
+                                            and self.publisher == "TARGET")
 
     def label(self) -> str:
         if self.country == "OTHER":
             return "OTHER_COUNTRY"
         if self.region == "OTHER":
             return "OTHER_REGION"
-        return "TARGET_COUNTRY" if self.country == "TARGET" else "UNKNOWN"
+        if self.country == "MIXED":
+            return "MIXED"
+        return "TARGET_COUNTRY" if self.target_country else "UNKNOWN"
 
 UNKNOWN_SCOPE = DocumentScope(reasons=("no signal",))
 
@@ -141,6 +186,24 @@ def _blank(text: str, spans: list[tuple[int, int]]) -> str:
             if not chars[i].isspace():
                 chars[i] = " "
     return "".join(chars)
+
+def _section_heading(line: str, before: str, after: str) -> bool:
+    """A section or table heading, not a wrapped line of prose (PDF text layers wrap lines):
+    short, not ending like a sentence part, standing apart from the text above (blank line,
+    start of text, or a finished sentence) and followed by a new line that starts a sentence,
+    a list item or a table row; or a table header row."""
+    from water_source_research.services.structure import _header_row, is_date_line
+    s = line.strip()
+    if not s or is_date_line(s):
+        return False
+    if _header_row(s):
+        return True
+    if len(s) > 120 or s.endswith((".", ";", ",", "-", "–")) or s[0].islower():
+        return False
+    apart = not before.strip() or before.rstrip().endswith((".", "!", "?", ":"))
+    nxt = after.strip()
+    starts = not nxt or nxt[0].isupper() or nxt[0].isdigit() or nxt[0] in "•-–*(\"'"
+    return apart and starts
 
 def _snippet(text: str, a: int, b: int, pad: int = 40) -> str:
     return " ".join(text[max(0, a - pad):b + pad].split())
@@ -184,6 +247,19 @@ class GeoMatcher:
             rf"(?<!\w)(?:{city_alt})\s+{_QUALIFIER}\s+({_CAP_WORD}(?:\s+{_CAP_WORD})?)")
         self.large_homonym = any((h.population or 0) >= LARGE_HOMONYM
                                  for h in identity.homonyms)
+        own_iso = (info.iso2 or "").casefold() if info else ""
+        self.homonym_isos = {h.iso2.casefold() for h in identity.homonyms
+                             if h.iso2 and h.iso2.casefold() != own_iso}
+        keys: set[str] = set()
+        for h in identity.homonyms:
+            if h.iso2 and h.iso2.casefold() != own_iso:
+                keys.add(fold(h.country))
+                keys |= {fold(a) for a in _country_aliases().get(fold(h.country), [])}
+        self.homonym_country_keys = keys
+        self.homonym_region_keys = {fold(h.region) for h in identity.homonyms if h.region}
+        own_city = {fold(n) for n in (*self.city_names, *identity.catalog_names())}
+        gaz_cities = [c for c in gazetteer()[0] if fold(c) not in own_city]
+        self.gazetteer_city_re = _names_regex(gaz_cities) if gaz_cities else None
         info_cc = (info.cctld or info.iso2 or "").casefold() if info else ""
         self.cctld = info_cc
         region = identity.region
@@ -192,6 +268,7 @@ class GeoMatcher:
             if region.iso_3166_2 and "-" in region.iso_3166_2:
                 self.region_host_labels.add(region.iso_3166_2.split("-", 1)[1].casefold())
             self.region_host_labels |= {fold(n).replace(" ", "") for n in self.region_names}
+        self.region_admin_re = self._region_admin_re(signal_regions)
 
     # --- signals -------------------------------------------------------------------------
 
@@ -201,6 +278,39 @@ class GeoMatcher:
             if pattern is not None and (m := pattern.search(text)):
                 return f"{label} {m.group(0)!r}"
         return None
+
+    def _homonym_place(self, signal: str) -> bool:
+        """Does an "other country/region 'X'" signal name a place where a homonym is listed?"""
+        m = re.search(r"'(.+)'|\"(.+)\"", signal)
+        name = fold(next(g for g in m.groups() if g)) if m else ""
+        return bool(name) and (name in self.homonym_country_keys
+                               or name in self.homonym_region_keys)
+
+    def _region_admin_re(self, regions: list[str]) -> re.Pattern[str] | None:
+        """The target region in administrative form (region inference). A region name that is
+        also a country's name or another homonym's region is left out: it can't tell."""
+        countries = {fold(c) for c in gazetteer()[1]} | set(_country_aliases())
+        homonym_regions = {fold(h.region) for h in self.identity.homonyms if h.region}
+        usable = [r for r in regions if fold(r) not in countries
+                  and fold(r) not in homonym_regions]
+        if not usable:
+            return None
+        alt = "|".join(_letters(r) for r in sorted(usable, key=len, reverse=True))
+        city = "|".join(_letters(n) for n in self.identity.catalog_names())
+        parts = [rf"(?<!\w)(?:{city}),\s*(?:{alt})(?!\w)",
+                 rf"(?<!\w)(?i:{_ADMIN_BEFORE})(?:{alt})(?!\w)",
+                 rf"(?<!\w)(?:{alt})(?i:{_ADMIN_AFTER})"]
+        region = self.identity.region
+        if region and region.iso_3166_2 and "-" in region.iso_3166_2:
+            code = region.iso_3166_2.split("-", 1)[1]
+            if code.isalpha() and len(code) == 2:  # "TX 77002", "Houston, TX"
+                parts.append(rf"(?<![\w-]){re.escape(code.upper())}\s+\d{{5}}(?:-\d{{4}})?\b")
+                parts.append(rf"(?<!\w)(?:{city}),\s*{re.escape(code.upper())}(?!\w)")
+        if region and region.level_term:
+            term = _letters(region.level_term)
+            parts += [rf"(?<!\w)(?:{alt})\s+{term}(?!\w)",
+                      rf"(?<!\w){term}\s+(?:of\s+|de\s+|do\s+|da\s+|del\s+)?(?:{alt})(?!\w)"]
+        return re.compile("|".join(parts))
 
     def _other_signal(self, text: str) -> str | None:
         if m := self.other_country_re.search(text):
@@ -249,39 +359,109 @@ class GeoMatcher:
             return DocumentScope("OTHER", "UNKNOWN", (f"country-code host .{tld}",))
         return UNKNOWN_SCOPE
 
+    def _foreign_publisher(self, url: str) -> tuple[str | None, str]:
+        """("REGION", reason) when the host belongs to a listed homonym's region (a US state
+        host, "<city><state>.gov"); ("COUNTRY", reason) when it lies in a listed homonym's
+        country; (None, "") otherwise: the publisher's location then says nothing about the
+        document's subject."""
+        host = (urlsplit(url or "").hostname or "").casefold().removeprefix("www.")
+        labels = host.split(".") if host else []
+        if len(labels) < 2:
+            return None, ""
+        tld, second = labels[-1], labels[-2]
+        iso, state = None, None
+        if tld in ("gov", "mil") or (tld == "us" and second in US_STATE_CODES | {"fed"}):
+            iso = "us"
+            if tld == "us":
+                state = second if second in US_STATE_CODES else None
+            else:
+                state = next((lab for lab in labels[:-1] if lab in US_STATE_CODES), None)
+                key = fold(self.identity.catalog_names()[0]).replace(" ", "")
+                if not state and second.startswith(key) and second[len(key):] in US_STATE_CODES:
+                    state = second[len(key):]
+                state = state or _STATE_BY_NAME.get(second)
+        elif len(tld) == 2 and (tld not in GENERIC_CCTLDS or second in GOV_SECOND_LEVEL):
+            iso = "gb" if tld == "uk" else tld  # gov.co is Colombia even though .co is generic
+        if iso is None:
+            return None, ""
+        own_iso = "gb" if self.cctld == "uk" else self.cctld
+        if state and iso == "us":
+            name = fold(US_STATE_NAMES[state])
+            if name in self.homonym_region_keys and name not in {fold(r)
+                                                                 for r in self.region_names}:
+                return "REGION", (f"publisher {host} is in {US_STATE_NAMES[state]}, "
+                                  f"a homonym's region")
+        if iso != own_iso and iso in self.homonym_isos:
+            return "COUNTRY", f"publisher {host} is in a homonym's country"
+        return None, ""
+
+    def _mentions(self, text: str) -> tuple[int, int]:
+        """(mentions of the name, those not decided HOMONYM) without a scope: does a document
+        that names only other countries still name the target city?"""
+        ds = self.neutralize(text, UNKNOWN_SCOPE).decisions
+        return len(ds), sum(1 for d in ds if d.status != "HOMONYM")
+
     def document_scope(self, url: str, title: str | None, texts: Iterable[str]) -> DocumentScope:
-        host = self.host_scope(url)
+        """The document's subject from its text, with the publisher kept apart (module doc):
+        TARGET (the target country, or the target region in administrative form with no other
+        country), MIXED (the target country among others), OTHER (other countries only and no
+        surviving mention of the city; or a homonym's regional publisher with no target
+        signal), else UNKNOWN."""
+        pub = self.host_scope(url)
+        foreign, foreign_reason = self._foreign_publisher(url)
         body = "\n".join([title or "", *texts])
         title_text = title or ""
         mine = len(self.country_re.findall(body))
         theirs = len(self.other_country_re.findall(body))
-        reasons = list(host.reasons)
-        country = host.country
-        if host.country == "UNKNOWN":
-            if mine and not theirs:
-                country = "TARGET"
-            elif theirs and not mine and (theirs >= 2 or self.other_country_re.search(
-                    title_text)):
-                country = "OTHER"
-            elif mine > 2 * theirs:
-                country = "TARGET"
-            elif theirs > 2 * mine and theirs >= 3:
-                country = "OTHER"
-            reasons.append(f"country names: target {mine}, other {theirs}")
-        elif host.country == "OTHER" and host.reasons and "government" not in host.reasons[0] \
-                and mine >= 2 and mine > 2 * theirs:
-            country = "TARGET"  # a foreign commercial ccTLD writing about the target country
-            reasons.append(f"country names: target {mine}, other {theirs}")
-        region = host.region
-        if region == "UNKNOWN" and country != "OTHER" and self.other_region_re is not None:
+        admin = len(self.region_admin_re.findall(body)) if self.region_admin_re else 0
+        reasons = [f"publisher {pub.label().lower()} ({'; '.join(pub.reasons) or 'no signal'})",
+                   f"country names: target {mine}, other {theirs}"]
+        if admin:
+            reasons.append(f"target region in administrative form: {admin}")
+        country: Scope = "UNKNOWN"
+        if mine and theirs:
+            country = "TARGET" if mine > 2 * theirs else "MIXED"
+        elif mine:
+            country = "TARGET"
+        elif admin and not theirs:
+            country = "TARGET"
+            reasons.append("country inferred from the region")
+        elif admin:
+            reasons.append("region named, other countries too: country uncertain")
+        elif theirs:
+            named, surviving = self._mentions(body)
+            if surviving:
+                reasons.append("the city is named, with other countries only: uncertain")
+            elif named or theirs >= 2 or self.other_country_re.search(title_text):
+                country = "OTHER"  # every mention of the name is a homonym, or none at all
+        region: Scope = "TARGET" if admin else "UNKNOWN"
+        if country != "OTHER" and self.other_region_re is not None:
             own = len(self.region_re.findall(body)) if self.region_re else 0
             other = len(self.other_region_re.findall(body))
-            if other and not own and (other >= 2 or self.other_region_re.search(title_text)):
+            if other and not own and not admin and (
+                    other >= 2 or self.other_region_re.search(title_text)):
                 region = "OTHER"
             elif own and not other:
                 region = "TARGET"
             reasons.append(f"region names: target {own}, other {other}")
-        return DocumentScope(country, region, tuple(reasons))
+        if region == "UNKNOWN" and pub.region == "TARGET":
+            region = "TARGET"  # the target region's own government host (texas.gov)
+        homonym_publisher = False
+        if foreign == "REGION" and country not in ("TARGET", "MIXED") and region != "TARGET":
+            region = "OTHER"
+            if pub.country == "OTHER":
+                country = "OTHER"
+            reasons.append(foreign_reason)
+        elif foreign == "COUNTRY" and country not in ("TARGET", "MIXED"):
+            homonym_publisher = True
+            reasons.append(foreign_reason + ": bare mentions uncertain")
+        return DocumentScope(country, region, tuple(reasons), publisher=pub.country,
+                             homonym_publisher=homonym_publisher)
+
+    def search_scope(self, url: str, title: str | None, snippet: str | None = None
+                     ) -> DocumentScope:
+        """A search result's scope: its title (and snippet) as the subject, publisher apart."""
+        return self.document_scope(url, title, [snippet or ""])
 
     # --- mentions ------------------------------------------------------------------------
 
@@ -346,19 +526,29 @@ class GeoMatcher:
                 else:
                     decisions.append(Decision("CONFIRMED", f"{target} nearby ({other} too)",
                                               snip))
+            elif other and self._homonym_place(other):
+                bare.append((a, b))
+                decisions.append(Decision("HOMONYM", f"{other} nearby (a homonym is listed "
+                                          f"there)", snip))
             elif other and scope.country == "TARGET" and scope.region != "OTHER":
                 decisions.append(Decision("PROBABLE", f"document about the target country "
                                           f"({other} nearby)", snip))
             elif other:
+                # No homonym listed there, but the lists may be incomplete: uncertain.
                 bare.append((a, b))
-                decisions.append(Decision("HOMONYM", f"{other} nearby", snip))
+                decisions.append(Decision("AMBIGUOUS", f"{other} nearby; nothing confirms "
+                                          f"the target city", snip))
             elif scope.elsewhere:
                 bare.append((a, b))
                 decisions.append(Decision("HOMONYM", f"document about "
                                           f"{scope.label().lower()}", snip))
-            elif scope.country == "TARGET":
+            elif scope.target_country:
                 decisions.append(Decision("PROBABLE", "document about the target country",
                                           snip))
+            elif scope.homonym_publisher:
+                bare.append((a, b))
+                decisions.append(Decision("AMBIGUOUS", "bare name; the publisher is in a "
+                                          "homonym's country", snip))
             elif self.large_homonym:
                 bare.append((a, b))
                 decisions.append(Decision("AMBIGUOUS", "bare name, unknown document scope, a "
@@ -388,6 +578,44 @@ class GeoMatcher:
         if m := self.other_country_re.search(n.text):
             return GeoMatch("OTHER_PLACE", f"other country {m.group(0)!r}", m.group(0))
         return GeoMatch("NONE", "the city is not named")
+
+    SECTION_MAX_LINES = 40
+
+    def section_place(self, text: str, start: int, scope: DocumentScope | None = None
+                      ) -> GeoMatch | None:
+        """The place of the passage at ``start`` of ``text`` (one page or chunk: context never
+        leaves it) from its local section: the nearest heading or table header above it must
+        itself be CONFIRMED for the city, and nothing from that heading down to the passage's
+        line may name another place (another country or region, a homonym, another listed
+        city) or an uncertain mention. Never looks past that heading. None if it doesn't
+        qualify."""
+        start = max(0, min(start, len(text)))
+        above = text[:start].split("\n")
+        line_now = above[-1] + text[start:].split("\n", 1)[0]
+        prior = above[:-1]
+        body = [line_now]
+        heading = None
+        first = max(0, len(prior) - self.SECTION_MAX_LINES)
+        for i in range(len(prior) - 1, first - 1, -1):
+            nxt = prior[i + 1] if i + 1 < len(prior) else line_now
+            if _section_heading(prior[i], prior[i - 1] if i else "", nxt):
+                heading = prior[i].strip()
+                break
+            body.append(prior[i])
+        if heading is None:
+            return None
+        place = self.match_place(heading, scope)
+        if place.status != "CONFIRMED":
+            return None
+        section = "\n".join(reversed(body))
+        n = self.neutralize(section, scope)
+        if any(d.status in ("HOMONYM", "AMBIGUOUS") for d in n.decisions):
+            return None
+        if self._other_signal(n.text) or (self.gazetteer_city_re is not None
+                                          and self.gazetteer_city_re.search(n.text)):
+            return None
+        return GeoMatch("CONFIRMED", f"section heading {heading[:80]!r} ({place.reason})",
+                        heading[:120])
 
     def names_city(self, text: str, scope: DocumentScope | None = None) -> bool:
         return bool(self.neutralize(text, scope).kept)

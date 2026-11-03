@@ -38,7 +38,8 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "10"  # 10: City + Region + Country identity (geo_match)
+RETRIEVAL_POLICY_VERSION = "11"  # 10: City + Region + Country identity (geo_match)
+# 11: publisher apart from document subject, MIXED documents, AMBIGUOUS foreign mentions
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"

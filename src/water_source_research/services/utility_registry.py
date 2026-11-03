@@ -54,7 +54,8 @@ from water_source_research.services.geo_match import (
     matcher_for,
 )
 
-UTILITY_POLICY_VERSION = "utility-2"  # 2: client vs contractor, untreated water, descriptor names
+UTILITY_POLICY_VERSION = "utility-3"  # 2: client vs contractor, untreated water, descriptor names
+# 3: publisher apart from subject, section context, a missing homonym is not evidence
 GOVERNMENT_TYPES = frozenset({"GOVERNMENT", "REGULATORY"})
 SERVING = frozenset({"SERVES", "SERVES_PART", "SUPPLIES_WHOLESALE"})
 
@@ -417,6 +418,13 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
             doc_places[url] = matcher.match_place(text, d.scope)
         return doc_places[url]
 
+    def section_of(c: EvidenceChunk, sentence: str):
+        """The sentence's place from its local section (heading on the same page/chunk)."""
+        def place():
+            return matcher.section_place(c.text, max(0, c.text.find(sentence)),
+                                         docs[c.url].scope)
+        return place
+
     for c in chunks:
         doc = docs[c.url]
         low = c.text.casefold()
@@ -428,7 +436,8 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
             for s in _SENTENCE.split(c.text):
                 if s.strip() and pattern.search(s):
                     named.add(s)
-                    ev = _classify(s, pattern, cand, doc, c.chunk_id, matcher, doc_place)
+                    ev = _classify(s, pattern, cand, doc, c.chunk_id, matcher, doc_place,
+                                   section_of(c, s))
                     if ev is not None:
                         cand.evidence.append(ev)
         own = owner.get(doc.host, [])
@@ -440,7 +449,8 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
             cand = found[own[0]]
             for s in _SENTENCE.split(c.text):
                 if s.strip() and s not in named and _FIRST_PERSON.search(s):
-                    ev = _classify(s, None, cand, doc, c.chunk_id, matcher, doc_place)
+                    ev = _classify(s, None, cand, doc, c.chunk_id, matcher, doc_place,
+                                   section_of(c, s))
                     if ev is not None and ev.relationship != "MENTION_ONLY":
                         ev.geo_reason = (ev.geo_reason + "; first-person statement on its "
                                          "own site").strip("; ")
@@ -613,11 +623,17 @@ def _builds(sentence: str, pattern: re.Pattern[str] | None) -> bool:
 
 def _classify(sentence: str, pattern: re.Pattern[str] | None, cand: UtilityCandidate,
               doc: _Doc, chunk_id: str, matcher: GeoMatcher,
-              doc_place=None) -> UtilityEvidence | None:
+              doc_place=None, section=None) -> UtilityEvidence | None:
     rest = pattern.sub(" ", sentence) if pattern is not None else sentence
     title = pattern.sub(" ", doc.title or "") if pattern is not None else (doc.title or "")
     place = matcher.match_place(rest, doc.scope, context=title)
-    if place.status == "NONE" and doc_place is not None:
+    if place.status in ("NONE", "AMBIGUOUS") and section is not None:
+        local = section()  # the sentence's own section heading names the city
+        if local is not None:
+            place = local
+    # The whole document's place, for a sentence naming no place, unless the document is a
+    # multi-country one (there only the section decides, above).
+    if place.status == "NONE" and doc_place is not None and doc.scope.country != "MIXED":
         whole = doc_place(doc.url)  # the sentence names no place: the document's place
         if whole.is_target:
             from water_source_research.services.geo_match import GeoMatch
@@ -664,7 +680,7 @@ def _strength(ev: UtilityEvidence, cand: UtilityCandidate, doc: _Doc) -> str:
     # ("the document is about the city") only supports.
     if ev.geo_reason.startswith("the document is about the city"):
         return "SUPPORTING"
-    placed = ev.geo_status == "CONFIRMED" or doc.scope.country == "TARGET"
+    placed = ev.geo_status == "CONFIRMED" or doc.scope.target_country
     if placed and (own or official):
         return "AUTHORITATIVE"
     return "SUPPORTING"

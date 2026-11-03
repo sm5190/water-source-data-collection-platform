@@ -55,7 +55,9 @@ def _place(results: list[SearchResult], city: str | None, country: str | None) -
     if matcher is None:
         return
     for r in results:
-        scope = matcher.host_scope(r.url)
+        # The title/snippet is the subject; the publisher's country alone never puts a
+        # result elsewhere (a report hosted abroad can be about the city).
+        scope = matcher.search_scope(r.url, r.title, r.snippet)
         r.geo_scope = scope.label()
         r.geo_status = matcher.match_place(f"{r.title}. {r.snippet or ''}", scope).status
 

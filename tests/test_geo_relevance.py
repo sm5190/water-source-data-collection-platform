@@ -60,7 +60,9 @@ def test_a_colombian_report_is_not_santiago_evidence(identity_on):
     b = bundle("water_quality_notes", [COLOMBIA])
     assert b.status is ContextStatus.NO_RELEVANT_EVIDENCE
     item = next(i for i in b.items if i.chunk_id == "inca")
-    assert item.geo.startswith("OTHER_COUNTRY")
+    # The text names no country: the Colombian host makes the bare "Santiago" uncertain
+    # (a homonym is listed in Colombia), not proof the report is about Colombia.
+    assert item.geo.startswith("UNKNOWN") and "homonym's country" in item.geo
 
 def test_without_an_identity_the_same_report_still_passes(identity_off):
     b = bundle("water_quality_notes", [COLOMBIA])
