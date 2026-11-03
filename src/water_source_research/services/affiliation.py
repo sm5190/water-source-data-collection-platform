@@ -5,8 +5,8 @@ Deterministic, from the run's stored text and links (acquisition/links.py).
   (``GeoMatcher.official_host``: the identity's official website, or a government-controlled
   suffix spelling the city), independent of the organisation's own host:
   - a sentence there stating that the organisation is a department, division, agency or
-    service of the city ("Toronto Water is a division of the City of Toronto",
-    "Magistratsabteilung 31 – Wiener Wasser"); or
+    service of the city ("X Water is a division of the City of X",
+    "Magistratsabteilung 31 – <utility>"); or
   - a link there to the organisation's own host whose anchor or context names the
     organisation, under a departments/agencies/services heading or list.
 - MUNICIPAL_CANDIDATE (priority only, never authority), from any one of:
