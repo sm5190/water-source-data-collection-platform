@@ -1,0 +1,14 @@
+{
+ "directory": "reports/eval/tokens/replays",
+ "written_at": "2026-11-03T17:34:15+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "comparison.json",
+   "bytes": 69020,
+   "sha256": "b08c96699beb2ae4aee71408d4fcc93ba076729ef9f8f7c538b7655f44f66eec",
+   "modified": "2026-10-29T05:21:14+00:00"
+  }
+ ]
+}

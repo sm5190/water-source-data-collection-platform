@@ -1,0 +1,74 @@
+{
+ "directory": "reports/eval/geo31/phase1",
+ "written_at": "2026-11-03T17:34:14+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "acceptance/acceptance_report.json",
+   "bytes": 48367,
+   "sha256": "2f326fea070dc78db4dfa117c0a8df95d062b532d942edd7982317d310b517da",
+   "modified": "2026-11-03T17:10:47+00:00"
+  },
+  {
+   "path": "counterfactual_acquisition.json",
+   "bytes": 17155,
+   "sha256": "c3ec996265b80b061c1d14c9a8fc1a7657bd55e02a10bc8ef5565393988c4aa6",
+   "modified": "2026-11-03T17:06:06+00:00"
+  },
+  {
+   "path": "counterfactual_acquisition_all.json",
+   "bytes": 54182,
+   "sha256": "3d788a37daed2b3354e02d344b88b5417c2627b4832aaf1886e5748a37f15fd8",
+   "modified": "2026-11-03T17:06:31+00:00"
+  },
+  {
+   "path": "evals/evaluation_180978b1-5448-4728-a5a3-a9abe879c063.json",
+   "bytes": 517801,
+   "sha256": "55f0197990e6f86c4450ce2294267db42603199924260a5e36f36fe8fab91b0c",
+   "modified": "2026-11-03T17:09:27+00:00"
+  },
+  {
+   "path": "evals/evaluation_20e1aa1c-5f30-41b2-97b9-ab4e04e8a501.json",
+   "bytes": 570368,
+   "sha256": "5cb6200892b997afe20c573017e31d8cd28d6d30d397ffdfc01fd4057614653e",
+   "modified": "2026-11-03T17:10:05+00:00"
+  },
+  {
+   "path": "evals/evaluation_815cb826-c4d9-49d8-801a-cd47a3719acc.json",
+   "bytes": 277267,
+   "sha256": "bad02ab09733469d6e1be3936b80e53650b444e54d343d159c906f94c8abe639",
+   "modified": "2026-11-03T17:09:50+00:00"
+  },
+  {
+   "path": "evals/evaluation_976f92aa-55ad-48a9-90cc-63ac4f2cf4f8.json",
+   "bytes": 345764,
+   "sha256": "48464f2d09b4c25b25e39c7e165467fb997ae843ea577a9d4fff5e93bf02fe05",
+   "modified": "2026-11-03T17:09:45+00:00"
+  },
+  {
+   "path": "evals/evaluation_b51ce99b-e6a1-44db-931d-24210c3e8393.json",
+   "bytes": 786053,
+   "sha256": "374d5038fa1b606a02430f8121070de98e55c3d0158bb297f3f4b0714d23b59d",
+   "modified": "2026-11-03T17:10:23+00:00"
+  },
+  {
+   "path": "evals/evaluation_bb489821-3e23-431d-b353-9efb0e8634c5.json",
+   "bytes": 541690,
+   "sha256": "77a1d22ddaac1a42f8c179059543afdc32990efa16457eeab152d594bc6c8229",
+   "modified": "2026-11-03T17:09:38+00:00"
+  },
+  {
+   "path": "evals/evaluation_c8fc9ea2-e96f-4589-bfbe-d681fc38ffc3.json",
+   "bytes": 544675,
+   "sha256": "7ae2a798b9b451c666789630b7ed444ed364f87350661c75f82953cfc905fae8",
+   "modified": "2026-11-03T17:09:21+00:00"
+  },
+  {
+   "path": "evals/evaluation_edd1e77e-ef6c-4474-b736-5fa14de5d1f8.json",
+   "bytes": 602547,
+   "sha256": "32a84088a696ae304b1e5f44e66d384ddc657089bd5e653bda69a41c7b4d8003",
+   "modified": "2026-11-03T17:09:55+00:00"
+  }
+ ]
+}

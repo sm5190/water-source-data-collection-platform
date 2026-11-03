@@ -1,0 +1,275 @@
+{
+ "759d7681-81c8-42e1-8c08-94769c19ef13": {
+  "run_id": "539dc664-d4a2-40bc-a81a-03f3d62b74ad",
+  "counts": {
+   "parent_run_id": "759d7681-81c8-42e1-8c08-94769c19ef13",
+   "claims": 41,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "293e896f-4814-48ef-9dfe-94ea7355076d": {
+  "run_id": "e398f2b4-a262-4e26-a696-2dcd24a9f02c",
+  "counts": {
+   "parent_run_id": "293e896f-4814-48ef-9dfe-94ea7355076d",
+   "claims": 35,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "10cfd3de-d82b-4d2c-a419-15afba05caf5": {
+  "run_id": "2eddb4d8-6611-49ce-8179-22099b3e5a9d",
+  "counts": {
+   "parent_run_id": "10cfd3de-d82b-4d2c-a419-15afba05caf5",
+   "claims": 28,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "90368a4d-7688-44ac-82bb-49d0e3664964": {
+  "run_id": "3c836f2c-1d16-4f97-b238-527c9a86283f",
+  "counts": {
+   "parent_run_id": "90368a4d-7688-44ac-82bb-49d0e3664964",
+   "claims": 22,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "0618af70-5e17-4719-b040-22509451d523": {
+  "run_id": "747428b2-556b-43c5-b32c-3c296378d80d",
+  "counts": {
+   "parent_run_id": "0618af70-5e17-4719-b040-22509451d523",
+   "claims": 15,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "city_name",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "f40356a7037e5d4d7b38d42c"
+     ],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "city_population_millions",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "infrastructure_notes",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "jurisdiction",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "seasonal_uses",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "source_withdrawal_contribution_method",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "total_city_water_withdrawals_m3_day",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "utility_name",
+    "entity_key": "*",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "4780cae2bd108d2ad475d540"
+     ],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "utility_reported_city_population_millions",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_quality_notes",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_quality_year",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_source",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "4559f969d55297b517ce6663"
+     ],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_system",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_transfer_system",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-3"
+    }
+   },
+   {
+    "field_key": "water_type",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "c052daeba50b78c24c3719e9"
+     ],
+     "policy_version": "resolve-3"
+    }
+   }
+  ]
+ },
+ "d0744989-ecfd-4520-a72a-0538833f1f9e": {
+  "run_id": "91e0aa92-826e-474c-9e97-d2571aade245",
+  "counts": {
+   "parent_run_id": "d0744989-ecfd-4520-a72a-0538833f1f9e",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "ff22b6cf-862c-4980-a5ce-72562c22007b": {
+  "run_id": "8412ca1b-ecc4-4a7f-94bc-780cbb9240d8",
+  "counts": {
+   "parent_run_id": "ff22b6cf-862c-4980-a5ce-72562c22007b",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae": {
+  "run_id": "67db99c4-0112-4e82-9318-1b527600d3b2",
+  "counts": {
+   "parent_run_id": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae",
+   "claims": 17,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "0d7d4af8-5d02-49b7-92fb-ee243245ed83": {
+  "run_id": "72aa8899-4a12-4733-9a3b-7085b961a34a",
+  "counts": {
+   "parent_run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ }
+}

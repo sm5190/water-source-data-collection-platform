@@ -1,0 +1,13 @@
+{"dataset": "a7f6cbdea3f4273cc7166229",
+ "code": "7022143 (normalize-3 / resolve-3)",
+ "cities": [
+  {"city": "Houston",   "parent": "759d7681-81c8-42e1-8c08-94769c19ef13", "run": "539dc664-d4a2-40bc-a81a-03f3d62b74ad", "eval": "27c2f913-7fcb-4151-b758-74d3801a61a3"},
+  {"city": "Nairobi",   "parent": "293e896f-4814-48ef-9dfe-94ea7355076d", "run": "e398f2b4-a262-4e26-a696-2dcd24a9f02c", "eval": "8f8b0c20-dc7c-4acb-8525-ef8f730281e3"},
+  {"city": "Vienna",    "parent": "10cfd3de-d82b-4d2c-a419-15afba05caf5", "run": "2eddb4d8-6611-49ce-8179-22099b3e5a9d", "eval": "9430cfa8-0871-49ee-84ed-c162c7e48c1f"},
+  {"city": "Luanda",    "parent": "90368a4d-7688-44ac-82bb-49d0e3664964", "run": "3c836f2c-1d16-4f97-b238-527c9a86283f", "eval": "c69522de-3562-4e23-bfa6-f2b525fca70c"},
+  {"city": "Toronto",   "parent": "0618af70-5e17-4719-b040-22509451d523", "run": "747428b2-556b-43c5-b32c-3c296378d80d", "eval": "645eeefb-e236-49e1-bacf-d0745fc7af8c", "verified_against": "8ad1fa90-cff6-4572-864d-a9997abea332"},
+  {"city": "Madrid",    "parent": "d0744989-ecfd-4520-a72a-0538833f1f9e", "run": "91e0aa92-826e-474c-9e97-d2571aade245", "eval": "57ee659f-cec9-4a22-9f57-537b1309be04"},
+  {"city": "Lisbon",    "parent": "ff22b6cf-862c-4980-a5ce-72562c22007b", "run": "8412ca1b-ecc4-4a7f-94bc-780cbb9240d8", "eval": "d74fdd47-bbae-46c6-8962-406d53ceaa5c"},
+  {"city": "Hyderabad", "parent": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae", "run": "67db99c4-0112-4e82-9318-1b527600d3b2", "eval": "935957bd-2a80-43ad-8787-5c102168d09e"},
+  {"city": "Santiago",  "parent": "0d7d4af8-5d02-49b7-92fb-ee243245ed83", "run": "72aa8899-4a12-4733-9a3b-7085b961a34a", "eval": null, "note": "not in reference dataset a7f6cbde; acceptance changes only"}
+ ]}

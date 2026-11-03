@@ -1,0 +1,1 @@
+Note: the two 'skipped slots with usable claims' (Nairobi country r2, Vienna references r2) are fields pruned in round 1 (catalog / generated) and so never rescheduled; they are filled at assemble. The classification was fixed after this run.

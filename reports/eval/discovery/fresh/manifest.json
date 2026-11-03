@@ -1,0 +1,188 @@
+{
+ "directory": "reports/eval/discovery/fresh",
+ "written_at": "2026-11-03T17:34:14+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "Houston-baseline-1.json",
+   "bytes": 119030,
+   "sha256": "50b82000605181c5c0568343886345ad61292da45602ab2d87592fe78a799e30",
+   "modified": "2026-11-02T04:30:44+00:00"
+  },
+  {
+   "path": "Houston-baseline-2.json",
+   "bytes": 249905,
+   "sha256": "e8f8bcdaac38cbe63287e7791799d552e6b3ea97d35a386c8cb7f528183df13e",
+   "modified": "2026-11-02T04:33:30+00:00"
+  },
+  {
+   "path": "Houston-improved-1.json",
+   "bytes": 189171,
+   "sha256": "91a24c3c9ed9674f7cbc0a666a0b6930a7097a18ab549f135a08a5d74ed943c6",
+   "modified": "2026-11-02T04:31:36+00:00"
+  },
+  {
+   "path": "Houston-improved-1.snapshots.jsonl",
+   "bytes": 234712,
+   "sha256": "3707399a37aa6a4f3a890092c9ebfbc00c3cf9becfbf3c3887994ff559fb2b88",
+   "modified": "2026-11-02T04:31:34+00:00"
+  },
+  {
+   "path": "Houston-improved-2.json",
+   "bytes": 741793,
+   "sha256": "ea0cb029f4ee0b87555ed6b530d4a8c7a7e28fbfd5d92d5eb4e6647172557ca3",
+   "modified": "2026-11-02T04:32:36+00:00"
+  },
+  {
+   "path": "Houston-improved-2.snapshots.jsonl",
+   "bytes": 256150,
+   "sha256": "887b77e98884df7cc7a9e07db4e29376bccfbd05bc93858ceb58112c4581164a",
+   "modified": "2026-11-02T04:32:34+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-baseline-1.json",
+   "bytes": 125806,
+   "sha256": "227a56145d97640723031080b3ce65f0aefb2a1c0322da3d1b0d331f3fd20ce3",
+   "modified": "2026-11-02T04:06:45+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-baseline-2.json",
+   "bytes": 7700,
+   "sha256": "58d5e0d05f5bee43f0212d97cfe2babdafb45afb1cf59dafc3a89c7df97e83e0",
+   "modified": "2026-11-02T04:09:21+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-improved-1.json",
+   "bytes": 28798,
+   "sha256": "6c9c32ac2e7015761a51990704b9c7319a3480ae47841abb2f206adfb78d4257",
+   "modified": "2026-11-02T04:07:53+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-improved-1.snapshots.jsonl",
+   "bytes": 196261,
+   "sha256": "0a96474c4f531405e79edc1dbe6d920e707a8bb14435f1e9fcacea18254d36d2",
+   "modified": "2026-11-02T04:07:53+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-improved-2.json",
+   "bytes": 8800,
+   "sha256": "6aa33a05b27f523c9b3dd0ed3a23108757faf51f7d869cd37c194d12b0fc370e",
+   "modified": "2026-11-02T04:08:37+00:00"
+  },
+  {
+   "path": "invalid_network/Santiago-improved-2.snapshots.jsonl",
+   "bytes": 4381,
+   "sha256": "fd736317d0ebfaf1dba176916ec9bba4ddc5c687c2531bb3b4830da25873b0a0",
+   "modified": "2026-11-02T04:08:37+00:00"
+  },
+  {
+   "path": "Santiago-baseline-1.json",
+   "bytes": 75078,
+   "sha256": "1fd9df9b1863fb451f5feb98b462f7b6ddd8f1232074570451f858c68850b8cf",
+   "modified": "2026-11-02T04:23:42+00:00"
+  },
+  {
+   "path": "Santiago-baseline-2.json",
+   "bytes": 57917,
+   "sha256": "fd6f8b25adf64ba4f022f752d6f7ab2c8932b80d4c9cf6bfd120d066653d4f55",
+   "modified": "2026-11-02T04:29:43+00:00"
+  },
+  {
+   "path": "Santiago-improved-1.json",
+   "bytes": 251843,
+   "sha256": "36ce107f3311d6b9d9af85e46e3050de226ddcbbbab0016c30e3b78cd36e3fc3",
+   "modified": "2026-11-02T04:24:56+00:00"
+  },
+  {
+   "path": "Santiago-improved-1.snapshots.jsonl",
+   "bytes": 296615,
+   "sha256": "bc8832e92a488892d459d4c473b04d373683932b50696b5d10598fafa56e54b9",
+   "modified": "2026-11-02T04:24:45+00:00"
+  },
+  {
+   "path": "Santiago-improved-2.json",
+   "bytes": 160430,
+   "sha256": "0ff6f882dec28cf5c168d197827cf0e21340cbb0044b0213674cd3c27efe7a80",
+   "modified": "2026-11-02T04:26:31+00:00"
+  },
+  {
+   "path": "Santiago-improved-2.snapshots.jsonl",
+   "bytes": 248677,
+   "sha256": "e13d2c19930685a114f360676aced3150fa3236e603b5aebc859520e2c8362a7",
+   "modified": "2026-11-02T04:26:13+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-baseline-1.json",
+   "bytes": 130046,
+   "sha256": "07eba9bb692266a848ac9dde5d206b944110076194d192180150cbf8f9c3990e",
+   "modified": "2026-11-02T04:11:31+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-baseline-2.json",
+   "bytes": 129395,
+   "sha256": "43bcde2e16a02181eede173a5b77182fe8965c3dde9c4bee84f3db37ab39c264",
+   "modified": "2026-11-02T04:14:53+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-improved-1.json",
+   "bytes": 209035,
+   "sha256": "dfd68cb89c58b981e3e81868621f952f020ddf831e484d7820b55265e8d6e46e",
+   "modified": "2026-11-02T04:12:23+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-improved-1.snapshots.jsonl",
+   "bytes": 256611,
+   "sha256": "9fad43af1225b3938bd78dfec75d34204374d0fb9e6d90726fda20a903e60061",
+   "modified": "2026-11-02T04:12:07+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-improved-2.json",
+   "bytes": 235748,
+   "sha256": "07447acba5b2331158a0326bb19101a296cd7dd390256b1daa3048053c9c7b25",
+   "modified": "2026-11-02T04:13:45+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Houston-improved-2.snapshots.jsonl",
+   "bytes": 250135,
+   "sha256": "22ae4efc9bfda3b2ee265760cc76ad519fc3a17d011862ed04cea6c0c39f87b4",
+   "modified": "2026-11-02T04:13:21+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-baseline-1.json",
+   "bytes": 165368,
+   "sha256": "41d86d5a7be1cef302c3af1722584e3a85bf644be9b0dd8faca90f95703d98bd",
+   "modified": "2026-11-02T04:16:27+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-baseline-2.json",
+   "bytes": 138696,
+   "sha256": "1e9fb6db3cb229641c12ec327f1b897af6c4264c64ff61d1dbd654bbd26a112d",
+   "modified": "2026-11-02T04:19:31+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-improved-1.json",
+   "bytes": 216106,
+   "sha256": "07f42d752be577f6a931350c40a6105a38b05f3cfa17edf2c76eb09c7b61120c",
+   "modified": "2026-11-02T04:17:43+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-improved-1.snapshots.jsonl",
+   "bytes": 308091,
+   "sha256": "53301ff46eed3e508a825bef26d6d7df617d37d07683b6753465513f95bfd84d",
+   "modified": "2026-11-02T04:17:39+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-improved-2.json",
+   "bytes": 172037,
+   "sha256": "2bd13c6438380e266ea6e8cee94d65399eedf6eb3e7d6b2e858cbe4a59730cd5",
+   "modified": "2026-11-02T04:18:40+00:00"
+  },
+  {
+   "path": "superseded_registry_bug/Santiago-improved-2.snapshots.jsonl",
+   "bytes": 318313,
+   "sha256": "2cfce6757d6fe5c7ad4bd84729bb76f8b4786b827d87b55b05c107ff46e0889f",
+   "modified": "2026-11-02T04:18:35+00:00"
+  }
+ ]
+}

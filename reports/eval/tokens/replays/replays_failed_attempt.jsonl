@@ -1,0 +1,3 @@
+{"condition": "baseline", "repeat": 1, "city": "Santiago", "parent": "0d7d4af8-5d02-49b7-92fb-ee243245ed83", "run_id": "", "exit": 1, "seconds": 7}
+{"condition": "baseline", "repeat": 1, "city": "Nairobi", "parent": "f622ab6a-06d8-494f-afc9-8415e8bb751a", "run_id": "", "exit": 1, "seconds": 7}
+{"note": "interrupted optimized Santiago replay 06a014a3-27b1-45e0-ab7f-7bb2b6dd2b04 (driver stopped after a baseline setup error); partial rows, no job row; excluded"}

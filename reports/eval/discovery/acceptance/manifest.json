@@ -1,0 +1,20 @@
+{
+ "directory": "reports/eval/discovery/acceptance",
+ "written_at": "2026-11-03T17:34:13+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "draft/acceptance_report.json",
+   "bytes": 49687,
+   "sha256": "2b11b9fd740ecf4861bd44f9b02dd6339a7c8ca7c702e08a44dd02af1d8366bc",
+   "modified": "2026-11-02T04:03:21+00:00"
+  },
+  {
+   "path": "off/acceptance_report.json",
+   "bytes": 51455,
+   "sha256": "07b721ea344e55d131be657a176a62f2ba678274849b123e55c91850ea1050e1",
+   "modified": "2026-11-02T04:03:16+00:00"
+  }
+ ]
+}

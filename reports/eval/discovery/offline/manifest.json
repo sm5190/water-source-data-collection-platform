@@ -1,0 +1,20 @@
+{
+ "directory": "reports/eval/discovery/offline",
+ "written_at": "2026-11-03T17:34:14+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "discovery_eval_draft.json",
+   "bytes": 1069969,
+   "sha256": "3b88343142d3910cfe75f28fc3316c46ea1587b71cbc2bc3fe8f97a831757e9a",
+   "modified": "2026-11-02T03:49:43+00:00"
+  },
+  {
+   "path": "discovery_eval_off.json",
+   "bytes": 1067191,
+   "sha256": "c46d25fa47b18c4086b1bac9ef05ccd731819be7624c2b6a96dfa3ade673213d",
+   "modified": "2026-11-02T03:48:17+00:00"
+  }
+ ]
+}

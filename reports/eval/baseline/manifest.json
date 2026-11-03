@@ -1,0 +1,50 @@
+{
+ "directory": "reports/eval/baseline",
+ "written_at": "2026-11-03T17:34:13+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "evaluation_27242834-ad25-4c1a-aba8-1f45637cb828.json",
+   "bytes": 843878,
+   "sha256": "222a775718cdf90cc8a173abf9497a9a84420867405daf3a67dd010204b00001",
+   "modified": "2026-10-26T01:02:38+00:00"
+  },
+  {
+   "path": "evaluation_34a5b09e-6f6d-4c9d-a5cd-d8853789aaf9.json",
+   "bytes": 338884,
+   "sha256": "eeeaa5c2dbe950952e169d9f00d98e08da7d04ae93d7a7682522741619f4c6b3",
+   "modified": "2026-10-26T01:42:33+00:00"
+  },
+  {
+   "path": "evaluation_35cfcf17-d84d-4d9e-9dc8-0820220b5316.json",
+   "bytes": 616129,
+   "sha256": "83b59ac9e68c3e25033487760231c8608c7d3e6f754d8e94d17b842d36ef2700",
+   "modified": "2026-10-26T01:43:52+00:00"
+  },
+  {
+   "path": "evaluation_4979fde1-399f-43d6-a02d-eb2c62af90f0.json",
+   "bytes": 940289,
+   "sha256": "98ca8f9558b6e38529e19d41e535f4a3d715fdab5732fe1a4f53d35851af0072",
+   "modified": "2026-10-26T00:54:51+00:00"
+  },
+  {
+   "path": "evaluation_cdeade22-ec8a-4041-a968-5be3e70f5ca2.json",
+   "bytes": 660369,
+   "sha256": "8413d8d26346e72a3a216388584c95c7c7b8e13c7eb496bd6e30833398410a92",
+   "modified": "2026-10-26T01:48:10+00:00"
+  },
+  {
+   "path": "evaluation_d0e5063f-c6b6-46ff-a24f-690561a0c41f.json",
+   "bytes": 503751,
+   "sha256": "2fc66251afe9ab678c3b3c78b31c355feb6880d0d932f2fd4eb4064f3511d0f5",
+   "modified": "2026-10-26T00:51:31+00:00"
+  },
+  {
+   "path": "evaluation_d43e9262-7e41-4e92-a1ae-27479b6f0f6b.json",
+   "bytes": 686521,
+   "sha256": "5ee847b39e78ce0d941766ddd3c3512792669c1e560fe6da77518cdade6bbeb5",
+   "modified": "2026-10-26T01:01:14+00:00"
+  }
+ ]
+}

@@ -1,0 +1,919 @@
+{
+ "759d7681-81c8-42e1-8c08-94769c19ef13": {
+  "run_id": "b15b238d-c1a2-41bc-bccf-f80108fcba41",
+  "counts": {
+   "parent_run_id": "759d7681-81c8-42e1-8c08-94769c19ef13",
+   "claims": 41,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.waterutility.ai/utilities/texas",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.leadingutilities.org/members/houston-water",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.waterworld.com/drinking-water-treatment/distribution/press-release/14279752/mccarthy-completes-houston-intake-pump-station",
+     "from": "REGULATORY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://geopub.epa.gov/DWWidgetApp/",
+     "from": "REGULATORY",
+     "to": "GOVERNMENT"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "city_population_millions",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "c8c300af78d51e77b53fb1cc"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_DESIGNATED_SOURCE",
+      "WARN_DESIGNATED_SOURCE_MISSING"
+     ]
+    }
+   },
+   {
+    "field_key": "city_population_reference_year",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "ab432e12d7c5c7a1f9fd5432"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_DESIGNATED_SOURCE",
+      "NOT_ESTABLISHED_YEAR_LINKED",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_DESIGNATED_SOURCE_MISSING",
+      "WARN_YEAR_NOT_LINKED"
+     ]
+    }
+   },
+   {
+    "field_key": "jurisdiction",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "23a6dd8ad4da141b9ca2f469"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_JURISDICTION_LEVEL",
+      "WARN_JURISDICTION_LEVEL"
+     ]
+    }
+   },
+   {
+    "field_key": "population_served_millions",
+    "entity_key": "groundwater",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "4df5ebac36e2ea1f50ae26f8"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_name",
+    "entity_key": "groundwater",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "e638b727a33614f28456b2ca"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_reported_city_population_reference_year",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "de25cda168ff8fed06984aa0"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_YEAR_LINKED",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_YEAR_NOT_LINKED"
+     ]
+    }
+   },
+   {
+    "field_key": "water_quality_year",
+    "entity_key": "eutaw aquifer",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "8f6c0b78fa4f7a58fa01e314"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "PARENT_NOT_ACCEPTED",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "PARENT_NOT_ACCEPTED"
+     ]
+    }
+   }
+  ]
+ },
+ "293e896f-4814-48ef-9dfe-94ea7355076d": {
+  "run_id": "c40d9e51-a799-4b1f-af45-44fdef40cde6",
+  "counts": {
+   "parent_run_id": "293e896f-4814-48ef-9dfe-94ea7355076d",
+   "claims": 35,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "source_withdrawal_contribution_year",
+    "entity_key": "groundwater",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "50a3717c96a26bfee6170efd"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "PARENT_NOT_ACCEPTED",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "PARENT_NOT_ACCEPTED"
+     ]
+    }
+   }
+  ]
+ },
+ "10cfd3de-d82b-4d2c-a419-15afba05caf5": {
+  "run_id": "8afa413d-086b-495b-8caa-fccaff4d27e1",
+  "counts": {
+   "parent_run_id": "10cfd3de-d82b-4d2c-a419-15afba05caf5",
+   "claims": 28,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.leadingutilities.org/members/vienna-water",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.borealisgroup.com/storage/Company/About-Borealis/Annual-Report/Borealis-Group-Annual-Report-2025-EN.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.icpdr.org/sites/default/files/2024-01/ICPDR_Annual-Report-2022_accessible_LNF.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.oe-eb.at/dam/jcr:79df32b5-9322-47be-8226-44ca50dcef1c/OeEB-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://openknowledge.worldbank.org/entities/publication/c5786509-9fb9-48ca-bea2-d1a8c9134816",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.verbund.com/media/hq2nhfvp/verbund-annual-financial-report-2025-englisch.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "city_population_millions",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "fed12c3f93d7a4b52280d645"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_DESIGNATED_SOURCE",
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "WARN_DESIGNATED_SOURCE_MISSING",
+      "WARN_MEASUREMENT_YEAR"
+     ]
+    }
+   },
+   {
+    "field_key": "total_city_water_withdrawals_m3_day",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "33c63a6bd9c597b5a01c2f59"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_FRESHNESS",
+      "NOT_ESTABLISHED_MEASUREMENT_TYPE",
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "WARN_FRESHNESS_UNKNOWN",
+      "WARN_MEASUREMENT_TYPE_MISMATCH",
+      "WARN_MEASUREMENT_YEAR"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_name",
+    "entity_key": "*",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "9f6bccf4a8874f6067fe6744"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_reported_city_population_millions",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "f41c940d4d863420b259a2e5"
+     ],
+     "policy_version": "resolve-3",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_MEASUREMENT_TERM",
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "NOT_ESTABLISHED_UTILITY_SERVES_CITY",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_MEASUREMENT_TERM",
+      "WARN_MEASUREMENT_YEAR",
+      "WARN_UTILITY_SERVICE_NOT_STATED"
+     ]
+    }
+   }
+  ]
+ },
+ "90368a4d-7688-44ac-82bb-49d0e3664964": {
+  "run_id": "c155dc4b-de33-498c-abdf-289fddf8e94b",
+  "counts": {
+   "parent_run_id": "90368a4d-7688-44ac-82bb-49d0e3664964",
+   "claims": 22,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.worldwater.org/conflict/list/",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://wp-afentra-2025.s3.eu-west-2.amazonaws.com/media/2026/05/Afentra-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.eni.com/content/dam/enicom/documents/eng/reports/2025/ar-2025/Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "0618af70-5e17-4719-b040-22509451d523": {
+  "run_id": "d5ee3b46-c533-41a7-80db-30811866f125",
+  "counts": {
+   "parent_run_id": "0618af70-5e17-4719-b040-22509451d523",
+   "claims": 15,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "city_name",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "f40356a7037e5d4d7b38d42c"
+     ],
+     "policy_version": "resolve-5",
+     "reasons": []
+    }
+   },
+   {
+    "field_key": "city_population_millions",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_DESIGNATED_SOURCE",
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_APPROXIMATE_VALUE",
+      "WARN_DESIGNATED_SOURCE_MISSING",
+      "WARN_GEOGRAPHIC_SCOPE",
+      "WARN_MEASUREMENT_YEAR"
+     ]
+    }
+   },
+   {
+    "field_key": "infrastructure_notes",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "REVIEW_ALWAYS"
+     ]
+    }
+   },
+   {
+    "field_key": "jurisdiction",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE"
+     ]
+    }
+   },
+   {
+    "field_key": "seasonal_uses",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "REVIEW_ALWAYS"
+     ]
+    }
+   },
+   {
+    "field_key": "source_withdrawal_contribution_method",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "VALUE_NOT_VERIFIED",
+      "WARN_VALUE_IN_QUOTE"
+     ]
+    }
+   },
+   {
+    "field_key": "total_city_water_withdrawals_m3_day",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_FRESHNESS",
+      "NOT_ESTABLISHED_MEASUREMENT_TYPE",
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_APPROXIMATE_VALUE",
+      "WARN_FRESHNESS_UNKNOWN",
+      "WARN_MEASUREMENT_BASIS",
+      "WARN_MEASUREMENT_TYPE_MISMATCH",
+      "WARN_MEASUREMENT_YEAR"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_name",
+    "entity_key": "*",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "4780cae2bd108d2ad475d540"
+     ],
+     "policy_version": "resolve-5",
+     "reasons": []
+    }
+   },
+   {
+    "field_key": "utility_reported_city_population_millions",
+    "entity_key": "city",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_MEASUREMENT_YEAR",
+      "WARN_APPROXIMATE_VALUE",
+      "WARN_GEOGRAPHIC_SCOPE",
+      "WARN_MEASUREMENT_YEAR"
+     ]
+    }
+   },
+   {
+    "field_key": "water_quality_notes",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "REVIEW_ALWAYS"
+     ]
+    }
+   },
+   {
+    "field_key": "water_quality_year",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE",
+      "WARN_YEAR_NOT_LINKED"
+     ]
+    }
+   },
+   {
+    "field_key": "water_source",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "4559f969d55297b517ce6663"
+     ],
+     "policy_version": "resolve-5",
+     "reasons": []
+    }
+   },
+   {
+    "field_key": "water_system",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "REVIEW_ALWAYS"
+     ]
+    }
+   },
+   {
+    "field_key": "water_transfer_system",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "REVIEW_ALWAYS"
+     ]
+    }
+   },
+   {
+    "field_key": "water_type",
+    "entity_key": "lake ontario",
+    "before": null,
+    "after": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "c052daeba50b78c24c3719e9"
+     ],
+     "policy_version": "resolve-5",
+     "reasons": []
+    }
+   }
+  ]
+ },
+ "d0744989-ecfd-4520-a72a-0538833f1f9e": {
+  "run_id": "2a3cb248-c475-48a6-9c05-212c986e3a3e",
+  "counts": {
+   "parent_run_id": "d0744989-ecfd-4520-a72a-0538833f1f9e",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.leadingutilities.org/members/canal-de-isabel-ii",
+     "from": "UTILITY",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "city_name",
+    "entity_key": "city",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "39e2178a6f7b1002ebb86af3"
+     ],
+     "policy_version": "resolve-1",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE"
+     ]
+    }
+   },
+   {
+    "field_key": "utility_name",
+    "entity_key": "*",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "93bcf4bf11eba607bea815b2"
+     ],
+     "policy_version": "resolve-1",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NOT_ESTABLISHED_UTILITY_SERVES_CITY",
+      "NO_OFFICIAL_SOURCE",
+      "WARN_UTILITY_SERVICE_NOT_STATED"
+     ]
+    }
+   }
+  ]
+ },
+ "ff22b6cf-862c-4980-a5ce-72562c22007b": {
+  "run_id": "6ab3ad01-6398-4345-8838-937c21561f80",
+  "counts": {
+   "parent_run_id": "ff22b6cf-862c-4980-a5ce-72562c22007b",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://economy-finance.ec.europa.eu/economic-surveillance-eu-member-states/country-pages-including-country-reports/country-report-portugal_en",
+     "from": "GOVERNMENT",
+     "to": "REGULATORY"
+    },
+    {
+     "url": "https://cityoflisbon.net/wp-content/uploads/2025/06/Lisbon-2024-CCR.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://cityoflisbon.net/wp-content/uploads/2024/05/CCREPORT23.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://www.epal.pt/EPAL/en/menu/epal/publications/water-quality-report",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://edp.com/sites/default/files/document/2025-06/IntegratedAnnualReport2024_Unofficial%20Version_Unaudited_0.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.typsa.com/wp-content/uploads/InformeAnual_2026_EN.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://mowi.com/wp-content/uploads/2025/05/Mowi-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae": {
+  "run_id": "30340722-fb1d-4b7a-a686-c5a36d8dd667",
+  "counts": {
+   "parent_run_id": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae",
+   "claims": 17,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.deccanchronicle.com/southern-states/telangana/water-board-prepares-master-plan-for-2047-1896895",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://hydnews.net/hyderabad-water-quality-report-2026/",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.wabag.com/wp-content/uploads/2026/07/Annual-Report-2026.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.varunbeverages.com/Annual-Report-FY-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "b844390c-4e71-4635-8433-dc6122779573": {
+  "run_id": "f2098ded-dcef-4936-b173-2f77c786468b",
+  "counts": {
+   "parent_run_id": "b844390c-4e71-4635-8433-dc6122779573",
+   "claims": 16,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "b13e0d1d-aa03-471b-be3b-b63c93ceba9d": {
+  "run_id": "2ba9c6ac-5118-4037-8f3b-038ced0f80e3",
+  "counts": {
+   "parent_run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+   "claims": 22,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": [
+   {
+    "field_key": "water_source",
+    "entity_key": "trinity river",
+    "before": {
+     "status": "RESOLVED",
+     "rule": "AUTO_STRICT",
+     "selected": [
+      "c4d5ebba7c96711bb5580649"
+     ],
+     "policy_version": "resolve-5",
+     "reasons": []
+    },
+    "after": {
+     "status": "HITL_REQUIRED",
+     "rule": "STRICT_NOT_MET",
+     "selected": [],
+     "policy_version": "resolve-5",
+     "reasons": [
+      "NO_OFFICIAL_SOURCE",
+      "WARN_UTILITY_RELATIONSHIP_UNVERIFIED"
+     ]
+    }
+   }
+  ]
+ },
+ "21b46e42-5dc5-41fd-ad97-6f0db36a40cb": {
+  "run_id": "7b5756ec-1932-46af-9542-f39990e188f9",
+  "counts": {
+   "parent_run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+   "claims": 29,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "6f48e458-0700-489f-ab50-d50aa1f2a81f": {
+  "run_id": "008b4383-8a08-4d46-b79b-5ba065b81aeb",
+  "counts": {
+   "parent_run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+   "claims": 20,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "707df87b-b086-47f8-8e00-a925bf93ac21": {
+  "run_id": "a4932af7-af09-483a-9f86-f340b9d2d817",
+  "counts": {
+   "parent_run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+   "claims": 5,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "d26a016b-3bed-4a4d-ae64-036ade81f70a": {
+  "run_id": "306e7c00-4754-4dd9-b555-51ef6d0465fd",
+  "counts": {
+   "parent_run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+   "claims": 26,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.toronto.ca/wp-content/uploads/2026/03/9568-2026-Public-Book-TW-V1.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://www.toronto.ca/wp-content/uploads/2026/02/935d-2025-Drinking-Water-System-Annual-Report.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://www.toronto.ca/wp-content/uploads/2025/02/955d-Toronto-Drinking-Water-System-Annual-Report-2024AODA.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ },
+ "b617e84b-3370-4227-9a32-f2d7754e4095": {
+  "run_id": "148f57cf-2a06-4e71-acfa-db710beb14df",
+  "counts": {
+   "parent_run_id": "b617e84b-3370-4227-9a32-f2d7754e4095",
+   "claims": 23,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE",
+  "differences": []
+ }
+}

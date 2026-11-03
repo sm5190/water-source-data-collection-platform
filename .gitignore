@@ -10,3 +10,23 @@ data/raw/
 data/processed/
 .mypy_cache/
 logs/
+
+# --- Private reference data: never committed ---
+resources/
+
+# --- Generated evaluation outputs: kept locally, listed in each directory's manifest.json ---
+reports/**/*.json
+reports/**/*.jsonl
+reports/**/*.log
+reports/**/*.generated.md
+# small reproducibility manifests (run ids, inputs) stay tracked
+!reports/**/manifest.json
+!reports/**/before.json
+!reports/**/after.json
+!reports/**/baseline.json
+!reports/**/revalidation.json
+!reports/**/*_revalidation.json
+!reports/**/m3_*.json
+!reports/**/pairs.json
+!reports/**/replays*.jsonl
+!reports/replay_runs.log

@@ -1,0 +1,9 @@
+[
+ {"city": "Santiago", "before": "0d7d4af8-5d02-49b7-92fb-ee243245ed83", "after": "b844390c-4e71-4635-8433-dc6122779573", "reference": false},
+ {"city": "Houston", "before": "993b3415-69f3-4665-8ec0-f04dbda26ae8", "after": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d"},
+ {"city": "Nairobi", "before": "f622ab6a-06d8-494f-afc9-8415e8bb751a", "after": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb"},
+ {"city": "Vienna", "before": "e800f614-3caf-42e5-9f13-cea0f04973fa", "after": "6f48e458-0700-489f-ab50-d50aa1f2a81f"},
+ {"city": "Luanda", "before": "80aafe20-306b-4344-b8c0-5e90891678aa", "after": "707df87b-b086-47f8-8e00-a925bf93ac21"},
+ {"city": "Toronto", "before": "0618af70-5e17-4719-b040-22509451d523", "after": "d26a016b-3bed-4a4d-ae64-036ade81f70a"},
+ {"city": "Hyderabad", "before": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae", "after": "b617e84b-3370-4227-9a32-f2d7754e4095"}
+]

@@ -1,0 +1,222 @@
+{
+ "759d7681-81c8-42e1-8c08-94769c19ef13": {
+  "run_id": "2b872a65-4bb6-4e5e-903f-d4fe24bd6002",
+  "counts": {
+   "parent_run_id": "759d7681-81c8-42e1-8c08-94769c19ef13",
+   "claims": 41,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.waterutility.ai/utilities/texas",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.leadingutilities.org/members/houston-water",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.waterworld.com/drinking-water-treatment/distribution/press-release/14279752/mccarthy-completes-houston-intake-pump-station",
+     "from": "REGULATORY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://geopub.epa.gov/DWWidgetApp/",
+     "from": "REGULATORY",
+     "to": "GOVERNMENT"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "293e896f-4814-48ef-9dfe-94ea7355076d": {
+  "run_id": "2e8d87c7-1b1b-472b-a749-839cd2f59b1c",
+  "counts": {
+   "parent_run_id": "293e896f-4814-48ef-9dfe-94ea7355076d",
+   "claims": 35,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE"
+ },
+ "10cfd3de-d82b-4d2c-a419-15afba05caf5": {
+  "run_id": "7e1add7e-7071-420a-8493-7a4334304def",
+  "counts": {
+   "parent_run_id": "10cfd3de-d82b-4d2c-a419-15afba05caf5",
+   "claims": 28,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.leadingutilities.org/members/vienna-water",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.borealisgroup.com/storage/Company/About-Borealis/Annual-Report/Borealis-Group-Annual-Report-2025-EN.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.icpdr.org/sites/default/files/2024-01/ICPDR_Annual-Report-2022_accessible_LNF.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.oe-eb.at/dam/jcr:79df32b5-9322-47be-8226-44ca50dcef1c/OeEB-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://openknowledge.worldbank.org/entities/publication/c5786509-9fb9-48ca-bea2-d1a8c9134816",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.verbund.com/media/hq2nhfvp/verbund-annual-financial-report-2025-englisch.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "90368a4d-7688-44ac-82bb-49d0e3664964": {
+  "run_id": "a43a1ab1-1547-4407-a454-30a28ade30a0",
+  "counts": {
+   "parent_run_id": "90368a4d-7688-44ac-82bb-49d0e3664964",
+   "claims": 22,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.worldwater.org/conflict/list/",
+     "from": "UTILITY",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://wp-afentra-2025.s3.eu-west-2.amazonaws.com/media/2026/05/Afentra-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.eni.com/content/dam/enicom/documents/eng/reports/2025/ar-2025/Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "0618af70-5e17-4719-b040-22509451d523": {
+  "run_id": "e5ae4cde-0104-453e-8cd0-af305ef5cb6b",
+  "counts": {
+   "parent_run_id": "0618af70-5e17-4719-b040-22509451d523",
+   "claims": 15,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE"
+ },
+ "d0744989-ecfd-4520-a72a-0538833f1f9e": {
+  "run_id": "86a66218-dbd2-41e5-a768-65dd309bb749",
+  "counts": {
+   "parent_run_id": "d0744989-ecfd-4520-a72a-0538833f1f9e",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.leadingutilities.org/members/canal-de-isabel-ii",
+     "from": "UTILITY",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "ff22b6cf-862c-4980-a5ce-72562c22007b": {
+  "run_id": "f947fc5c-21a5-4c20-afb0-2b58c88715d5",
+  "counts": {
+   "parent_run_id": "ff22b6cf-862c-4980-a5ce-72562c22007b",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://economy-finance.ec.europa.eu/economic-surveillance-eu-member-states/country-pages-including-country-reports/country-report-portugal_en",
+     "from": "GOVERNMENT",
+     "to": "REGULATORY"
+    },
+    {
+     "url": "https://cityoflisbon.net/wp-content/uploads/2025/06/Lisbon-2024-CCR.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://cityoflisbon.net/wp-content/uploads/2024/05/CCREPORT23.pdf",
+     "from": "TECHNICAL",
+     "to": "GOVERNMENT"
+    },
+    {
+     "url": "https://www.epal.pt/EPAL/en/menu/epal/publications/water-quality-report",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://edp.com/sites/default/files/document/2025-06/IntegratedAnnualReport2024_Unofficial%20Version_Unaudited_0.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.typsa.com/wp-content/uploads/InformeAnual_2026_EN.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://mowi.com/wp-content/uploads/2025/05/Mowi-Annual-Report-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae": {
+  "run_id": "00239269-9481-4833-a51f-04c34d44558f",
+  "counts": {
+   "parent_run_id": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae",
+   "claims": 17,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": [
+    {
+     "url": "https://www.wabag.com/wp-content/uploads/2026/07/Annual-Report-2026.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    },
+    {
+     "url": "https://www.varunbeverages.com/Annual-Report-FY-2025.pdf",
+     "from": "TECHNICAL",
+     "to": "OTHER"
+    }
+   ]
+  },
+  "completion": "INCOMPLETE"
+ },
+ "0d7d4af8-5d02-49b7-92fb-ee243245ed83": {
+  "run_id": "b3dd1f6c-b738-4d9e-96e2-e313d3e80a73",
+  "counts": {
+   "parent_run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+   "claims": 7,
+   "excluded_corrected": 0,
+   "unknown_field": 0,
+   "reclassified": []
+  },
+  "completion": "INCOMPLETE"
+ }
+}

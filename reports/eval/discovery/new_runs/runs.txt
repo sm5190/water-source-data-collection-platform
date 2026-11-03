@@ -1,0 +1,7 @@
+b844390c-4e71-4635-8433-dc6122779573 Santiago QUEUED created
+b13e0d1d-aa03-471b-be3b-b63c93ceba9d Houston QUEUED created
+21b46e42-5dc5-41fd-ad97-6f0db36a40cb Nairobi QUEUED created
+6f48e458-0700-489f-ab50-d50aa1f2a81f Vienna QUEUED created
+707df87b-b086-47f8-8e00-a925bf93ac21 Luanda QUEUED created
+d26a016b-3bed-4a4d-ae64-036ade81f70a Toronto QUEUED created
+b617e84b-3370-4227-9a32-f2d7754e4095 Hyderabad QUEUED created

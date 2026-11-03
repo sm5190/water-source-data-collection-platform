@@ -1,0 +1,86 @@
+{
+ "directory": "reports/eval/discovery/new_runs",
+ "written_at": "2026-11-03T17:34:14+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "comparison.json",
+   "bytes": 8990,
+   "sha256": "dc96bf593a0195d17b708051ac1ce7744d5b0d95d8ea1b496524e46e3e3b34ab",
+   "modified": "2026-11-02T05:23:41+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_1bd489ee-ccf0-468c-8227-9859a8d9c261.json",
+   "bytes": 466387,
+   "sha256": "0189dd40e665cd939fc3f530bfad70b00fe220841ce6b669fbdfeafab0af642d",
+   "modified": "2026-11-02T05:05:01+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_21562673-dc64-4ede-9e62-2ab07b27d50b.json",
+   "bytes": 478228,
+   "sha256": "8bd3ab76aec031d53c9d70c1024375fc96796fe651bcc1824c2b3a4c6bb92436",
+   "modified": "2026-11-02T05:08:04+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_2d201fc9-8712-443b-8172-d47a6441ff56.json",
+   "bytes": 307485,
+   "sha256": "637576e1a88b7f5add83160f72fdfdd6a0a788bd5e46a6f38c1b45646f8da0d5",
+   "modified": "2026-11-02T05:14:52+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_3784cc6f-74bf-4da0-9d7b-914dc541e2f6.json",
+   "bytes": 530234,
+   "sha256": "5883efb7ead0c60754c8f7ef4276d6e25192d6805116078c3479abdacda89348",
+   "modified": "2026-11-02T05:08:14+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_4fc73334-c8a1-486e-991b-77ed34d286a6.json",
+   "bytes": 233584,
+   "sha256": "98d55fb648d2e2642652470e031c9169b6d21cac179202f16fdf1565d23282f7",
+   "modified": "2026-11-02T05:15:43+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_6b5914e6-8bd6-417b-82bd-683d2f309a13.json",
+   "bytes": 330479,
+   "sha256": "294ba5f3cf931835fddc101dd19d5e56924e6bc23ea60d3eae1eafe13f2f70a1",
+   "modified": "2026-11-02T05:17:24+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_78ae3606-28d8-4c6a-9277-1d7719438f14.json",
+   "bytes": 784420,
+   "sha256": "d84ed7547691bbf4634d0f58734334d99e94d834ac29eff9045be899e4fedf96",
+   "modified": "2026-11-02T05:20:04+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_7d14c1b8-5c78-479b-8e0a-2f6e70c3f51e.json",
+   "bytes": 203248,
+   "sha256": "ddf2ff379bf6f828632b7b9e785f18ebc8cc753f1401b43e10871546a74324a5",
+   "modified": "2026-11-02T05:15:47+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_933db9b3-e2be-4fb5-b1a1-dac1af4f3b8e.json",
+   "bytes": 447725,
+   "sha256": "4edb1cdcfb79cea463cb72303238d3f0774672b60f1f87ded0efa669cfc9f93f",
+   "modified": "2026-11-02T05:06:13+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_b5e8df47-3d02-438c-941f-4aa5b8d07dee.json",
+   "bytes": 743404,
+   "sha256": "c29b942adfa7313e36d5758f36d834eff36091926383aea252d008784db7f4a5",
+   "modified": "2026-11-02T05:23:40+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_c15d68ec-01b7-4dce-9eb0-d1e58144f55d.json",
+   "bytes": 472801,
+   "sha256": "e597ac521502e603d381f5bcb4bd41cc2833eb3999c22a69fa54372a907698a8",
+   "modified": "2026-11-02T05:06:20+00:00"
+  },
+  {
+   "path": "evaluations/evaluation_f281df98-8055-48e7-b316-868be303c142.json",
+   "bytes": 564866,
+   "sha256": "d890cbcdfd31942fca29ffc7b48aa4df70dd0f1607947adffef49f6ebb978668",
+   "modified": "2026-11-02T05:14:45+00:00"
+  }
+ ]
+}

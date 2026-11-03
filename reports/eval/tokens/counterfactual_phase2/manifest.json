@@ -1,0 +1,14 @@
+{
+ "directory": "reports/eval/tokens/counterfactual_phase2",
+ "written_at": "2026-11-03T17:34:15+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "counterfactual.json",
+   "bytes": 42672,
+   "sha256": "18b45edd1ad8584c51e08c1d82e514e9ca5f9eab28cb3e7c72c016be92f976c8",
+   "modified": "2026-10-29T04:01:45+00:00"
+  }
+ ]
+}

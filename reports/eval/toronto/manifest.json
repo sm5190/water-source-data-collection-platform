@@ -1,0 +1,44 @@
+{
+ "directory": "reports/eval/toronto",
+ "written_at": "2026-11-03T17:34:15+00:00",
+ "git_commit": "0d04159",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "evaluation_35d77974-6b72-42a1-82b4-2498af10cbd9.json",
+   "bytes": 262757,
+   "sha256": "3b806f4a44720255c9b5d34fc3eb8684818cffce6f64a93855e371bee41be828",
+   "modified": "2026-10-26T00:30:16+00:00"
+  },
+  {
+   "path": "evaluation_b81084be-3c4b-4ac4-9b9d-ca4b97941483.json",
+   "bytes": 368673,
+   "sha256": "c60ae762e70266c25bc4ecf8cc2c14c73fb48e42d121af91dc269136f764c4e2",
+   "modified": "2026-10-26T01:15:01+00:00"
+  },
+  {
+   "path": "evaluation_c4c68f1b-9bb9-4d26-b45b-19205332abd6.json",
+   "bytes": 186994,
+   "sha256": "dd49c7a41d8b3e769f74dbd4c9f9c68ca9836ac5c5c569330954498948db99cc",
+   "modified": "2026-10-19T14:47:24+00:00"
+  },
+  {
+   "path": "evaluation_e5cd1005-da86-4887-b703-d61e93b31ab3.json",
+   "bytes": 363076,
+   "sha256": "58267c57a3024527cefeeb16916b172344ffeef8734eaa508a1659cdc620eb45",
+   "modified": "2026-10-26T01:17:32+00:00"
+  },
+  {
+   "path": "evaluation_e66e68b6-dba3-457e-a8b6-aea056504890.json",
+   "bytes": 262670,
+   "sha256": "77aacb72e24bfb0cdbf0360e6da26a01b9f3361a8b214375103e38e43c419026",
+   "modified": "2026-10-26T00:26:43+00:00"
+  },
+  {
+   "path": "evaluation_ff3dbb5f-ee7e-4699-86e4-18c3026a875d.json",
+   "bytes": 188350,
+   "sha256": "215bab90a33399d227435ea5851cd27b8d44ef335152fcbac15a4f8c86441b66",
+   "modified": "2026-10-19T14:30:07+00:00"
+  }
+ ]
+}
