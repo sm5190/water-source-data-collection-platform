@@ -94,8 +94,11 @@ CONTAINS = re.compile(
 ALIAS = re.compile(
     r"\b(?:also\s+known\s+as|a\.k\.a\.|formerly\s+known\s+as|tambi[eé]n\s+conocid[oa]\s+como|"
     r"auch\s+bekannt\s+als|anteriormente\s+(?:llamad[oa]|conocid[oa]\s+como))\b", re.IGNORECASE)
+# Where a "comprises ..." list ends: the next clause is about something else.
+CLAUSE_END = re.compile(r";|,?\s+(?:while|whereas|but|whilst|mientras|während|alors\s+que)\b"
+                        r"|\.\s", re.IGNORECASE)
 NEGATION = re.compile(
-    r"\b(?:not|never|no\s+longer|ceased\s+to|stopped|ya\s+no|no\s+(?:se\s+)?(?:abastece|capta|"
+    r"\b(?:not|never|no\s+longer|no\s+plans?\s+to|ceased\s+to|stopped|ya\s+no|no\s+(?:se\s+)?(?:abastece|capta|"
     r"toma)|nicht(?:\s+mehr)?|n['’]est\s+plus|ne\s+\w+\s+plus)\b", re.IGNORECASE)
 DISCONTINUED = re.compile(
     r"\b(?:no\s+longer|ceased|stopped|decommissioned|abandoned|replaced\s+by|ya\s+no|"
@@ -287,17 +290,14 @@ class _Builder:
                     e.role == "HISTORICAL_OPERATOR" and WHOLESALE.search(e.quote))
                 kind = "SUPPLIES_WHOLESALE_TO" if wholesale else "UTILITY_SERVES_CITY"
                 obj = self._wholesale_object(cand.key, e.quote) if wholesale else self.city
-                inherited = e.geo_reason.startswith("the document is about the city")
-                placed = e.geo_status in ("CONFIRMED", "PROBABLE") and not inherited
+                chunk = self.by_chunk.get(e.chunk_id or "")
+                placed, why = self._statement_placed(cand, e, chunk)
                 temporal, *_ = _temporal(e.quote)
                 if e.role == "HISTORICAL_OPERATOR" and temporal != "HISTORICAL":
-                    placed = False  # past tense only: neither current nor historical evidence
-                chunk = self.by_chunk.get(e.chunk_id or "")
+                    placed, why = False, why + "; past tense only"
                 self.add(kind, subject, obj, self.evidence(
                     chunk, e.url, e.quote, e.relationship.lower().replace("_", " "),
-                    e.geo_status, e.geo_reason + ("; past tense only" if e.role ==
-                                                  "HISTORICAL_OPERATOR" and not placed else ""),
-                    placed, e.strength, cand.bound_hosts))
+                    e.geo_status, why, placed, e.strength, cand.bound_hosts))
                 serving = True
             if not serving and "claim" in cand.origins:
                 for ref, quote in self._claim_refs(cand.all_names()):
@@ -319,6 +319,29 @@ class _Builder:
                         self.add("PREDECESSOR_OF", subject, self.utility_entity(other_key),
                                  ev.model_copy(update={"temporal": "HISTORICAL",
                                                        "temporal_marker": "predecessor"}))
+
+    def _statement_placed(self, cand, e, chunk: EvidenceChunk | None) -> tuple[bool, str]:
+        """Does the statement itself place the service at the city? The sentence (the
+        utility's own name removed) or its section heading must name the city; the page title
+        or the document as a whole counts only for a government/regulatory document (whose
+        title then states the city). Stricter than the registry, which also reads the title:
+        the registry and acceptance are unchanged."""
+        if e.geo_status not in ("CONFIRMED", "PROBABLE"):
+            return False, e.geo_reason
+        pattern = _name_re(cand.all_names())
+        text = pattern.sub(" ", e.quote) if pattern is not None else e.quote
+        scope = self.scopes.get(e.url, UNKNOWN_SCOPE)
+        own = self.matcher.match_place(text, scope)
+        if own.is_target:
+            return True, own.reason
+        if chunk is not None:
+            local = self.matcher.section_place(chunk.text, max(0, chunk.text.find(
+                e.quote[:60])), scope)
+            if local is not None:
+                return True, local.reason
+        if (e.source_type or "").upper() in GOVERNMENT_TYPES and not scope.elsewhere:
+            return True, f"government document about the city ({e.geo_reason})"
+        return False, f"only the page title or document places the city ({e.geo_reason})"
 
     def _wholesale_object(self, subject_key: str, quote: str) -> Entity:
         """Another utility the wholesale sentence names (bulk water to a retailer), else the
@@ -473,8 +496,10 @@ class _Builder:
                         key=lambda m: m[1], default=None)
             if whole is None:
                 continue
-            for part in (m for m in ents if m[0] >= pm.end()):
-                if part[2].entity_id != whole[2].entity_id:
+            stop = CLAUSE_END.search(sentence, pm.end())
+            end = stop.start() if stop else len(sentence)
+            for part in (m for m in ents if pm.end() <= m[0] < end):
+                if part[2].entity_id != whole[2].entity_id and part[2].type == "source":
                     self._composition(chunk, quote, pm.group(0), part[2], whole[2])
         for pm in ALIAS.finditer(sentence):
             pool = sources + utilities

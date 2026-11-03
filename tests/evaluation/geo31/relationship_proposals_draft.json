@@ -1,0 +1,150 @@
+{
+ "R05b559af": {
+  "label": "CORRECT",
+  "basis": "USGS: Lake Houston is Houston's primary drinking-water source (it is a reservoir, not a natural source)"
+ },
+ "Ra5212984": {
+  "label": "CORRECT",
+  "basis": "CWA's own site: untreated surface water to Houston (raw-water wholesale)"
+ },
+ "R0a1d8a7c": {
+  "label": "INCORRECT",
+  "basis": "'East Water' is a fragment of the East Water Purification Plant, not a supplier"
+ },
+ "R372e7431": {
+  "label": "CORRECT",
+  "basis": "City of Houston water utility system named on houstontx.gov"
+ },
+ "R635b78fc": {
+  "label": "CORRECT",
+  "basis": "Houston Water = the City's combined utility system"
+ },
+ "Rbd9c6f39": {
+  "label": "CORRECT",
+  "basis": "Houston Water operates the city's drinking water system"
+ },
+ "R3b7e90f8": {
+  "label": "UNCERTAIN",
+  "basis": "third-party grading site's name for Houston's system; probably the City utility"
+ },
+ "R7995d3dd": {
+  "label": "INCORRECT",
+  "basis": "mined fragment of North Fort Bend Water Authority; not Houston's operator"
+ },
+ "R6ea71864": {
+  "label": "INCORRECT",
+  "basis": "'Community Drinking Water' plants in rural India (Waterlife); not Hyderabad's utility"
+ },
+ "Rf68abbe3": {
+  "label": "CORRECT",
+  "basis": "HMWSSB supplies drinking water to Hyderabad"
+ },
+ "R100886d2": {
+  "label": "INCORRECT",
+  "basis": "Development Workshop is an NGO running standpost programmes, not the operator"
+ },
+ "R19d9e43c": {
+  "label": "CORRECT",
+  "basis": "Luanda Provincial Water Company (EPAL) is the state water service company"
+ },
+ "Ra02713f9": {
+  "label": "CORRECT",
+  "basis": "EPAL is Luanda's public water utility"
+ },
+ "R205d300c": {
+  "label": "CORRECT",
+  "basis": "'Provincial Water Company' = EPAL (same organisation, not merged)"
+ },
+ "Ra4cda718": {
+  "label": "CORRECT",
+  "basis": "NCWSC (truncated name) supplies Nairobi"
+ },
+ "Raa599cc4": {
+  "label": "CORRECT",
+  "basis": "Nairobi City Water (NCWSC) is mandated to provide water"
+ },
+ "R58f85c00": {
+  "label": "CORRECT",
+  "basis": "Nairobi City water supply (NCWSC)"
+ },
+ "R040ec7c5": {
+  "label": "CORRECT",
+  "basis": "NCWSC mandated to provide clean water (county assembly)"
+ },
+ "R0faab95d": {
+  "label": "CORRECT",
+  "basis": "Nairobi Water Company is NCWSC's common name"
+ },
+ "R9172c7b2": {
+  "label": "CORRECT",
+  "basis": "own site: supplying water to areas of Nairobi"
+ },
+ "R8431a527": {
+  "label": "UNCERTAIN",
+  "basis": "EMOS -> EMOS S.A. is a change of legal form; predecessor or same organisation"
+ },
+ "R55d3fa98": {
+  "label": "CORRECT",
+  "basis": "Empresa de Agua Potable de Santiago was renamed EMOS"
+ },
+ "Rff21ddd0": {
+  "label": "CORRECT",
+  "basis": "Aguas Andinas treats water it takes from the Maipo River (MMA document)"
+ },
+ "R3523620e": {
+  "label": "CORRECT",
+  "basis": "Aguas Andinas is Santiago's drinking-water utility"
+ },
+ "Rf3382c5a": {
+  "label": "CORRECT",
+  "basis": "Aguas Andinas, the water utility of Greater Santiago"
+ },
+ "Ra2e88e4f": {
+  "label": "OUTDATED",
+  "basis": "EMOS was Greater Santiago's utility before Aguas Andinas (older World Bank document)"
+ },
+ "R82d1a121": {
+  "label": "CORRECT",
+  "basis": "Toronto's drinking water comes from Lake Ontario"
+ },
+ "Ra59e02b5": {
+  "label": "INCORRECT",
+  "basis": "Scottish Water appears in a congress attendee list; does not serve Toronto"
+ },
+ "R1e13acc7": {
+  "label": "CORRECT",
+  "basis": "Toronto Water is the City of Toronto's water division"
+ },
+ "R6452d55f": {
+  "label": "CORRECT",
+  "basis": "Toronto Water distributes drinking water to Toronto"
+ },
+ "Re250ffa3": {
+  "label": "INCORRECT",
+  "basis": "glossary definition 'Water Treatment Plant'; not an organisation"
+ },
+ "R7a3532cc": {
+  "label": "INCORRECT",
+  "basis": "glossary definition 'Water Treatment Plant'; not an organisation"
+ },
+ "Rc05c422b": {
+  "label": "CORRECT",
+  "basis": "Vienna's water comes from the Limestone Alps (a region; the springs are the standardized sources)"
+ },
+ "Reda37e9a": {
+  "label": "CORRECT",
+  "basis": "MA 31 – Vienna Water operates Vienna's water supply"
+ },
+ "Rb8d4bdf2": {
+  "label": "CORRECT",
+  "basis": "Vienna Water (Wiener Wasser) is the city's utility; this sentence is weak"
+ },
+ "R42c9a74d": {
+  "label": "CORRECT",
+  "basis": "Vienna Water provides drinking water to the City of Vienna"
+ },
+ "R91dc0c52": {
+  "label": "CORRECT",
+  "basis": "Wiener Wasser, the city's water utility"
+ }
+}

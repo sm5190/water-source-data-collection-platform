@@ -1,0 +1,336 @@
+{
+ "R05b559af": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SOURCE_SUPPLIES_CITY|source:lake:lake houston|city:houston|united states of america",
+  "kind": "SOURCE_SUPPLIES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "Ra5212984": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SUPPLIES_WHOLESALE_TO|utility:coastal water authority|city:houston|united states of america",
+  "kind": "SUPPLIES_WHOLESALE_TO",
+  "status": "SUPPORTED",
+  "basis": [
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "R0a1d8a7c": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "SUPPLIES_WHOLESALE_TO|utility:east water|city:houston|united states of america",
+  "kind": "SUPPLIES_WHOLESALE_TO",
+  "status": "SUPPORTED",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R372e7431": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "UTILITY_SERVES_CITY|utility:city of houston water utility system|city:houston|united states of america",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "R635b78fc": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "UTILITY_SERVES_CITY|utility:houston water|city:houston|united states of america",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "R7995d3dd": {
+  "run_id": "b13e0d1d-aa03-471b-be3b-b63c93ceba9d",
+  "key": "UTILITY_SERVES_CITY|utility:nfbwa internal distribution water|city:houston|united states of america",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "R55d3fa98": {
+  "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+  "key": "PREDECESSOR_OF|utility:empresa de agua potable de santiago|utility:empresa metropolitana de obras sanitarias",
+  "kind": "PREDECESSOR_OF",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R8431a527": {
+  "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+  "key": "PREDECESSOR_OF|utility:empresa metropolitana de obras sanitarias|utility:emos",
+  "kind": "PREDECESSOR_OF",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Rff21ddd0": {
+  "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+  "key": "SOURCE_SUPPLIES_UTILITY|source:river:rio maipo|utility:aguas andinas",
+  "kind": "SOURCE_SUPPLIES_UTILITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R3523620e": {
+  "run_id": "b844390c-4e71-4635-8433-dc6122779573",
+  "key": "UTILITY_SERVES_CITY|utility:aguas andinas|city:santiago|chile",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "Reda37e9a": {
+  "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+  "key": "UTILITY_SERVES_CITY|utility:municipal department 31 vienna water|city:vienna|austria",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "Rb8d4bdf2": {
+  "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+  "key": "UTILITY_SERVES_CITY|utility:vienna water|city:vienna|austria",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R91dc0c52": {
+  "run_id": "6f48e458-0700-489f-ab50-d50aa1f2a81f",
+  "key": "UTILITY_SERVES_CITY|utility:wiener wasser|city:vienna|austria",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "R040ec7c5": {
+  "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+  "key": "UTILITY_SERVES_CITY|utility:nairobi city water and sewerage company|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "Raa599cc4": {
+  "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+  "key": "UTILITY_SERVES_CITY|utility:nairobi city water|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R0faab95d": {
+  "run_id": "21b46e42-5dc5-41fd-ad97-6f0db36a40cb",
+  "key": "UTILITY_SERVES_CITY|utility:nairobi water company|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "Ra02713f9": {
+  "run_id": "707df87b-b086-47f8-8e00-a925bf93ac21",
+  "key": "UTILITY_SERVES_CITY|utility:luanda public water utility epal|city:luanda|angola",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "Ra59e02b5": {
+  "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+  "key": "UTILITY_SERVES_CITY|utility:scottish water|city:toronto|canada",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R1e13acc7": {
+  "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+  "key": "UTILITY_SERVES_CITY|utility:toronto water|city:toronto|canada",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "Re250ffa3": {
+  "run_id": "d26a016b-3bed-4a4d-ae64-036ade81f70a",
+  "key": "UTILITY_SERVES_CITY|utility:water treatment plant|city:toronto|canada",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Rf68abbe3": {
+  "run_id": "b617e84b-3370-4227-9a32-f2d7754e4095",
+  "key": "UTILITY_SERVES_CITY|utility:hmwssb|city:hyderabad|india",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "CLAIM"
+  ]
+ },
+ "R3b7e90f8": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "UTILITY_SERVES_CITY|utility:houston water utilities|city:houston|united states of america",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Rbd9c6f39": {
+  "run_id": "993b3415-69f3-4665-8ec0-f04dbda26ae8",
+  "key": "UTILITY_SERVES_CITY|utility:houston water|city:houston|united states of america",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Rf3382c5a": {
+  "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+  "key": "UTILITY_SERVES_CITY|utility:aguas andinas|city:santiago|chile",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Ra2e88e4f": {
+  "run_id": "0d7d4af8-5d02-49b7-92fb-ee243245ed83",
+  "key": "UTILITY_SERVES_CITY|utility:empresa metropolitana de obras sanitarias|city:santiago|chile",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "Rc05c422b": {
+  "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+  "key": "SOURCE_SUPPLIES_CITY|source:unspecified:limestone alps of lower austria and styria|city:vienna|austria",
+  "kind": "SOURCE_SUPPLIES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R42c9a74d": {
+  "run_id": "e800f614-3caf-42e5-9f13-cea0f04973fa",
+  "key": "UTILITY_SERVES_CITY|utility:vienna water|city:vienna|austria",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR",
+   "INDEPENDENT"
+  ]
+ },
+ "Ra4cda718": {
+  "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+  "key": "UTILITY_SERVES_CITY|utility:city water and sewerage company|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R58f85c00": {
+  "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+  "key": "UTILITY_SERVES_CITY|utility:nairobi city water|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R9172c7b2": {
+  "run_id": "f622ab6a-06d8-494f-afc9-8415e8bb751a",
+  "key": "UTILITY_SERVES_CITY|utility:nairobi water company|city:nairobi|kenya",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "R100886d2": {
+  "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+  "key": "UTILITY_SERVES_CITY|utility:development workshop|city:luanda|angola",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R19d9e43c": {
+  "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+  "key": "UTILITY_SERVES_CITY|utility:luanda provincial water company|city:luanda|angola",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R205d300c": {
+  "run_id": "80aafe20-306b-4344-b8c0-5e90891678aa",
+  "key": "UTILITY_SERVES_CITY|utility:provincial water company|city:luanda|angola",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R82d1a121": {
+  "run_id": "0618af70-5e17-4719-b040-22509451d523",
+  "key": "SOURCE_SUPPLIES_CITY|source:lake:lake ontario|city:toronto|canada",
+  "kind": "SOURCE_SUPPLIES_CITY",
+  "status": "VERIFIED",
+  "basis": [
+   "GOVERNMENT_OR_REGULATOR"
+  ]
+ },
+ "R6452d55f": {
+  "run_id": "0618af70-5e17-4719-b040-22509451d523",
+  "key": "UTILITY_SERVES_CITY|utility:toronto water|city:toronto|canada",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "SUPPORTED",
+  "basis": [
+   "SELF_DESCRIPTION"
+  ]
+ },
+ "R7a3532cc": {
+  "run_id": "0618af70-5e17-4719-b040-22509451d523",
+  "key": "UTILITY_SERVES_CITY|utility:water treatment plant|city:toronto|canada",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ },
+ "R6ea71864": {
+  "run_id": "f951b63c-9ea9-4036-9db9-3f4c5c5d9fae",
+  "key": "UTILITY_SERVES_CITY|utility:community drinking water|city:hyderabad|india",
+  "kind": "UTILITY_SERVES_CITY",
+  "status": "CANDIDATE",
+  "basis": [
+   "INDEPENDENT"
+  ]
+ }
+}

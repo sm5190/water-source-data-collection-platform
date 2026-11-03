@@ -255,3 +255,33 @@ def test_a_stored_graph_is_replaced_not_duplicated(tmp_path):
     repo.save_relationships("run-1", other)  # another version is kept apart
     assert repo.relationships("run-1")["versions"] == ["relationship-0", "relationship-1"]
     assert repo.relationships("run-2")["relationships"] == []
+
+# --- precision lessons from the stored runs ----------------------------------------------------
+
+def test_a_title_naming_the_city_does_not_place_a_list_or_glossary_sentence():
+    """A congress report titled with the city lists utilities from elsewhere; a glossary
+    defines a treatment plant. Neither sentence places a service at the city."""
+    congress = chunk("https://www.example-congress.org/report.pdf", "Speakers came from "
+                     "Harbour Water Board (Scotland) and Island Water Authority, which supplies "
+                     "drinking water to customers.", "TECHNICAL", "Congress Report – Houston")
+    g = graph("Houston", [congress], utilities=[("Harbour Water Board", congress.url, "x"),
+                                                ("Island Water Authority", congress.url, "x")])
+    assert not [r for r in g.of_kind("UTILITY_SERVES_CITY") if r.status in ("SUPPORTED",
+                                                                            "VERIFIED")]
+
+def test_a_comprises_list_ends_at_the_next_clause():
+    text = ("The spring zone of the First Valley Spring Pipeline comprises the Alder spring and "
+            "the Birch spring, while the Second Valley Spring Pipeline draws on the Cedar "
+            "spring.")
+    g = graph("Vienna", [chunk("https://www.wien.gv.at/z", text, "GOVERNMENT")])
+    parts = {(r.subject.name, r.object.name) for r in g.of_kind("SOURCE_PART_OF_SYSTEM")}
+    assert ("Alder spring", "First Valley Spring Pipeline") in parts
+    assert ("Birch spring", "First Valley Spring Pipeline") in parts
+    assert not any("Second" in s or "Cedar" in s for s, _ in parts)
+
+def test_no_plans_for_bulk_supply_is_not_a_wholesale_relationship():
+    doc = chunk("https://www.example-groundwater.org/x", "The Delta Water Company has indicated "
+                "that there are currently no plans to exploit groundwater in Houston, Texas for "
+                "bulk supply.", "TECHNICAL")
+    g = graph("Houston", [doc], utilities=[("Delta Water Company", doc.url, "Delta Water")])
+    assert g.of_kind("SUPPLIES_WHOLESALE_TO") == []
