@@ -1,0 +1,110 @@
+{
+ "G001": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G003": {
+  "passages": {
+   "1": "UNCERTAIN",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  },
+  "passage_basis": "DRAFT passages: 1 national water situation with a Luanda dateline (city only as dateline); 2 hydropower 200 km away, Luanda as a reference point; 3 minister quote"
+ },
+ "G007": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G012": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "OTHER_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  },
+  "passage_basis": "DRAFT passages: 1 auditor's Nairobi address; 2 Nairobi Satellite Towns programme in Ongata Rongai/Kiserian (outside the city); 3 contents"
+ },
+ "G014": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G026": {
+  "passages": {
+   "1": "TARGET",
+   "2": "TARGET",
+   "3": "TARGET"
+  }
+ },
+ "G033": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G034": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "UNCERTAIN"
+  },
+  "passage_basis": "DRAFT passages: 1-2 irrigation/farming projects near Hyderabad; 3 community filtration plants in Hyderabad (drinking water, scope unclear)"
+ },
+ "G036": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G039": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G041": {
+  "passages": {
+   "1": "OTHER_PLACE",
+   "2": "OTHER_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G050": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "TARGET",
+   "3": "NOT_ABOUT_PLACE"
+  },
+  "passage_basis": "DRAFT passages: 1 CenterPoint Energy Houston (company name); 2 City of Houston's Northeast Water Purification Plant expansion; 3 meeting place Katy"
+ },
+ "G054": {
+  "passages": {
+   "1": "NOT_ABOUT_PLACE",
+   "2": "NOT_ABOUT_PLACE",
+   "3": "NOT_ABOUT_PLACE"
+  }
+ },
+ "G063": {
+  "passages": {
+   "1": "OTHER_PLACE",
+   "2": "OTHER_PLACE",
+   "3": "OTHER_PLACE"
+  }
+ },
+ "G070": {
+  "passages": {
+   "1": "UNCERTAIN",
+   "2": "UNCERTAIN",
+   "3": "NOT_ABOUT_PLACE"
+  },
+  "passage_basis": "DRAFT passages: 1-2 Luanda (Angola) in a list of cities with groundwater assessments; 3 title"
+ }
+}

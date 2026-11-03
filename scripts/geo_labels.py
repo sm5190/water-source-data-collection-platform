@@ -3,13 +3,17 @@
     uv run python scripts/geo_labels.py export <run_id> [...] [--per-stratum 8]
         [--out tests/evaluation/geo31]          # geo_labels.csv + geo_labels_key.json
     uv run python scripts/geo_labels.py fill <proposals.json> [--out ...]
-        # drafted proposals {sample_id: {about_place, basis}} (rows stay UNCONFIRMED)
+        # drafted proposals {sample_id: {about_place, basis}} or passage proposals
+        # {sample_id: {passages: {"1": TARGET, ...}, passage_basis}} (rows stay UNCONFIRMED)
     uv run python scripts/geo_labels.py metrics [--out ...] [--report reports/eval/geo31/x.md]
 
 The strata come from the current geography rules with the DRAFT city identity
 (CITY_IDENTITY_ALLOW_DRAFT=1, evaluation only); the reviewer sees neither. A person fills
 confirmed_about_place (TARGET / SUPPLY_SOURCE / MIXED / OTHER_PLACE / UNCERTAIN), name and
-date, and sets label_status CONFIRMED. Read only on research data.
+date, and sets label_status CONFIRMED. Each quoted passage has its own label
+(passage_<i>_place_confirmed: TARGET / SUPPLY_SOURCE / OTHER_PLACE / NOT_ABOUT_PLACE /
+UNCERTAIN): a MIXED document counts as relevant only through a relevant passage. Read only on
+research data.
 """
 
 import argparse
@@ -27,10 +31,18 @@ def _fill(sheet: Path, proposals: dict) -> int:
     rows = list(csv.DictReader(sheet.open(encoding="utf-8", newline="")))
     n = 0
     for r in rows:
+        for k in COLUMNS:
+            r.setdefault(k, "")
         p = proposals.get(r["sample_id"])
         if p:
-            r["proposed_about_place"], r["proposed_basis"] = p.get("about_place", ""), \
-                p.get("basis", "")
+            if "about_place" in p:
+                r["proposed_about_place"], r["proposed_basis"] = p.get("about_place", ""), \
+                    p.get("basis", "")
+            for i, place in (p.get("passages") or {}).items():
+                r[f"passage_{i}_place_proposed"] = place
+            if p.get("passage_basis") and p["passage_basis"] not in r["proposed_basis"]:
+                r["proposed_basis"] = "; ".join(x for x in (r["proposed_basis"],
+                                                             p["passage_basis"]) if x)
             n += 1
     with sheet.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNS)
@@ -42,15 +54,17 @@ def _render(m: dict) -> str:
     lines = ["# Geographic precision and false exclusions", "",
              ("Rates on the sampled documents: decided = rows labelled other than UNCERTAIN. "
               "Validated = person-confirmed rows; provisional = drafts."), "",
-             "| city | metric | status | about target / decided | uncertain | unlabelled |",
-             "|---|---|---|---|---|---|"]
+             ("| city | metric | status | relevant / decided | uncertain | undetermined (MIXED, "
+              "no relevant passage) | unlabelled |"),
+             "|---|---|---|---|---|---|---|"]
     for city, metrics in m.items():
         if city.startswith("_"):
             continue
         for metric, by_status in metrics.items():
             for status, r in by_status.items():
                 lines.append(f"| {city} | {metric} | {status} | {r['about_target']}/"
-                             f"{r['decided']} | {r['uncertain']} | {r['unlabelled']} |")
+                             f"{r['decided']} | {r['uncertain']} | {r['undetermined']} | "
+                             f"{r['unlabelled']} |")
     lines += ["", "Pool sizes (documents per stratum before sampling): "
               + json.dumps(m.get("_pool_sizes", {}))]
     return "\n".join(lines) + "\n"

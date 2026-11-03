@@ -17,11 +17,24 @@ carefully as wrong inclusions:
   OTHER_REGION, or returned by search but deprioritized as a homonym / other place (title and
   host only; those were never fetched, so the reviewer opens the link).
 
-Metrics (validated = person-confirmed rows only; provisional = drafts; kept apart):
-- geographic precision = (TARGET + SUPPLY_SOURCE + MIXED) / decided rows, INCLUDED stratum
-- false exclusion rate = (TARGET + SUPPLY_SOURCE + MIXED) / decided rows, EXCLUDED stratum
-  (UNCERTAIN rows are reported, not decided). Both are rates on the sample; the pool sizes are
-  reported too, so a reader can scale them.
+Document relevance and passage relevance are kept apart (Milestone 3.1 Phase 2). Each quoted
+passage gets its own label (passage_<i>_place_*: TARGET = about the target city's water,
+utility or service area; SUPPLY_SOURCE = about a source or infrastructure supplying it, even far
+away; OTHER_PLACE = about another place; NOT_ABOUT_PLACE = names the city without being about
+it (an address, a company's headquarters, an event venue, boilerplate); UNCERTAIN). A document counts as relevant when its label is TARGET or
+SUPPLY_SOURCE, or when it is MIXED with at least one passage labelled TARGET or SUPPLY_SOURCE;
+a MIXED document whose passages aren't labelled relevant (or that has no passages: search
+results never fetched) is UNDETERMINED, never relevant. Validated relevance needs the
+document label and that passage confirmed by a person.
+
+Metrics (validated = person-confirmed only; provisional = drafts; kept apart):
+- geographic precision = relevant / decided documents, INCLUDED stratum
+- false exclusion rate = relevant / decided documents, EXCLUDED stratum
+  (UNCERTAIN and UNDETERMINED are reported, not decided). Rates on the sample; pool sizes are
+  reported so a reader can scale them.
+- passages (``passage_metrics``): per labelled passage against the system's passage decision
+  (INCLUDED / EXCLUDED / UNCERTAIN): correctly included, false exclusions, relevant passages
+  left uncertain, wrong inclusions, correctly excluded.
 
 The sheet hides the stratum and every system output (key file only). Evaluation only: the
 research package never imports this module.
@@ -42,12 +55,16 @@ from water_source_research.discovery.normalize import canonical_url
 from .discovery_labels import _quotes, candidate_documents
 
 PLACES = ("TARGET", "SUPPLY_SOURCE", "MIXED", "OTHER_PLACE", "UNCERTAIN")
-ABOUT_TARGET = {"TARGET", "SUPPLY_SOURCE", "MIXED"}
+RELEVANT_PLACES = {"TARGET", "SUPPLY_SOURCE"}
+PASSAGE_PLACES = ("TARGET", "SUPPLY_SOURCE", "OTHER_PLACE", "NOT_ABOUT_PLACE", "UNCERTAIN")
+MAX_PASSAGES = 3
 INCLUDED, EXCLUDED = "INCLUDED", "EXCLUDED"
 COLUMNS = ["sample_id", "city", "region", "country", "url", "title",
            "quote_1", "chunk_1", "quote_2", "chunk_2", "quote_3", "chunk_3",
            "proposed_about_place", "proposed_basis", "label_status",
-           "confirmed_about_place", "reviewer_notes", "reviewer", "reviewed_on"]
+           "confirmed_about_place", "reviewer_notes", "reviewer", "reviewed_on",
+           *(f"passage_{i}_place_{k}" for i in range(1, MAX_PASSAGES + 1)
+             for k in ("proposed", "confirmed"))]
 
 def geo_decision(doc: Mapping[str, Any]) -> tuple[str, str]:
     """(INCLUDED|EXCLUDED, reason) under the current rules. Uses the city identity the
@@ -152,17 +169,48 @@ def read_geo_labels(csv_path: Path) -> list[dict[str, Any]]:
                       else row.get("proposed_about_place")) or "").strip().upper()
             if value and value not in PLACES:
                 raise ValueError(f"{row['sample_id']}: about_place {value!r} not in {PLACES}")
+            passages = []
+            for i in range(1, MAX_PASSAGES + 1):
+                quote = (row.get(f"quote_{i}") or "").strip()
+                if not quote:
+                    continue
+                conf = (row.get(f"passage_{i}_place_confirmed") or "").strip().upper()
+                prop = (row.get(f"passage_{i}_place_proposed") or "").strip().upper()
+                place = (conf if confirmed and conf else prop) or None
+                if place and place not in PASSAGE_PLACES:
+                    raise ValueError(f"{row['sample_id']} passage {i}: {place!r} not in "
+                                     f"{PASSAGE_PLACES}")
+                passages.append({"index": i, "quote": quote, "chunk_id": row.get(f"chunk_{i}"),
+                                 "place": place, "confirmed": bool(confirmed and conf)})
             out.append({"sample_id": row["sample_id"], "city": row["city"],
-                        "url": row["url"], "confirmed": confirmed, "about_place": value or None})
+                        "url": row["url"], "confirmed": confirmed, "about_place": value or None,
+                        "passages": passages})
     return out
 
+def document_relevance(row: Mapping[str, Any]) -> tuple[str, bool]:
+    """(RELEVANT | NOT_RELEVANT | UNCERTAIN | UNDETERMINED | UNLABELLED, validated)."""
+    place = row.get("about_place")
+    if not place:
+        return "UNLABELLED", False
+    if place in RELEVANT_PLACES:
+        return "RELEVANT", row["confirmed"]
+    if place == "OTHER_PLACE":
+        return "NOT_RELEVANT", row["confirmed"]
+    if place == "UNCERTAIN":
+        return "UNCERTAIN", row["confirmed"]
+    relevant = [p for p in row.get("passages", []) if p["place"] in RELEVANT_PLACES]
+    if relevant:  # MIXED with an independently labelled relevant passage
+        return "RELEVANT", row["confirmed"] and any(p["confirmed"] for p in relevant)
+    return "UNDETERMINED", row["confirmed"]
+
 def _rate(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    c = Counter(r["about_place"] or "UNLABELLED" for r in rows)
-    decided = sum(c[p] for p in PLACES if p != "UNCERTAIN")
-    hits = sum(c[p] for p in ABOUT_TARGET)
+    c = Counter(document_relevance(r)[0] for r in rows)
+    places = Counter(r["about_place"] or "UNLABELLED" for r in rows)
+    decided = c["RELEVANT"] + c["NOT_RELEVANT"]
+    hits = c["RELEVANT"]
     return {"about_target": hits, "decided": decided, "uncertain": c["UNCERTAIN"],
-            "unlabelled": c["UNLABELLED"], "counts": dict(c),
-            "rate": round(hits / decided, 3) if decided else None}
+            "undetermined": c["UNDETERMINED"], "unlabelled": c["UNLABELLED"],
+            "counts": dict(places), "rate": round(hits / decided, 3) if decided else None}
 
 def geo_metrics(labels: Sequence[Mapping[str, Any]], key: Mapping[str, Any],
                 decide=None) -> dict[str, Any]:
@@ -177,7 +225,9 @@ def geo_metrics(labels: Sequence[Mapping[str, Any]], key: Mapping[str, Any],
         if k is None:
             continue
         stratum = decide(k) if decide else k["stratum"]
-        status = "validated" if row["confirmed"] else "provisional"
+        validated = document_relevance(row)[1] if row["about_place"] in (
+            "MIXED",) else row["confirmed"]
+        status = "validated" if validated else "provisional"
         for city in (k["city"], "ALL"):
             groups[(city, stratum, status)].append(row)
     out: dict[str, Any] = {}
@@ -186,3 +236,37 @@ def geo_metrics(labels: Sequence[Mapping[str, Any]], key: Mapping[str, Any],
         out.setdefault(city, {}).setdefault(metric, {})[status] = _rate(rows)
     out["_pool_sizes"] = key.get("pool_sizes", {})
     return out
+
+PASSAGE_OUTCOMES = ("correctly_included", "false_exclusion", "relevant_uncertain",
+                    "wrong_inclusion", "correctly_excluded", "other_uncertain")
+
+def passage_outcome(label: str | None, decision: str) -> str | None:
+    """How the system's passage decision (INCLUDED / EXCLUDED / UNCERTAIN) compares with a
+    passage label; None when the label is missing or UNCERTAIN."""
+    if label in RELEVANT_PLACES:
+        return {"INCLUDED": "correctly_included", "EXCLUDED": "false_exclusion"}.get(
+            decision, "relevant_uncertain")
+    if label in ("OTHER_PLACE", "NOT_ABOUT_PLACE"):
+        return {"INCLUDED": "wrong_inclusion", "EXCLUDED": "correctly_excluded"}.get(
+            decision, "other_uncertain")
+    return None
+
+def passage_metrics(labels: Sequence[Mapping[str, Any]], key: Mapping[str, Any],
+                    decide_passage) -> dict[str, Any]:
+    """Per city and overall, validated and provisional apart: passage outcomes.
+    ``decide_passage(sample, passage) -> INCLUDED | EXCLUDED | UNCERTAIN``."""
+    samples = key["samples"]
+    out: dict[str, Any] = {}
+    for row in labels:
+        k = samples.get(row["sample_id"])
+        if k is None:
+            continue
+        for p in row.get("passages", []):
+            outcome = passage_outcome(p["place"], decide_passage(k, p))
+            if outcome is None:
+                continue
+            status = "validated" if p["confirmed"] else "provisional"
+            for city in (k["city"], "ALL"):
+                bucket = out.setdefault(city, {}).setdefault(status, Counter())
+                bucket[outcome] += 1
+    return {c: {s: dict(v) for s, v in by.items()} for c, by in out.items()}
