@@ -1035,12 +1035,6 @@ cities:
       property: alternatenames
       detail: alternateNameId 1591570
   unverified_names:
-  - name: Greater Santiago
-    lang: en
-    sources:
-    - source: wikidata
-      id: Q2887
-      property: alias:en
   - name: Santiago del Nuevo Extremo
     lang: es
     sources:
@@ -1048,12 +1042,6 @@ cities:
       id: Q2887
       property: alias:es
   - name: Santiago de la Nueva Extremadura
-    lang: es
-    sources:
-    - source: wikidata
-      id: Q2887
-      property: alias:es
-  - name: Gran Santiago
     lang: es
     sources:
     - source: wikidata
@@ -1107,6 +1095,21 @@ cities:
       id: '3871336'
       property: alternatenames
       detail: alternateNameId 1513903
+  context_names:
+  - name: Greater Santiago
+    lang: en
+    sources:
+    - source: wikidata
+      id: Q2887
+      property: alias:en
+      detail: metropolitan alias of the city
+  - name: Gran Santiago
+    lang: es
+    sources:
+    - source: wikidata
+      id: Q2887
+      property: alias:es
+      detail: metropolitan alias of the city
   homonyms:
   - name: Santiago de Leon de Caracas
     country: Venezuela
@@ -1494,6 +1497,9 @@ cities:
       id: '3918972'
       property: cities500
       detail: qualified form
+  notes:
+  - 'curation: ''Greater Santiago'' -> context name (metropolitan alias)'
+  - 'curation: ''Gran Santiago'' -> context name (metropolitan alias)'
 - city: Bogotá
   country: Colombia
   status: DRAFT
@@ -3387,23 +3393,9 @@ cities:
     - source: wikidata
       id: Q1361
       property: P1448
-  - name: حیدر آباد‎
-    kind: OFFICIAL_LOCAL
-    lang: ur
-    sources:
-    - source: wikidata
-      id: Q1361
-      property: P1448
   - name: హైదరాబాదు
     kind: OFFICIAL_LOCAL
     lang: te
-    sources:
-    - source: wikidata
-      id: Q1361
-      property: P1705
-  - name: حیدرآباد
-    kind: OFFICIAL_LOCAL
-    lang: ur
     sources:
     - source: wikidata
       id: Q1361
@@ -3466,6 +3458,20 @@ cities:
       id: '1269843'
       property: alternatenames
       detail: alternateNameId 19448976
+  - name: حیدر آباد‎
+    kind: OFFICIAL_LOCAL
+    lang: ur
+    sources:
+    - source: wikidata
+      id: Q1361
+      property: P1448
+  - name: حیدرآباد
+    kind: OFFICIAL_LOCAL
+    lang: ur
+    sources:
+    - source: wikidata
+      id: Q1361
+      property: P1705
   homonyms:
   - name: Hyderabad
     country: Pakistan
@@ -3476,6 +3482,11 @@ cities:
     - source: geonames
       id: '1176734'
       property: cities500
+  notes:
+  - 'curation: ''حیدر آباد\u200e'' (ur) -> unverified: only Wikidata official/native name, a language
+    of a large homonym''s country'
+  - 'curation: ''حیدرآباد'' (ur) -> unverified: only Wikidata official/native name, a language of a large
+    homonym''s country'
 - city: Jaipur
   country: India
   status: DRAFT

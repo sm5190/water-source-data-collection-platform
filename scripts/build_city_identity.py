@@ -495,7 +495,92 @@ def build_one(entry: dict, fetch: Fetcher, cities: list[dict], countries: dict, 
     ident.context_names = context_names(fetch, entity, qid, langs)
     targets = {fold(n) for n in ident.unambiguous_city_names()}
     ident.homonyms = homonyms(cities, chosen, targets, countries, admin1)
+    curate(ident, countries)
     return ident
+
+# --- curation rules (also applied to an existing file with --recurate) ------------------------
+
+LARGE_HOMONYM = 100_000  # services/geo_match.py LARGE_HOMONYM
+OFFICIAL_ONLY = {"P1448", "P1705"}
+_METRO_BEFORE = r"(?:greater|gran|grand|grande|gro(?:ss|ß)(?:raum)?|metropolitan|metro|" \
+                r"area metropolitana|zona metropolitana|region metropolitana|" \
+                r"regiao metropolitana|region metropolitaine)"
+_METRO_AFTER = r"(?:metropolitan area|metro area|metropolitan region|area|region|msa|" \
+               r"metropolitana|metropolitaine)"
+
+def _official_only(n: IdentityName) -> bool:
+    return all(s.source == "wikidata" and (s.property or "") in OFFICIAL_ONLY
+               for s in n.sources)
+
+def _metro_alias(name: str, city_names: list[str]) -> bool:
+    """"Gran Santiago", "Greater Toronto", "Santiago metropolitan area": the marker together
+    with the city's whole catalog name (so a city named "Grand Rapids" keeps its name)."""
+    key = fold(name).replace("-", " ")
+    for city in city_names:
+        c = re.escape(fold(city))
+        if re.fullmatch(rf"{_METRO_BEFORE}\s+(?:de\s+|of\s+)?{c}", key) or re.fullmatch(
+                rf"{c}\s+{_METRO_AFTER}", key):
+            return True
+    return False
+
+def curate(ident: CityIdentity, countries: dict[str, dict]) -> list[str]:
+    """Generic rules applied after drafting; returns what was moved (for the notes).
+
+    - A name supported only by Wikidata's official/native-name properties, in a language of
+      the country of a large listed homonym, may name that place too: unverified.
+    - An alias formed from a metropolitan marker and the city's name is a context name
+      (METRO_AREA), never a name of the city."""
+    moved: list[str] = []
+    own = ident.country_info.iso2 if ident.country_info else None
+    homonym_langs = {lang for h in ident.homonyms if (h.population or 0) >= LARGE_HOMONYM
+                     and h.iso2 and h.iso2 != own
+                     for lang in countries.get(h.iso2, {}).get("languages", [])}
+    keep = []
+    for n in ident.names:
+        lang = (n.lang or "").split("-")[0]
+        if _official_only(n) and lang and lang in homonym_langs:
+            ident.unverified_names.append(n)
+            moved.append(f"{n.name!r} ({lang}) -> unverified: only Wikidata official/native "
+                         f"name, a language of a large homonym's country")
+        else:
+            keep.append(n)
+    ident.names = keep
+    known = {fold(c.name) for c in ident.context_names}
+    for bucket in ("names", "unverified_names"):
+        rest = []
+        for n in getattr(ident, bucket):
+            if _metro_alias(n.name, ident.catalog_names()):
+                if fold(n.name) not in known:
+                    known.add(fold(n.name))
+                    ident.context_names.append(ContextName(
+                        name=n.name, kind="METRO_AREA", lang=n.lang, sources=[
+                            s.model_copy(update={"detail": "metropolitan alias of the city"})
+                            for s in n.sources]))
+                moved.append(f"{n.name!r} -> context name (metropolitan alias)")
+            else:
+                rest.append(n)
+        setattr(ident, bucket, rest)
+    ident.notes += [f"curation: {m}" for m in moved if f"curation: {m}" not in ident.notes]
+    return moved
+
+def recurate_file(path: Path, countries: dict[str, dict]) -> list[tuple[str, list[str]]]:
+    """Apply ``curate`` to every entry of an existing identity file; entries that don't
+    change are written back untouched. Statuses are never changed."""
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    changes = []
+    for i, entry in enumerate(doc.get("cities", [])):
+        if entry.get("status") not in ("DRAFT", "AMBIGUOUS", "APPROVED"):
+            continue
+        ident = CityIdentity.model_validate(entry)
+        moved = curate(ident, countries)
+        if moved:
+            changes.append((f"{ident.city}, {ident.country}", moved))
+            doc["cities"][i] = {"city": ident.city, "country": ident.country,
+                                "status": ident.status} | ident.model_dump(
+                mode="json", exclude_none=True, exclude_defaults=True)
+    path.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False, width=100),
+                    encoding="utf-8")
+    return changes
 
 def review_sheet(identities: list[CityIdentity]) -> str:
     """A Markdown summary of the draft for the person approving it."""
@@ -542,8 +627,19 @@ def main() -> int:
     ap.add_argument("--cities", help="comma-separated subset (catalog city names)")
     ap.add_argument("--offline", action="store_true", help="use cached downloads only")
     ap.add_argument("--review", type=Path, help="also write a Markdown review sheet here")
+    ap.add_argument("--recurate", action="store_true",
+                    help="apply the curation rules to the existing --out file (needs only "
+                         "countryInfo.txt); statuses and unchanged entries are kept")
     args = ap.parse_args()
     fetch = Fetcher(args.cache_dir.resolve(), args.offline)
+    if args.recurate:
+        sys.stdout.reconfigure(encoding="utf-8")
+        countries = read_countries(fetch.file("countryInfo.txt", GEONAMES + "countryInfo.txt"))
+        for city, moved in recurate_file(args.out, countries):
+            print(city)
+            for m in moved:
+                print("   ", m)
+        return 0
     catalog = yaml.safe_load(args.catalog.read_text(encoding="utf-8"))["cities"]
     entries = [{"city": e["city"], "country": e["country"]} for e in catalog]  # identity only
     if args.cities:
