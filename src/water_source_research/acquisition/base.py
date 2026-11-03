@@ -12,3 +12,5 @@ class AcquiredDocument:
     retrieved_at: str | None = None  # ISO 8601 UTC
     source_date: str | None = None  # publication/modification date from the document itself
     content_sha256: str | None = None
+    # HTML: outbound links with anchor, context, heading (acquisition/links.py)
+    links: list[dict] | None = None

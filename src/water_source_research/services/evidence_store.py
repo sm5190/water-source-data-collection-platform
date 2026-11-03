@@ -13,7 +13,8 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 from water_source_research.core.versions import EXTRACTION_PROMPT_VERSION
 from water_source_research.db.evidence_models import (
-    ClaimCitationRecord, DiscoveryResultRecord, EvidenceChunkRecord, FieldClaimRecord,
+    ClaimCitationRecord, DiscoveryResultRecord, DocumentLinkRecord, EvidenceChunkRecord,
+    FieldClaimRecord,
     FieldResolutionRecord, RunFieldStateRecord, RunSupplyRelationshipRecord,
     RunUtilityCandidateRecord, SourceDocumentRecord,
 )
@@ -131,6 +132,60 @@ class EvidenceRepository:
                 policy_version=str(registry.get("policy_version"))[:32],
                 identity=str(registry.get("identity"))[:32]) for c in new)
         return len(new)
+
+    def save_document_links(self, run_id: str, links_by_url: Mapping[str, list[Mapping]],
+                            basis: str = "PARSED", observed_at: str | None = None) -> int:
+        """Outbound links of the run's documents (url -> links), insert-or-skip per
+        (document, target, anchor). Returns the number of new rows."""
+        import hashlib
+        if not links_by_url:
+            return 0
+        added = 0
+        with Session(self.engine) as session, session.begin():
+            docs = session.scalars(select(SourceDocumentRecord).where(
+                SourceDocumentRecord.run_id == run_id)).all()
+            ids: dict[str, SourceDocumentRecord] = {}
+            for d in docs:
+                for u in (d.final_url, d.requested_url, d.canonical_url):
+                    if u:
+                        ids.setdefault(u, d)
+            for url, links in links_by_url.items():
+                doc = ids.get(url)
+                if doc is None:
+                    continue
+                existing = set(session.scalars(select(DocumentLinkRecord.link_key).where(
+                    DocumentLinkRecord.run_id == run_id,
+                    DocumentLinkRecord.document_id == doc.id)))
+                for link in links:
+                    key = hashlib.sha1(f"{link['target_url']}|{link.get('anchor_text', '')}"
+                                       .encode()).hexdigest()
+                    if key in existing:
+                        continue
+                    existing.add(key)
+                    session.add(DocumentLinkRecord(
+                        run_id=run_id, document_id=doc.id, source_url=url[:2048], link_key=key,
+                        target_url=link["target_url"][:2048],
+                        target_host=link["target_host"][:255],
+                        anchor_text=(link.get("anchor_text") or "")[:500],
+                        context=(link.get("context") or "")[:300],
+                        heading=(link.get("heading") or "")[:300],
+                        in_footer=bool(link.get("in_footer")), basis=basis,
+                        observed_at=observed_at or doc.retrieved_at))
+                    added += 1
+        return added
+
+    def document_links(self, run_id: str) -> dict[str, list[dict[str, Any]]]:
+        """source document URL -> its stored links."""
+        out: dict[str, list[dict[str, Any]]] = {}
+        with Session(self.engine) as session:
+            for r in session.scalars(select(DocumentLinkRecord).where(
+                    DocumentLinkRecord.run_id == run_id).order_by(DocumentLinkRecord.id)):
+                out.setdefault(r.source_url, []).append({
+                    "document_id": r.document_id, "target_url": r.target_url,
+                    "target_host": r.target_host, "anchor_text": r.anchor_text,
+                    "context": r.context, "heading": r.heading, "in_footer": r.in_footer,
+                    "basis": r.basis, "observed_at": r.observed_at})
+        return out
 
     def save_relationships(self, run_id: str, graph: Mapping[str, Any]) -> int:
         """The run's relationship graph (services/supply_relationships.py) for its policy
@@ -344,6 +399,20 @@ class EvidenceRepository:
                         page_number=c.page_number, ordinal=c.ordinal, text=c.text,
                         char_count=c.char_count))
                     copied += 1
+                have = set(session.scalars(select(DocumentLinkRecord.link_key).where(
+                    DocumentLinkRecord.run_id == to_run,
+                    DocumentLinkRecord.document_id == doc.id)))
+                for link in session.scalars(select(DocumentLinkRecord).where(
+                        DocumentLinkRecord.document_id == src.id,
+                        DocumentLinkRecord.run_id == from_run)):
+                    if link.link_key not in have:
+                        session.add(DocumentLinkRecord(
+                            run_id=to_run, document_id=doc.id, source_url=link.source_url,
+                            link_key=link.link_key, target_url=link.target_url,
+                            target_host=link.target_host, anchor_text=link.anchor_text,
+                            context=link.context, heading=link.heading,
+                            in_footer=link.in_footer, basis=link.basis,
+                            observed_at=link.observed_at))
         return copied
 
     def evidence_chunks(self, run_id: str) -> list[dict[str, Any]]:

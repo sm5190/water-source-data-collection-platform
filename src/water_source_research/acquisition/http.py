@@ -2,6 +2,7 @@ import hashlib
 import trafilatura
 from bs4 import BeautifulSoup
 from .base import AcquiredDocument
+from .links import extract_links
 from .config import AcquisitionSettings
 from .safe_http import FetchError, FetchErrorKind, SafeFetcher
 
@@ -29,6 +30,10 @@ def parse_html(url: str, body: bytes, content_type: str = "text/html") -> Acquir
     html = _decode(body, content_type)
     extracted = trafilatura.extract(html, include_tables=True, include_links=False)
     soup = BeautifulSoup(html, "html.parser")
+    try:
+        links = extract_links(soup, url)
+    except Exception:  # noqa: BLE001 - links are context, never block the document
+        links = []
     if not extracted:
         for tag in soup(["script", "style", "noscript"]):
             tag.decompose()
@@ -51,6 +56,7 @@ def parse_html(url: str, body: bytes, content_type: str = "text/html") -> Acquir
         acquisition_method="DIRECT_HTTP",
         source_date=source_date,
         content_sha256=hashlib.sha256(body).hexdigest(),
+        links=links,
     )
 
 def _decode(body: bytes, content_type: str) -> str:

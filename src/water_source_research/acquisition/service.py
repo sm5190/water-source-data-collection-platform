@@ -63,6 +63,8 @@ class AcquisitionOutcome:
     records: list[dict[str, Any]] = field(default_factory=list)  # one per attempted URL
     chunks: list[EvidenceChunk] = field(default_factory=list)
     skipped_failing: dict[str, str] = field(default_factory=dict)  # key -> reason, this round
+    # document URL (final) -> its outbound links (HTML only; acquisition/links.py)
+    links: dict[str, list[dict]] = field(default_factory=dict)
 
 def doc_key(url: str | None) -> str:
     return canonical_url(url) or (url or "")
@@ -289,6 +291,8 @@ class AcquisitionService:
                 else:
                     hashes.add(doc.content_sha256)
                     outcome.chunks.extend(chunks)
+                    if doc.links:
+                        outcome.links[record.get("final_url") or record["requested_url"]] =                             doc.links
                 record["chunks"] = len(chunks)
                 if response is not None and self.artifacts is not None:
                     await self._store_raw(record, response)

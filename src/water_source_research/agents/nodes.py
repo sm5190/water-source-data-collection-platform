@@ -539,6 +539,12 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
     if evidence_store is not None and outcome.records:
         await asyncio.to_thread(evidence_store.save_documents, state["run_id"],
                                 outcome.records, outcome.chunks)
+        if outcome.links:  # context for municipal affiliation: soft
+            try:
+                await asyncio.to_thread(evidence_store.save_document_links, state["run_id"],
+                                        outcome.links)
+            except Exception:
+                log.warning("could not store document links", exc_info=True)
     updates: GraphState = {"acquired_documents": previous + outcome.records,
                            "evidence_chunks": chunks, "events": events}
     return updates, len(outcome.records), len(new_chunks)

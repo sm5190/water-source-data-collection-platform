@@ -172,6 +172,31 @@ class RunUtilityCandidateRecord(Base):
     identity: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+class DocumentLinkRecord(Base):
+    """An outbound link of an acquired HTML page (acquisition/links.py): target, anchor,
+    context, nearest heading, footer flag. ``basis`` PARSED (at acquisition) or REPARSED
+    (re-read from the stored raw HTML for evaluation). Context for municipal affiliation;
+    never evidence by itself."""
+
+    __tablename__ = "document_links"
+    __table_args__ = (UniqueConstraint("run_id", "document_id", "link_key",
+                                       name="uq_document_links"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    document_id: Mapped[int] = mapped_column(Integer, index=True)
+    source_url: Mapped[str] = mapped_column(String(2048))
+    link_key: Mapped[str] = mapped_column(String(40))  # sha1(target_url | anchor_text)
+    target_url: Mapped[str] = mapped_column(String(2048))
+    target_host: Mapped[str] = mapped_column(String(255))
+    anchor_text: Mapped[str] = mapped_column(String(500), default="")
+    context: Mapped[str] = mapped_column(String(300), default="")
+    heading: Mapped[str] = mapped_column(String(300), default="")
+    in_footer: Mapped[bool] = mapped_column(Boolean, default=False)
+    basis: Mapped[str] = mapped_column(String(16), default="PARSED")
+    observed_at: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 class RunSupplyRelationshipRecord(Base):
     """The run's water-supply relationship graph (services/supply_relationships.py), one row
     per relationship (status REJECTED rows: statements kept to audit exclusions). A rebuild for
