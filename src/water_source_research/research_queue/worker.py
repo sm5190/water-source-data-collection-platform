@@ -43,7 +43,7 @@ RESULT_KEYS = ("finalized", "events", "context_bundle_ids", "procedure_selection
                "post_processing_errors", "distillation_jobs", "acquired_documents",
                "unresolved_fields", "discovery_provider_status", "discovery_candidates",
                "candidate_urls", "resolution_log", "fields_requiring_review", "review_round",
-               "record_set", "completion")
+               "record_set", "completion", "geo_basis")
 
 class _Stop(Exception):
     def __init__(self, reason: str) -> None:

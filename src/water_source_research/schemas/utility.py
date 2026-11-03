@@ -51,6 +51,7 @@ class UtilityRegistry(BaseModel):
     city: str
     country: str | None = None
     identity: str = "catalog-only"  # geo_match.identity_signature
+    geo_basis: str = "NAME_ONLY"  # geo_match.geo_basis: APPROVED | DRAFT_EVALUATION | NAME_ONLY
     candidates: list[UtilityCandidate] = Field(default_factory=list)
 
     def get(self, key: str) -> UtilityCandidate | None:

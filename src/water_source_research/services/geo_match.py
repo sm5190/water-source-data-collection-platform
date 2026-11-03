@@ -432,6 +432,21 @@ def matcher_for(city: str | None, country: str | None) -> GeoMatcher | None:
         return None
     return _matcher(city.strip(), country.strip(), _allow_draft())
 
+GeoBasisKind = Literal["APPROVED", "DRAFT_EVALUATION", "NAME_ONLY"]
+
+def geo_basis(city: str | None, country: str | None) -> dict[str, str]:
+    """What the run's geography rests on, recorded per run so a name-only run is never
+    reported as geographically verified: APPROVED identity, a DRAFT identity used because
+    CITY_IDENTITY_ALLOW_DRAFT is set (evaluation only), or NAME_ONLY (no identity)."""
+    m = matcher_for(city, country)
+    if m is None:
+        basis: GeoBasisKind = "NAME_ONLY"
+    elif m.identity.status == "APPROVED":
+        basis = "APPROVED"
+    else:
+        basis = "DRAFT_EVALUATION"
+    return {"basis": basis, "identity_signature": identity_signature(city, country)}
+
 def identity_signature(city: str | None, country: str | None) -> str:
     """Part of cache keys: changes when the identity used for the city changes."""
     m = matcher_for(city, country)

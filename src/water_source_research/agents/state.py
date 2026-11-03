@@ -28,6 +28,8 @@ class GraphState(TypedDict, total=False):
     # Hosts not fetched or site-searched again this run (commercial/directory hosts shown
     # irrelevant; never government, regulatory, academic, technical or database hosts).
     suppressed_hosts: list[str]
+    # services/geo_match.py::geo_basis: APPROVED | DRAFT_EVALUATION | NAME_ONLY + signature
+    geo_basis: dict[str, str]
     context_bundle_ids: dict[str, str]  # field_key -> persisted ContextBundle id
     claims: list[dict]
     # Normalization/resolution (services/normalization.py, services/resolution.py).

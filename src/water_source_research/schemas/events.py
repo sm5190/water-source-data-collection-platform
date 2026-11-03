@@ -28,11 +28,16 @@ class EventKind(StrEnum):
     # A host (or DOI prefix) skipped for the rest of the run after repeated failed fetches
     # (bot checks, 401/403, empty pages): acquisition/service.py::failing_hosts.
     HOST_SKIPPED = "HOST_SKIPPED"
+    # What the run's geography rests on (services/geo_match.py::geo_basis), once per run.
+    GEO_BASIS = "GEO_BASIS"
+    # The acquisition slot reserved for a credible unverified utility candidate: used or not.
+    UTILITY_SLOT = "UTILITY_SLOT"
 
 # Outcome bookkeeping, not research strategy: not part of distillation trajectories' steps.
 NON_PLANNING_KINDS = frozenset({EventKind.VALIDATION, EventKind.RESOLUTION,
                                 EventKind.UTILITY_STATUS, EventKind.HOST_SUPPRESSED,
-                                EventKind.HOST_SKIPPED})
+                                EventKind.HOST_SKIPPED, EventKind.GEO_BASIS,
+                                EventKind.UTILITY_SLOT})
 
 class EventResult(StrEnum):
     SUCCESS = "SUCCESS"
@@ -57,7 +62,8 @@ ALLOWED_ATTRS = frozenset({
     "validation_override", "reextraction", "new_chunks", "discovery_round",
     "usage_unknown_calls", "cached_tokens", "context_digest", "evidence_items", "skip_reason",
     "items_by_locality", "rule_hits", "persistent_cache_hits",
-    "utility", "roles", "hosts", "host", "policy",
+    "utility", "roles", "hosts", "host", "policy", "geo_basis", "identity_signature",
+    "selection", "candidate",
 })
 MAX_ATTR_CHARS = 300
 

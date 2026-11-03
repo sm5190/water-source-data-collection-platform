@@ -62,9 +62,20 @@ def make_plan_node(
         if "research_state" not in state:
             research = initialize_city_state(state["city_name"], state.get("country"))
             updates["research_state"] = research.model_dump(mode="json")
+        if "geo_basis" not in state:  # recorded once per run (resumes keep the first)
+            from water_source_research.services.geo_match import geo_basis
+            research = CityResearchState.model_validate(
+                updates.get("research_state") or state["research_state"])
+            basis = geo_basis(research.city_name, research.country)
+            updates["geo_basis"] = basis
+            updates["events"] = append_event(
+                list(state.get("events", [])), kind=EventKind.GEO_BASIS, node="plan",
+                strategy="geo_basis", attrs={"geo_basis": basis["basis"],
+                                             "identity_signature": basis["identity_signature"]})
         state = {**state, **updates}
         with get_tracer().start_as_current_span("graph.plan") as span:
             span.set_attribute("research.run_id", state["run_id"])
+            span.set_attribute("research.geo_basis", state["geo_basis"]["basis"])
             if procedure_memory is None:
                 span.set_attribute("procedure.enabled", False)
                 return state

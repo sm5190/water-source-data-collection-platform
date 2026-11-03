@@ -50,7 +50,8 @@ from water_source_research.schemas.utility import (
 )
 from water_source_research.services.city_identity import catalog_only, fold
 from water_source_research.services.geo_match import (
-    UNKNOWN_SCOPE, DocumentScope, GeoMatcher, document_scopes, identity_signature, matcher_for,
+    UNKNOWN_SCOPE, DocumentScope, GeoMatcher, document_scopes, geo_basis, identity_signature,
+    matcher_for,
 )
 
 UTILITY_POLICY_VERSION = "utility-2"  # 2: client vs contractor, untreated water, descriptor names
@@ -455,7 +456,8 @@ def build_registry(state: CityResearchState, chunks: Sequence[EvidenceChunk],
             or any(e.relationship != "MENTION_ONLY" for e in c.evidence)]
     kept.sort(key=lambda c: (order[c.status], c.name.casefold()))
     return UtilityRegistry(policy_version=UTILITY_POLICY_VERSION, city=city, country=country,
-                           identity=identity_signature(city, country), candidates=kept)
+                           identity=identity_signature(city, country),
+                           geo_basis=geo_basis(city, country)["basis"], candidates=kept)
 
 def registry_for_index(research: CityResearchState, index) -> UtilityRegistry:
     """The registry for a validation EvidenceIndex (services/normalization.py), cached on the

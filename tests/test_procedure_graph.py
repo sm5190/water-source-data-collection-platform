@@ -131,7 +131,8 @@ def test_procedure_memory_outage_uses_default_strategy(repo):
     result = run(graph_with(repo), initial(chunks=[CHUNK]))
     assert result["finalized"] and result["procedure_memory_degraded"]
     assert result["procedure_selections"] == []
-    plan_events = [e for e in result["events"] if e["node"] == "plan"]
+    plan_events = [e for e in result["events"]  # GEO_BASIS is bookkeeping, not planning
+                   if e["node"] == "plan" and e["kind"] != "GEO_BASIS"]
     assert plan_events[0]["strategy"] == "default:degraded"
     assert result["research_state"]["fields"][PRIMARY]["candidate_claims"]
 
