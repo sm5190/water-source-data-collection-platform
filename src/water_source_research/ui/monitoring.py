@@ -310,7 +310,11 @@ def usage_table(groups: list[dict[str, Any]], label: str) -> pd.DataFrame:
         "Input tokens": tokens(g, "input_tokens"), "Output tokens": tokens(g, "output_tokens"),
         "Retries": g["retries"], "Failed": g["failed_calls"],
         "Median latency": latency(g["latency_p50_ms"]), "p95": latency(g["latency_p95_ms"]),
-        "Estimated cost": cost(g)} for g in groups])
+        "Estimated cost": cost(g),
+        **({"Credits (estimated)": f"{g.get('credits_estimated') or 0:g}",
+            "Credits (actual)": (f"{g['credits_actual']:g}" if g.get("credits_actual")
+                                 is not None else UNKNOWN)} if g.get("credit_calls") else {}),
+    } for g in groups])
 
 def cache_note(t: dict[str, Any]) -> str:
     """Application cache (no model call) and provider prompt cache (a model call whose repeated
@@ -357,6 +361,14 @@ def render_usage(client: Any) -> None:
         st.info(f"Cost is Unknown for {t['unknown_cost_calls']} model call(s): their "
                 "provider/model has no price in config/llm_prices.yaml (the VT models have "
                 "none). Unknown costs are not counted as zero.")
+    if t.get("credit_calls"):
+        actual = t.get("credits_actual")
+        st.info(f"Crawling credits ({t['credit_calls']} request(s)): estimated "
+                f"{t.get('credits_estimated') or 0:g} (a conservative estimate: kept "
+                "reservations count in full); actual "
+                + (f"{actual:g}" if actual is not None else UNKNOWN)
+                + (f" ({t['unknown_actual_credit_calls']} request(s) not reported by the "
+                   "provider)" if t.get("unknown_actual_credit_calls") else "") + ".")
     if u["groups"]:
         st.dataframe(usage_table(u["groups"], group), hide_index=True, width="stretch")
     else:

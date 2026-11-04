@@ -170,8 +170,24 @@ def summarize_usage(rows: Iterable[Any],
         "unknown_cost_calls": unknown_cost,
         "cost_status": ("NO_CALLS" if not invocations else "UNKNOWN" if not priced
                         else "PARTIAL" if unknown_cost else "KNOWN"),
+        # Credit-priced calls (Firecrawl): actual credits only where the provider reported
+        # them; estimates (or kept reservations) apart, never as actual, never 0 for Unknown.
+        **_credits(rows),
         "source": "ledger",
     }
+
+def _credits(rows: list[Any]) -> dict[str, Any]:
+    credit_rows = [r for r in rows if getattr(r, "kind", None) == "CRAWL"
+                   or r.credits is not None or getattr(r, "credits_estimated", None) is not None]
+    if not credit_rows:
+        return {}
+    actual = [r.credits for r in credit_rows if r.credits is not None]
+    estimated = [r.credits_estimated for r in credit_rows
+                 if getattr(r, "credits_estimated", None) is not None]
+    return {"credit_calls": len(credit_rows),
+            "credits_actual": round(sum(actual), 3) if actual else None,
+            "unknown_actual_credit_calls": len(credit_rows) - len(actual),
+            "credits_estimated": round(sum(estimated), 3) if estimated else None}
 
 def _pct(values: list[int], p: int) -> float | None:
     if not values:
@@ -278,10 +294,21 @@ def run_detail(engine: Engine, run_id: str, settings: Any = None,
                                            S.finished_at, S.summary)
                                     .where(S.run_id == run_id)
                                     .order_by(S.attempt, S.seq)).all()
-        docs = Counter(s for (s,) in session.execute(
-            select(SourceDocumentRecord.status).where(SourceDocumentRecord.run_id == run_id)))
-        rounds = Counter(r for (r,) in session.execute(
-            select(SourceDocumentRecord.round).where(SourceDocumentRecord.run_id == run_id)))
+        doc_rows = session.execute(select(
+            SourceDocumentRecord.status, SourceDocumentRecord.round,
+            SourceDocumentRecord.attempt, SourceDocumentRecord.escalation).where(
+            SourceDocumentRecord.run_id == run_id)).all()
+        # Documents = URLs attempted (direct); a Firecrawl attempt of the same URL is counted
+        # apart, by its recovery status.
+        docs = Counter(r.status for r in doc_rows if (r.attempt or "direct") == "direct")
+        rounds = Counter(r.round for r in doc_rows if (r.attempt or "direct") == "direct")
+        firecrawl = Counter(((r.escalation or {}).get("recovery_status") or r.status)
+                            for r in doc_rows if r.attempt == "firecrawl")
+        firecrawl_credits = sum(float((r.escalation or {}).get("credits_estimated")
+                                      if (r.escalation or {}).get("credits_estimated")
+                                      is not None
+                                      else (r.escalation or {}).get("credits_reserved") or 0)
+                                for r in doc_rows if r.attempt == "firecrawl")
         chunks = session.scalar(select(func.count()).select_from(EvidenceChunkRecord)
                                 .where(EvidenceChunkRecord.run_id == run_id)) or 0
         D = DiscoveryResultRecord
@@ -335,6 +362,9 @@ def run_detail(engine: Engine, run_id: str, settings: Any = None,
         "pipeline": {
             "search_results": found[0], "search_results_kept": found[1],
             "documents": dict(docs), "documents_by_round": dict(sorted(rounds.items())),
+            "firecrawl": ({"attempts": dict(firecrawl),
+                           "credits_estimated_or_reserved": firecrawl_credits}
+                          if firecrawl else None),
             "chunks": chunks,
             "extraction": {k: {**v, "statuses": dict(v["statuses"])}
                            for k, v in sorted(per_field.items())},
