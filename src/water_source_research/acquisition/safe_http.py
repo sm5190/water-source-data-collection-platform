@@ -201,6 +201,30 @@ class SafeFetcher:
             except httpx.HTTPError as exc:
                 raise FetchError(FetchErrorKind.NETWORK, f"{type(exc).__name__}") from None
 
+    async def robots_decision(self, url: str) -> str:
+        """ALLOWED | DISALLOWED | UNREACHABLE | NOT_CHECKED (robots not honoured, or the host
+        is blocked/invalid). Uses (and fills) the per-origin cache: for a URL the fetcher
+        already tried it makes no request."""
+        if not self.s.respect_robots:
+            return "NOT_CHECKED"
+        try:
+            await self._check_host(url)
+            allowed = await self._robots_allow(url)
+        except FetchError:
+            return "NOT_CHECKED"
+        if allowed is None:
+            return "UNREACHABLE"
+        return "ALLOWED" if allowed else "DISALLOWED"
+
+    async def check_public(self, url: str) -> str | None:
+        """None when ``url`` is an acceptable public http(s) URL on 80/443, else the reason
+        (same checks as a fetch: scheme, port, credentials, every resolved address)."""
+        try:
+            await self._check_host(url)
+        except FetchError as exc:
+            return exc.kind.value
+        return None
+
     async def _robots_allow(self, url: str) -> bool | None:
         """Allowed by robots.txt; None when robots.txt couldn't be read (stay away)."""
         parts = urlsplit(url)

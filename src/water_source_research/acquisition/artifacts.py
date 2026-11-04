@@ -8,7 +8,8 @@ import threading
 from typing import Protocol
 from .config import ArtifactSettings
 
-_EXTENSIONS = {"application/pdf": ".pdf", "text/html": ".html", "text/plain": ".txt"}
+_EXTENSIONS = {"application/pdf": ".pdf", "text/html": ".html", "text/plain": ".txt",
+               "text/markdown": ".md"}
 
 class ArtifactStore(Protocol):
     def put(self, data: bytes, sha256: str, content_type: str) -> str: ...

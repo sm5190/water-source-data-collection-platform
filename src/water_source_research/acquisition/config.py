@@ -24,6 +24,18 @@ class AcquisitionSettings(BaseModel):
     respect_robots: bool = True
     user_agent: str = "VT-Water-Source-Research/0.1 (research crawler; respects robots.txt)"
 
+    # Firecrawl fetch fallback (acquisition/firecrawl.py): OFF unless explicitly enabled AND
+    # FIRECRAWL_API_KEY is set. Only pages the direct fetch read as empty, or couldn't reach
+    # (timeout, network, HTTP 429/5xx) on an origin whose robots.txt allowed it, are retried;
+    # 401/403, bot checks and robots refusals never are. The cap is a conservative estimate of
+    # credits per run (the scrape API reports no per-request charge); the lower of this and
+    # MAX_FIRECRAWL_CREDITS_PER_CITY applies.
+    firecrawl_enabled: bool = False
+    firecrawl_max_credits_per_run: int = Field(default=20, ge=1, le=500)
+    firecrawl_pdf_max_pages: int = Field(default=8, ge=1, le=100)
+    firecrawl_concurrency: int = Field(default=2, ge=1, le=8)
+    firecrawl_timeout_seconds: float = Field(default=90, gt=0)
+
     # Chunking (characters). Overlap is carried into the next chunk only when it fits.
     chunk_max_chars: int = Field(default=2000, ge=200)
     chunk_overlap_chars: int = Field(default=200, ge=0)
