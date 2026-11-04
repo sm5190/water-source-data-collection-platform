@@ -1,0 +1,20 @@
+{
+ "directory": "reports/eval/firecrawl",
+ "written_at": "2026-11-04T04:44:09+00:00",
+ "git_commit": "9cad8c9",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "live_check.json",
+   "bytes": 2860,
+   "sha256": "3339827b9bfdebd9ea5e42444626e91821b290be7b6ab75683bcf98e7a7e7649",
+   "modified": "2026-11-04T04:32:35+00:00"
+  },
+  {
+   "path": "pilot_santiago.json",
+   "bytes": 1488,
+   "sha256": "0ed5f941dbed9862e76e7e540a1ccc81e68c4745546b956be1e8e05bdb58cbb6",
+   "modified": "2026-11-04T04:40:40+00:00"
+  }
+ ]
+}
