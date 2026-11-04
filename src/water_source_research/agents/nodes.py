@@ -506,7 +506,8 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
                                               skip_hosts=state.get("suppressed_hosts") or [],
                                               features=features,
                                               candidate_hosts=candidate_hosts(state),
-                                              city=research.city_name, reserved=reserved)
+                                              city=research.city_name, reserved=reserved,
+                                              run_id=state.get("run_id"))
     chunks = list(state.get("evidence_chunks", []))
     known = {c["chunk_id"] for c in chunks}
     new_chunks = [c for c in outcome.chunks if c.chunk_id not in known]
@@ -547,9 +548,16 @@ async def _acquire(acquisition: AcquisitionService, evidence_store: EvidenceRepo
         strategy = "fetch:" + rec["status"].lower()
         if rec.get("error_kind"):
             strategy += ":" + rec["error_kind"].lower()
+        firecrawl = rec.get("attempt") == "firecrawl"
+        if firecrawl:
+            esc = rec.get("escalation") or {}
+            strategy = "firecrawl:" + str(esc.get("recovery_status") or "failed").lower()
+            attrs["reason_code"] = esc.get("retry_reason") or ""
         events = append_event(events, kind=EventKind.TOOL_CALL, node="acquire",
-                              capability=Capability.STATIC_DOCUMENT_FETCH,
-                              provider="direct_http", strategy=strategy,
+                              capability=(Capability.DYNAMIC_DOCUMENT_ACQUISITION if firecrawl
+                                          else Capability.STATIC_DOCUMENT_FETCH),
+                              provider="firecrawl" if firecrawl else "direct_http",
+                              strategy=strategy,
                               result=EventResult.SUCCESS if ok else EventResult.FAILURE,
                               attrs=attrs)
         if ok and rec.get("acquisition_method") == "DIRECT_HTTP_PDF":

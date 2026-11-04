@@ -22,7 +22,7 @@ _COPIED = ("requested_url", "canonical_url", "final_url", "title", "source_type"
            "publisher_kind", "classification_version", "classification_signals",
            "acquisition_method", "media_type", "retrieved_at", "source_date", "content_sha256",
            "byte_size", "page_count", "status", "error_kind", "error_message", "raw_object_key",
-           "discovery_provider", "discovery_query", "duration_ms")
+           "discovery_provider", "discovery_query", "duration_ms", "attempt", "escalation")
 
 class ReplayAcquisition:
     """``city``: re-check each document's source type under the current rules
@@ -54,7 +54,7 @@ class ReplayAcquisition:
                             round_no: int = 1, priority_hosts: Any = (),
                             skip_hosts: Any = (), features: Any = (), *,
                             candidate_hosts: Any = (), city: Any = None,
-                            reserved: Any = ()) -> AcquisitionOutcome:
+                            reserved: Any = (), run_id: Any = None) -> AcquisitionOutcome:
         """The parent's documents of ``round_no`` (candidates are ignored: nothing is
         discovered or fetched in a replay)."""
         self.served.append(round_no)

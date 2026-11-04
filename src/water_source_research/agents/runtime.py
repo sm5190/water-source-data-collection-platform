@@ -42,7 +42,7 @@ def build_production_graph(
         run_recorder=recorder,
         checkpointer=checkpointer,
         discovery=build_discovery_service(settings),
-        acquisition=build_acquisition_service(settings, artifact_store),
+        acquisition=build_acquisition_service(settings, artifact_store, engine),
         evidence_store=EvidenceRepository(engine),
         record_store=RecordRepository(engine),
         # Persistent human review (pauses the run) whenever runs are checkpointed.

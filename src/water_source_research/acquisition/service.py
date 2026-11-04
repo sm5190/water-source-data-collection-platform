@@ -14,7 +14,7 @@ import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 from water_source_research.discovery.normalize import canonical_url, municipal_hint
 from water_source_research.observability.otel import get_tracer
@@ -27,6 +27,9 @@ from .config import AcquisitionSettings
 from .http import parse_html
 from .pdf import is_pdf, parse_pdf
 from .safe_http import FetchedResponse, FetchError, FetchErrorKind, SafeFetcher
+
+if TYPE_CHECKING:
+    from .escalation import FirecrawlEscalator
 
 log = logging.getLogger(__name__)
 
@@ -233,10 +236,13 @@ def select_candidates(candidates: list[Mapping[str, Any]],
 class AcquisitionService:
     def __init__(self, settings: AcquisitionSettings | None = None, *,
                  fetcher: SafeFetcher | None = None,
-                 artifact_store: ArtifactStore | None = None) -> None:
+                 artifact_store: ArtifactStore | None = None,
+                 firecrawl: "FirecrawlEscalator | None" = None) -> None:
         self.s = settings or AcquisitionSettings()
         self.fetcher = fetcher or SafeFetcher(self.s)
         self.artifacts = artifact_store
+        # Fetch fallback (acquisition/escalation.py); None = off (the default).
+        self.firecrawl = firecrawl
 
     async def acquire_round(self, candidates: list[Mapping[str, Any]],
                             previous: list[Mapping[str, Any]],
@@ -246,19 +252,26 @@ class AcquisitionService:
                             features: Sequence[str] = (), *,
                             candidate_hosts: Sequence[str] = (),
                             city: str | None = None,
-                            reserved: Sequence[Mapping[str, Any]] = ()) -> AcquisitionOutcome:
+                            reserved: Sequence[Mapping[str, Any]] = (),
+                            run_id: str | None = None) -> AcquisitionOutcome:
         """Acquire new documents for one round. ``previous`` are earlier document records
         (any status), used for de-duplication and the per-run budget. Never raises."""
         attempted = set()
         hashes = set()
+        acquired = set()  # keys of documents actually read (OK), for Firecrawl results
         for r in previous:
             attempted.add(r.get("canonical_url") or doc_key(r.get("requested_url")))
             if r.get("final_url"):
                 attempted.add(doc_key(r["final_url"]))
             if r.get("content_sha256") and r.get("status") == DocStatus.OK:
                 hashes.add(r["content_sha256"])
+            if r.get("status") == DocStatus.OK:
+                acquired |= {r.get("canonical_url"), doc_key(r.get("final_url"))}
+        # The document budget counts URLs (direct attempts); a Firecrawl attempt of the same
+        # URL has its own credit budget.
         budget = self.s.max_documents_total - sum(
-            1 for r in previous if r.get("status") != DocStatus.SKIPPED_DUPLICATE)
+            1 for r in previous if r.get("status") != DocStatus.SKIPPED_DUPLICATE
+            and (r.get("attempt") or "direct") == "direct")
         outcome = AcquisitionOutcome()
         if budget <= 0:
             return outcome
@@ -296,8 +309,46 @@ class AcquisitionService:
                 record["chunks"] = len(chunks)
                 if response is not None and self.artifacts is not None:
                     await self._store_raw(record, response)
+                if record["status"] == DocStatus.OK:
+                    acquired |= {record["canonical_url"], final_key}
             outcome.records.append(record)
+        if self.firecrawl is not None and run_id:
+            await self._escalate(run_id, round_no, outcome, acquired, hashes)
         return outcome
+
+    async def _escalate(self, run_id: str, round_no: int, outcome: AcquisitionOutcome,
+                        acquired: set, hashes: set) -> None:
+        """Firecrawl attempts for this round's retryable failures, appended beside them."""
+        try:
+            results = await self.firecrawl.escalate(run_id, round_no, outcome.records)
+        except Exception:  # the fallback never fails a round
+            log.warning("firecrawl escalation failed", exc_info=True)
+            return
+        for record, doc in results:
+            record["round"] = round_no
+            final_key = doc_key(record.get("final_url"))
+            if doc is not None and record["status"] == DocStatus.OK and (
+                    (final_key and final_key in acquired) or doc.content_sha256 in hashes):
+                record["status"] = DocStatus.SKIPPED_DUPLICATE
+                record["error_message"] = "same document already acquired"
+                record["escalation"]["recovery_status"] = "DUPLICATE"
+                doc = None
+            if doc is not None:
+                chunks = chunk_document(doc, source_type=record.get("source_type"),
+                                        max_chars=self.s.chunk_max_chars,
+                                        overlap_chars=self.s.chunk_overlap_chars)
+                if not chunks:
+                    record["status"] = DocStatus.EMPTY
+                    record["escalation"]["recovery_status"] = "EMPTY"
+                else:
+                    hashes.add(doc.content_sha256)
+                    acquired |= {record["canonical_url"], final_key}
+                    outcome.chunks.extend(chunks)
+                    if doc.links:
+                        outcome.links[record.get("final_url") or record["requested_url"]] = \
+                            doc.links
+                record["chunks"] = len(chunks)
+            outcome.records.append(record)
 
     async def _fetch_one(self, c: Mapping[str, Any]
                          ) -> tuple[dict[str, Any], AcquiredDocument | None,
@@ -336,7 +387,7 @@ class AcquisitionService:
             "page_count": None, "status": DocStatus.FAILED, "error_kind": None,
             "error_message": None, "raw_object_key": None, "chunks": 0,
             "discovery_provider": c.get("provider"), "discovery_query": c.get("query"),
-            "duration_ms": 0.0,
+            "duration_ms": 0.0, "attempt": "direct",
         }
         if c.get("selection"):
             record["selection"] = c["selection"]
@@ -411,8 +462,29 @@ class AcquisitionService:
             log.warning("could not store raw artifact for %s: %s", record["requested_url"], exc)
             record["artifact_error"] = f"{type(exc).__name__}: {exc}"[:300]
 
-def build_acquisition_service(settings, artifact_store: ArtifactStore | None = None
-                              ) -> AcquisitionService | None:
+def build_acquisition_service(settings, artifact_store: ArtifactStore | None = None,
+                              engine=None) -> AcquisitionService | None:
     if not settings.acquisition.enabled:
         return None
-    return AcquisitionService(settings.acquisition, artifact_store=artifact_store)
+    fetcher = SafeFetcher(settings.acquisition)
+    return AcquisitionService(settings.acquisition, fetcher=fetcher,
+                              artifact_store=artifact_store,
+                              firecrawl=build_firecrawl(settings, fetcher, artifact_store,
+                                                        engine))
+
+def build_firecrawl(settings, fetcher: SafeFetcher, artifact_store=None, engine=None
+                    ) -> "FirecrawlEscalator | None":
+    """The Firecrawl fallback, only when explicitly enabled AND a key is set AND attempts can
+    be persisted (the budget must survive restarts); else None (today's behaviour)."""
+    acq = settings.acquisition
+    if not (acq.firecrawl_enabled and settings.firecrawl_api_key and engine is not None):
+        return None
+    from .escalation import FirecrawlEscalator
+    from .firecrawl import FirecrawlClient
+    from .firecrawl_store import FirecrawlAttemptStore
+    cap = min(acq.firecrawl_max_credits_per_run, settings.max_firecrawl_credits_per_city)
+    return FirecrawlEscalator(
+        FirecrawlClient(settings.firecrawl_api_key, timeout_seconds=acq.firecrawl_timeout_seconds),
+        FirecrawlAttemptStore(engine), fetcher, cap=cap,
+        pdf_max_pages=acq.firecrawl_pdf_max_pages, concurrency=acq.firecrawl_concurrency,
+        artifacts=artifact_store)

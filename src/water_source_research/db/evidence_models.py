@@ -17,8 +17,10 @@ from .models import Base, JSONType, utcnow
 
 class SourceDocumentRecord(Base):
     __tablename__ = "source_documents"
-    __table_args__ = (UniqueConstraint("run_id", "canonical_url",
-                                       name="uq_source_documents_run_url"),)
+    # One record per URL and attempt: the direct fetch, and (only when it failed in a
+    # retryable way) one Firecrawl attempt kept beside it, never replacing it.
+    __table_args__ = (UniqueConstraint("run_id", "canonical_url", "attempt",
+                                       name="uq_source_documents_run_url_attempt"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(64), index=True)
@@ -51,7 +53,36 @@ class SourceDocumentRecord(Base):
     discovery_provider: Mapped[str | None] = mapped_column(String(64))
     discovery_query: Mapped[str | None] = mapped_column(String(1000))
     duration_ms: Mapped[float | None] = mapped_column(Float)
+    # direct | firecrawl. escalation (Firecrawl attempts only): recovery status, credits
+    # (reserved / estimated; actual unknown), representation chosen and why, PDF coverage.
+    attempt: Mapped[str] = mapped_column(String(16), default="direct",
+                                         server_default="direct")
+    escalation: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class FirecrawlAttemptRecord(Base):
+    """One Firecrawl request per (run, URL), ever. Written PENDING (with its credit
+    reservation) before the request is sent, so a restarted worker never repeats a request
+    that may have been billed; settled afterwards. An uncertain outcome (timeout, dropped
+    connection, process death) keeps its reservation: the run's budget is a conservative
+    estimate, since the scrape API doesn't report credits per request."""
+
+    __tablename__ = "firecrawl_attempts"
+    __table_args__ = (UniqueConstraint("run_id", "canonical_url",
+                                       name="uq_firecrawl_attempts_run_url"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    canonical_url: Mapped[str] = mapped_column(String(2048))
+    round: Mapped[int] = mapped_column(Integer, default=1)
+    state: Mapped[str] = mapped_column(String(16))  # PENDING | SETTLED | UNCERTAIN
+    credits_reserved: Mapped[float] = mapped_column(Float)
+    credits_estimated: Mapped[float | None] = mapped_column(Float, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    error_kind: Mapped[str | None] = mapped_column(String(32))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                         nullable=True)
 
 class EvidenceChunkRecord(Base):
     __tablename__ = "evidence_chunks"

@@ -95,6 +95,9 @@ class ProviderUsageRecord(Base):
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cached_tokens: Mapped[int | None] = mapped_column(Integer)
     credits: Mapped[float | None] = mapped_column(Float)
+    # Estimated credits where the provider reports none per request (Firecrawl scrape);
+    # ``credits`` stays NULL (Unknown) then, never 0.
+    credits_estimated: Mapped[float | None] = mapped_column(Float, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[float | None] = mapped_column(Float)
     cost_basis: Mapped[str | None] = mapped_column(String(128))  # price-table key used

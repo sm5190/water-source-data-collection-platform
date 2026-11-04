@@ -366,3 +366,32 @@ def test_a_final_stage_reviewed_from_the_reference_is_not_independent(engine, tm
     perf = performance(store)
     assert perf["cities"][0]["final_reference_derived"]
     assert "FINAL" not in perf["stages"]  # never pooled into the automated scores
+
+def test_a_partially_read_pdf_is_never_evidence_that_a_value_is_absent():
+    """Firecrawl PDFs truncated to their first pages (coverage PARTIAL): a reference value
+    missing from them is UNKNOWN, not an acquisition failure; the read (OK) attempt of a URL
+    represents it over its failed direct attempt."""
+    from water_source_research.evaluation.diagnosis import Diagnoser
+    from water_source_research.evaluation.policy import load_policy
+    from water_source_research.evaluation.reference import ReferenceValue
+    from water_source_research.services.field_state import load_field_definitions
+    url = "https://www.example.gov/annual-report.pdf"
+    docs = [{"document_id": 1, "requested_url": url, "canonical_url": url, "final_url": url,
+             "status": "FAILED", "error_kind": "TIMEOUT", "attempt": "direct", "chunks": 0},
+            {"document_id": 2, "requested_url": url, "canonical_url": url, "final_url": url,
+             "status": "OK", "attempt": "firecrawl", "chunks": 3,
+             "escalation": {"coverage": "PARTIAL", "pages_parsed": 8, "pages_total": 40}}]
+    snap = {"chunks": [], "discovery_candidates": [], "documents": docs,
+            "context_bundles": [], "discovery_results": [], "context_bundle_basis": "none"}
+    fields = load_field_definitions()
+    dx = Diagnoser(snap, fields, load_policy())
+    [trail] = dx.source_trail([url])
+    assert trail["document_status"] == "OK" and trail["coverage"] == "PARTIAL"
+    ref = ReferenceValue(field_key="total_city_water_withdrawals_m3_day", scope="CITY",
+                         raw=450000, normalized=450000, value_status="KNOWN",
+                         source_urls=[url])
+    d = dx._upstream(fields["total_city_water_withdrawals_m3_day"],
+                     "total_city_water_withdrawals_m3_day", "", ref,
+                     {"predicted": {"candidates": []}}, [])
+    assert (d["root_cause"], d["confidence"]) == ("UNKNOWN", "UNKNOWN")
+    assert "not evidence that the value is absent" in d["explanation"]

@@ -5,6 +5,7 @@ the step plus what changed since the previous one (new events, claims, ...). Sum
 bounded in size; full detail lives in the run result and the trusted event log.
 """
 
+from collections import Counter
 from typing import Any
 from .diagnostics import process_sample, state_size
 
@@ -63,6 +64,22 @@ def summarize_step(node: str, state: dict[str, Any], previous: dict[str, Any]) -
                                                          "source_type", "error_kind",
                                                          "chunks")}
                                   for d in new_docs][:MAX_TOP_CANDIDATES])
+        fc = [d for d in new_docs if d.get("attempt") == "firecrawl"]
+        noted = [((d.get("escalation") or {}).get("firecrawl")) for d in new_docs
+                 if (d.get("escalation") or {}).get("firecrawl")]
+        if fc or noted:
+            status = [(d.get("escalation") or {}).get("recovery_status") or d.get("status")
+                      for d in fc]
+            run_fc = [d for d in docs if d.get("attempt") == "firecrawl"]
+            summary["firecrawl"] = {
+                "sent": len(fc), "recovered": status.count("RECOVERED"),
+                "partial": status.count("PARTIAL"), "outcomes": dict(Counter(status)),
+                "not_sent": dict(Counter(str(n).split(":", 1)[0] for n in noted)),
+                # conservative: settled estimates, else the reservation kept
+                "credits_run": sum(float(e.get("credits_estimated")
+                                         if e.get("credits_estimated") is not None
+                                         else e.get("credits_reserved") or 0)
+                                   for e in ((d.get("escalation") or {}) for d in run_fc))}
     elif node == "extract":
         new_claims = state.get("claims", [])[len(previous.get("claims", [])):]
         summary.update(

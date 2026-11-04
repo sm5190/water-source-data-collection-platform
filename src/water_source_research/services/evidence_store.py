@@ -32,7 +32,7 @@ _DOC_COLUMNS = ("round", "requested_url", "canonical_url", "final_url", "title",
                 "acquisition_method", "media_type", "retrieved_at", "source_date",
                 "content_sha256", "byte_size", "page_count", "status", "error_kind",
                 "error_message", "raw_object_key", "artifact_error", "discovery_provider",
-                "discovery_query", "duration_ms")
+                "discovery_query", "duration_ms", "attempt", "escalation")
 _LIMITS = {"requested_url": 2048, "canonical_url": 2048, "final_url": 2048, "title": 1000,
            "media_type": 255, "error_message": 1000, "artifact_error": 500,
            "discovery_query": 1000}
@@ -59,7 +59,8 @@ class EvidenceRepository:
                 doc = session.scalar(select(SourceDocumentRecord).where(
                     SourceDocumentRecord.run_id == run_id,
                     SourceDocumentRecord.canonical_url == _clip("canonical_url",
-                                                                rec["canonical_url"])))
+                                                                rec["canonical_url"]),
+                    SourceDocumentRecord.attempt == (rec.get("attempt") or "direct")))
                 if doc is None:
                     doc = SourceDocumentRecord(
                         run_id=run_id, chunk_count=rec.get("chunks") or 0,
@@ -375,7 +376,8 @@ class EvidenceRepository:
             for src in sources:
                 doc = session.scalar(select(SourceDocumentRecord).where(
                     SourceDocumentRecord.run_id == to_run,
-                    SourceDocumentRecord.canonical_url == src.canonical_url))
+                    SourceDocumentRecord.canonical_url == src.canonical_url,
+                    SourceDocumentRecord.attempt == src.attempt))
                 if doc is None:
                     columns = {k: getattr(src, k) for k in _DOC_COLUMNS}
                     if reclassify_city is not None:

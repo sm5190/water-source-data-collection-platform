@@ -84,7 +84,9 @@ class Diagnoser:
             self.returned.setdefault(canonical_url(h["url"]), []).append(h)
         self.recorded_queries = sorted({h["query"] for h in hits if h.get("query")})
         self.documents: dict[str, dict[str, Any]] = {}
-        for d in snap["documents"]:
+        # A URL may have a failed direct attempt and a Firecrawl attempt: the one that was
+        # read (OK) represents it.
+        for d in sorted(snap["documents"], key=lambda d: d.get("status") != "OK"):
             for u in (d.get("requested_url"), d.get("final_url"), d.get("canonical_url")):
                 if u:
                     self.documents.setdefault(canonical_url(u), d)
@@ -168,6 +170,8 @@ class Diagnoser:
                               "provider", "query", "position", "retained")} for h in hits[:3]],
                           "document_id": doc["document_id"] if doc else None,
                           "document_status": doc["status"] if doc else None,
+                          "coverage": ((doc.get("escalation") or {}).get("coverage")
+                                       if doc else None),
                           "chunks": doc.get("chunks") if doc else None})
         return trail
 
@@ -302,6 +306,13 @@ class Diagnoser:
                          "say which one gave this field — needs review")
         if any(t["document_status"] == "OK" for t in trail):
             ok = [t for t in trail if t["document_status"] == "OK"]
+            if any(t.get("coverage") == "PARTIAL" for t in ok):
+                # Only some pages were read: the missing ones may hold the value.
+                return _diag("RAW", record_key, field_key, "UNKNOWN", "UNKNOWN", symptoms,
+                             probes,
+                             f"the reference's source {ok[0]['url']} was read only in part "
+                             "(PDF truncated to its first pages); its omitted pages are not "
+                             "evidence that the value is absent — needs review")
             if d.type not in ("number", "percent", "coordinate"):
                 # A paraphrased reference ("Peak Demand Periods") needn't appear verbatim.
                 return _diag("RAW", record_key, field_key, "UNKNOWN", "UNKNOWN", symptoms,
