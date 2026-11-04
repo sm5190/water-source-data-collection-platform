@@ -433,3 +433,24 @@ def test_a_reported_charge_is_recorded_apart_and_the_budget_takes_the_higher(tmp
     assert store.used("run-1") == 2.0
     assert rows[0]["credits"] == 2.0 and rows[0]["credits_estimated"] == 1.0
     assert rows[0]["attempt_errors"] is None
+
+def test_a_stated_retrieval_failure_settles_at_zero_but_a_generic_5xx_stays_uncertain(tmp_path):
+    """Seen live (Santiago pilot): HTTP 500 'All scraping engines failed to retrieve content
+    from this URL' -> no document, 0 credits; the documented generic UNKNOWN_ERROR 500 keeps
+    its reservation."""
+    a, b = "https://city.example/a", "https://city.example/b"
+    site = Site().html(a, BARE).html(b, BARE)
+    fake = FakeFirecrawl().raw(a, lambda: httpx.Response(500, json={
+        "success": False, "error": "All scraping engines failed to retrieve content from "
+                                   "this URL. Engines tried: [fire-engine;chrome-cdp]"}))
+    fake.raw(b, lambda: httpx.Response(500, json={
+        "success": False, "code": "UNKNOWN_ERROR",
+        "error": "An unexpected error occurred on the server."}))
+    svc, store, _ = build(tmp_path, site, fake)
+    out = run(svc, [a, b])
+    by_url = {r["requested_url"]: r for r in by_attempt(out.records, "firecrawl")}
+    assert by_url[a]["error_kind"] == "FIRECRAWL_SCRAPE_FAILED"
+    assert by_url[a]["escalation"]["recovery_status"] == "FAILED"
+    assert by_url[a]["escalation"]["credits_estimated"] == 0.0
+    assert by_url[b]["escalation"]["recovery_status"] == "UNCERTAIN"
+    assert store.used("run-1") == 2.0  # only b's reservation is kept

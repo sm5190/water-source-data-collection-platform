@@ -32,6 +32,9 @@ class FirecrawlErrorKind(StrEnum):
     SERVER = "SERVER"  # 5xx: UNCERTAIN unless the body says it failed
     BAD_RESPONSE = "BAD_RESPONSE"  # 2xx without a usable body: UNCERTAIN
     REQUEST = "REQUEST"  # other 4xx (request rejected before any work): not billed
+    # 5xx whose body states the page could not be retrieved ("All scraping engines failed
+    # to retrieve content"): a definite no-document outcome (0 credits per the billing docs)
+    SCRAPE_FAILED = "SCRAPE_FAILED"
 
 # Outcomes where Firecrawl may have done (and billed) the work although we got no answer.
 UNCERTAIN_KINDS = frozenset({FirecrawlErrorKind.TIMEOUT, FirecrawlErrorKind.NETWORK,
@@ -180,6 +183,11 @@ def _retry_after(r: httpx.Response) -> float:
     except ValueError:
         return 5.0
 
+# Only explicit statements that no content was retrieved; a generic "unexpected error" stays
+# SERVER (uncertain: the work may have been done and billed).
+_NO_DOCUMENT = re.compile(r"engines failed to retrieve|failed to retrieve content|"
+                          r"could not retrieve content", re.IGNORECASE)
+
 def _http_error(status: int, payload: dict[str, Any]) -> FirecrawlError:
     message = str(payload.get("error") or payload.get("code") or f"HTTP {status}")[:300]
     if status == 401:
@@ -191,6 +199,8 @@ def _http_error(status: int, payload: dict[str, Any]) -> FirecrawlError:
     if status == 408:
         return FirecrawlError(FirecrawlErrorKind.TIMEOUT, message, status)
     if status >= 500:
+        if payload.get("success") is False and _NO_DOCUMENT.search(str(payload.get("error"))):
+            return FirecrawlError(FirecrawlErrorKind.SCRAPE_FAILED, message, status)
         return FirecrawlError(FirecrawlErrorKind.SERVER, message, status)
     return FirecrawlError(FirecrawlErrorKind.REQUEST, message, status)
 
