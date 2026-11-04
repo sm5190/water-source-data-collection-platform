@@ -174,6 +174,10 @@ class ContextItem:
     # source at least as authoritative: it is still shown, but doesn't make the field worth a
     # model call on its own.
     repeat_of: dict[str, str] | None = None
+    # With an approved identity: a short line on where the passage is (the city, uncertain,
+    # another place, its section's place, a source's stated location). Rendered above the
+    # passage, outside the quotable text.
+    place_tag: str | None = None
 
 @dataclass(slots=True)
 class SourceRef:
@@ -321,7 +325,8 @@ class ContextBundle:
         grouped: dict[str, list[str]] = {}
         for item in self.items:
             if item.kind == "evidence" and item.source_id:
-                grouped.setdefault(item.source_id, []).append(item.text)
+                text = f"({item.place_tag})\n{item.text}" if item.place_tag else item.text
+                grouped.setdefault(item.source_id, []).append(text)
         if grouped:
             blocks = [
                 self.sources[sid].label() + "\n" + "\n\n".join(texts)
@@ -329,6 +334,29 @@ class ContextBundle:
             ]
             sections.append("## Evidence\n" + "\n\n".join(blocks))
         return "\n\n".join(sections)
+
+def _geographic_place(state: CityResearchState, place: str) -> tuple[str, list[str]]:
+    """With an approved identity: "City, Region, Country (not: <largest homonyms>)" and the
+    note that sources may lie outside the city. Without one: unchanged (name-only)."""
+    from water_source_research.services.geo_match import matcher_for
+    m = matcher_for(state.city_name, state.country)
+    if m is None:
+        return place, []
+    ident = m.identity
+    parts = [state.city_name]
+    if ident.region and fold_key(ident.region.name) != fold_key(state.city_name):
+        parts.append(ident.region.name)
+    parts.append(_country(state) or ident.country)
+    homonyms = sorted(ident.homonyms, key=lambda h: -(h.population or 0))[:3]
+    others = [", ".join(x for x in (h.name, h.region, h.country) if x) for h in homonyms]
+    line = ", ".join(parts) + (f" (not: {'; '.join(others)})" if others else "")
+    note = ("Water sources may lie outside the city (upstream, in other regions or "
+            "countries). Each passage carries a place note; quote only passage text.")
+    return line, [note]
+
+def fold_key(text: str) -> str:
+    from water_source_research.services.city_identity import fold
+    return fold(text)
 
 class _SourceRegistry:
     def __init__(self, bundle: ContextBundle) -> None:
@@ -565,11 +593,14 @@ class ContextManager:
 
     def _header(self, purpose: ContextPurpose, targets: list[str], state: CityResearchState) -> str:
         place = ", ".join(x for x in (state.city_name, _country(state)) if x)
+        geo_lines = []
+        if purpose == ContextPurpose.EXTRACT:
+            place, geo_lines = _geographic_place(state, place)
         # The EXTRACT header keeps its "Target fields" section: dropping it (extract-4) made the
         # model miss a source named only in a dam's location ("on Ruiru River": 8 of 9 calls
         # with it, 3 of 10 without, same evidence). It costs the response cache nothing in a
         # replay or retry: the same state gives the same status line.
-        lines =[f"# Task: {purpose.value}", f"City: {place}", "## Target fields"]
+        lines = [f"# Task: {purpose.value}", f"City: {place}", *geo_lines, "## Target fields"]
         for key in targets:
             d = self.fields[key]
             kind = f"enum: {' | '.join(d.allowed)}" if d.allowed else d.type
@@ -776,6 +807,7 @@ class ContextManager:
                            for k in keys},
                     also_found_in=also.get(pos), repeat_of=repeat or None,
                     geo=relevance.geo_note(chunk),
+                    place_tag=relevance.place_tag(chunk, passage),
                 ))
                 used += cost
                 per_source[chunk.url] += 1

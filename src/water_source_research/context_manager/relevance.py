@@ -110,6 +110,29 @@ class RelevanceContext:
         s = self.scope(chunk.url)
         return f"{s.label()}: {'; '.join(s.reasons)}"
 
+    def place_tag(self, chunk: EvidenceChunk, passage: str) -> str | None:
+        """Where the passage is, for the prompt (approved identity only; None otherwise):
+        "place: the city (confirmed)", "place: uncertain", "place: another place",
+        "place: section '...' (the city)", plus "source located in X" when stated."""
+        if self.matcher is None:
+            return None
+        m, scope = self.matcher, self.scope(chunk.url)
+        place = m.match_place(passage, scope)
+        labels = {"CONFIRMED": "the city (confirmed)", "PROBABLE": "probably the city",
+                  "HOMONYM": "another place with the same name", "OTHER_PLACE": "another place",
+                  "AMBIGUOUS": "uncertain"}
+        tag = labels.get(place.status)
+        if place.status in ("NONE", "AMBIGUOUS"):
+            local = m.section_place(chunk.text, max(0, chunk.text.find(passage[:40])), scope)
+            if local is not None:
+                tag = f"section '{local.evidence[:60]}' (the city)"
+        if tag is None:
+            tag = "the city is not named"
+        located = [f.place for f in m.feature_locations(passage)][:2]
+        if located:
+            tag += "; source located in " + ", ".join(located)
+        return "place: " + tag
+
     def doc_names_city(self, chunk: EvidenceChunk) -> bool:
         pages = self.city_pages.get(chunk.url)
         if not pages:
