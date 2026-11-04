@@ -1,0 +1,50 @@
+{
+ "directory": "reports/eval/geo31/extraction",
+ "written_at": "2026-11-04T07:16:38+00:00",
+ "git_commit": "d261d98",
+ "note": "Generated outputs kept out of Git (see reports/README.md). Run ids, commands and settings are in the Markdown reports in this directory.",
+ "files": [
+  {
+   "path": "e7_comparison.json",
+   "bytes": 67328,
+   "sha256": "0ed87dc0d4c7dc5e75cfc8d12b2c85bb002eb0b5bed81d403c5274a1cfef053f",
+   "modified": "2026-11-04T07:14:30+00:00"
+  },
+  {
+   "path": "evals/evaluation_d22eb535-7565-40f4-9d53-29fd3cbb4237.json",
+   "bytes": 490235,
+   "sha256": "c1617ea8dc2049a436ec5fdcc107b24bd15a35d08e8869b20107dd9ce667955b",
+   "modified": "2026-11-04T05:50:10+00:00"
+  },
+  {
+   "path": "inputs_after.json",
+   "bytes": 981,
+   "sha256": "349b738da48aee3cc672cc59504e97f5b62337632c5fcebccfdc9b4035be0c4f",
+   "modified": "2026-11-04T07:14:25+00:00"
+  },
+  {
+   "path": "inputs_before.json",
+   "bytes": 981,
+   "sha256": "349b738da48aee3cc672cc59504e97f5b62337632c5fcebccfdc9b4035be0c4f",
+   "modified": "2026-11-04T05:20:27+00:00"
+  },
+  {
+   "path": "offline_checks.json",
+   "bytes": 1226,
+   "sha256": "20baba299835b36b16cd345859daafc873fd21f4c70b33ec9e9d14a88a7cff79",
+   "modified": "2026-11-04T03:09:48+00:00"
+  },
+  {
+   "path": "revalidation_e1e6.json",
+   "bytes": 9161,
+   "sha256": "0b67d20c44cf32753b6e740932ecd56651f985ce1d65eb6bd9e39c0188047ead",
+   "modified": "2026-11-04T03:09:17+00:00"
+  },
+  {
+   "path": "revalidation_e1e6.log",
+   "bytes": 1542,
+   "sha256": "73adb6148e7fffc0e9ecef68afc30e96fc45e550fa6eb1b518845e791a545975",
+   "modified": "2026-11-04T03:09:17+00:00"
+  }
+ ]
+}
