@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import ClassVar
+import httpx
 import pytest
 
 pytest.importorskip("streamlit")
@@ -503,3 +504,34 @@ def test_review_card_without_a_graph_still_renders():
     at = app(NoGraph(item=_source_item()))
     assert not at.exception, at.exception
     assert not any(e.label.startswith("Relationships found") for e in at.expander)
+
+# --- review queue reachability --------------------------------------------------------------
+
+class WaitingBehindReplayClient(ReviewClient):
+    """Toronto's newest run is a replay copy; the run waiting for review is older."""
+
+    def runs(self, city=None, country=None, limit=50, status=None):
+        waiting = {**self._run(), "run_id": "run-1", "mode": "RESEARCH",
+                   "status": "AWAITING_REVIEW", "created_at": "2026-10-09T10:00:00+00:00"}
+        replay = {**self._run(), "run_id": "replay-9", "mode": "REPLAY",
+                  "status": "SUCCEEDED", "created_at": "2026-10-10T10:00:00+00:00"}
+        if status == "AWAITING_REVIEW":
+            return [waiting]
+        return [replay, waiting] if city == "Toronto" else []
+
+def test_the_run_waiting_for_review_is_opened_before_newer_replay_copies():
+    at = app(WaitingBehindReplayClient())
+    run_box = next(s for s in at.selectbox if s.label == "Run")
+    assert run_box.value == "run-1"
+    assert any("replay copy" in str(o) for o in run_box.options)
+    assert any("Waiting for review (1)" in c.value for c in at.sidebar.caption)
+    assert any(b.label.startswith("Toronto") for b in at.sidebar.button)
+
+def test_a_slow_relationship_graph_never_breaks_the_review_screen():
+    class Slow(ReviewClient):
+        def relationships(self, run_id, build=True):
+            raise httpx.ReadTimeout("timed out")
+    at = app(Slow())
+    assert not at.exception, at.exception
+    assert "Relationship evidence is unavailable right now" in all_text(at)
+    assert any(e.label.endswith("Total City Water Withdrawals (m3/d)") for e in at.expander)

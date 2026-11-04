@@ -81,6 +81,29 @@ cities = load_cities(api_url)
 labels = [c["label"] + (f" — {c['region']}" if c.get("region") else "")
           for c in cities]
 
+def _city_index(city_name: str, country: str | None) -> int | None:
+    key = (city_name.casefold(), (country or "").casefold())
+    return next((i for i, c in enumerate(cities)
+                 if (c["city"].casefold(), (c["country"] or "").casefold()) == key), None)
+
+def _open_run(city_name: str, country: str | None, run_id: str) -> None:
+    index = _city_index(city_name, country)
+    if index is not None:
+        st.session_state["city_index"] = index
+    st.session_state["run_id"] = run_id
+
+# Every run waiting for a person, across cities: one click opens it (Review queue tab).
+try:
+    waiting = client.runs(status="AWAITING_REVIEW", limit=200)
+except (ApiError, TypeError):
+    waiting = []
+with st.sidebar:
+    st.caption(f"🧑‍⚖️ Waiting for review ({len(waiting)})")
+    for w in sorted(waiting, key=lambda r: r["city_name"]):
+        st.button(f"{w['city_name']} · {(w.get('created_at') or '')[:10]} · {w['run_id'][:8]}",
+                  key=f"open_review:{w['run_id']}", width="stretch",
+                  on_click=_open_run, args=(w["city_name"], w.get("country"), w["run_id"]))
+
 left, right = st.columns([3, 1], vertical_alignment="bottom")
 choice = left.selectbox(f"City ({len(cities)} in catalog)", range(len(cities)),
                         format_func=lambda i: labels[i], key="city_index")
@@ -107,13 +130,26 @@ if not runs:
     st.stop()
 
 run_ids = [r["run_id"] for r in runs]
-default = run_ids.index(st.session_state["run_id"]) \
-    if st.session_state.get("run_id") in run_ids else 0
-run_id = st.selectbox(
-    "Run", run_ids, index=default,
-    format_func=lambda rid: next(f"{STATUS_ICON.get(r['status'], '')} {r['status']} · "
-                                 f"{(r['created_at'] or '')[:19].replace('T', ' ')} · {rid[:8]}"
-                                 for r in runs if r["run_id"] == rid))
+
+def _default_run() -> int:
+    """The run the person most likely wants: the one chosen before, else a run that needs
+    attention (waiting for review, queued, running), else the newest research run; replay and
+    revalidation copies only when nothing else exists."""
+    if st.session_state.get("run_id") in run_ids:
+        return run_ids.index(st.session_state["run_id"])
+    research = [i for i, r in enumerate(runs) if (r.get("mode") or "RESEARCH") == "RESEARCH"]
+    attention = [i for i in research
+                 if runs[i]["status"] in ACTIVE | {"AWAITING_REVIEW"}]
+    return (attention or research or [0])[0]
+
+def _run_label(rid: str) -> str:
+    r = next(x for x in runs if x["run_id"] == rid)
+    mode = r.get("mode") or "RESEARCH"
+    return (f"{STATUS_ICON.get(r['status'], '')} {r['status']} · "
+            f"{(r['created_at'] or '')[:19].replace('T', ' ')} · {rid[:8]}"
+            + (f" · {mode.lower()} copy" if mode != "RESEARCH" else ""))
+
+run_id = st.selectbox("Run", run_ids, index=_default_run(), format_func=_run_label)
 st.session_state["run_id"] = run_id
 selected_run = next(r for r in runs if r["run_id"] == run_id)
 is_active = selected_run["status"] in ACTIVE

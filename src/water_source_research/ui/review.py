@@ -16,6 +16,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from typing import Any
+import httpx
 import streamlit as st
 from water_source_research.schemas.standardized import COLUMNS, HEADERS
 from water_source_research.services.field_state import load_field_definitions
@@ -210,8 +211,11 @@ def run_relationships(client: Any, run_id: str) -> list[dict[str, Any]]:
         try:
             st.session_state[key] = (client.relationships(run_id, build=True)
                                      .get("relationships") or [])
-        except (ApiError, AttributeError):
+        except (ApiError, AttributeError, httpx.HTTPError):
+            # The cards still work without relationships (information only).
             st.session_state[key] = []
+            st.caption("Relationship evidence is unavailable right now; the review cards "
+                       "work without it.")
     return st.session_state[key]
 
 def candidate_value(c: dict[str, Any]) -> Any:

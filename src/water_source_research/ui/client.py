@@ -34,8 +34,9 @@ class ResearchApiClient:
         return r.json()
 
     def runs(self, city: str | None = None, country: str | None = None,
-             limit: int = 50) -> list[dict[str, Any]]:
-        return self._get("/research/runs", city=city, country=country, limit=limit)
+             limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
+        return self._get("/research/runs", city=city, country=country, limit=limit,
+                         status=status)
 
     def steps(self, run_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/steps")
@@ -49,7 +50,12 @@ class ResearchApiClient:
     # --- human review ---------------------------------------------------------------------
 
     def relationships(self, run_id: str, build: bool = True) -> dict[str, Any]:
-        return self._get(f"/research/runs/{run_id}/relationships", build=str(build).lower())
+        # Building a waiting run's graph can take several seconds: a longer timeout here only.
+        r = self.http.get(f"/research/runs/{run_id}/relationships",
+                          params={"build": str(build).lower()}, timeout=60.0)
+        if r.status_code >= 400:
+            raise ApiError(f"GET relationships -> {r.status_code}: {r.text[:200]}")
+        return r.json()
 
     def review_pending(self, run_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/review/pending")

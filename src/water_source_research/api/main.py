@@ -265,6 +265,10 @@ def create_app(queue: ResearchQueue | None = None,
                                 for k, v in rs.city_values.items()},
                 "exports": records.exports(run_id)}
 
+    # Graphs built on request, per (run, status, review round, attempt): a waiting run's
+    # evidence doesn't change until it is resumed, so it is built once (it can take ~10 s).
+    built_graphs: dict[tuple, dict] = {}
+
     @app.get("/research/runs/{run_id}/relationships")
     async def get_relationships(run_id: str, policy_version: str | None = None,
                                 build: bool = False):
@@ -273,12 +277,18 @@ def create_app(queue: ResearchQueue | None = None,
         predicate, passage geography, temporal context), plus the rejected statements.
         A run not finalized yet (e.g. awaiting review) has none stored: with build=true it is
         built now from the run's stored evidence, read only and not stored."""
-        require_run(run_id)
+        job = require_run(run_id)
         stored = evidence.relationships(run_id, policy_version)
         if stored["relationships"] or stored["rejected"] or not build:
             return {**stored, "built_on_request": False}
         from water_source_research.services.relationship_view import build_from_store
-        g = await asyncio.to_thread(build_from_store, queue.engine, run_id)
+        key = (run_id, job.status, getattr(job, "review_round", None), job.attempts)
+        g = built_graphs.get(key)
+        if g is None:
+            g = await asyncio.to_thread(build_from_store, queue.engine, run_id)
+            if len(built_graphs) >= 64:
+                built_graphs.pop(next(iter(built_graphs)))
+            built_graphs[key] = g
         return {"policy_version": g["policy_version"], "versions": [], "geo_basis":
                 g["geo_basis"], "identity": g["identity"], "relationships": g["relationships"],
                 "rejected": g["rejected"], "built_on_request": True}
