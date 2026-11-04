@@ -30,3 +30,14 @@ def test_no_deciding_module_reads_the_graph_or_affiliation():
     for rel in DECIDING:
         found = {m for m in _imports(SRC / rel) for g in GRAPH_MODULES if m.startswith(g)}
         assert not found, (rel, found)
+
+def test_no_decision_reads_the_informational_geo_notes():
+    """qualifiers.geo is written by validation for review only."""
+    import re
+    for rel in ["services/resolution.py", "services/semantics.py", "services/supply_records.py",
+                "services/review.py", "services/export.py", "context_manager/relevance.py",
+                "context_manager/manager.py"]:
+        text = (SRC / rel).read_text(encoding="utf-8")
+        assert not re.search(r"qualifiers\.geo\b|\[\"geo\"\]", text), rel
+    norm = (SRC / "services/normalization.py").read_text(encoding="utf-8")
+    assert norm.count("qualifiers.geo") == 1  # the one assignment

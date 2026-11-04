@@ -18,6 +18,7 @@ to its measurement, designated dataset, a utility shown to serve the city).
 import hashlib
 import json
 import math
+import itertools
 import re
 from urllib.parse import urlsplit
 from collections.abc import Iterable, Mapping
@@ -379,6 +380,8 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
     if definition.key in SOURCE_FIELDS and claim.value_status is ValueStatus.KNOWN:
         _check_source_kind(claim, definition, qualifiers, checks)
     _check_out_of_area(located, research, checks)
+    # informational only, after every check: no check or rule reads it
+    qualifiers.geo = geo_notes(definition, located, index, research)
     if previous is not None and previous.year_basis == "reviewer":
         # the year a reviewer gave with a corrected value is kept as given
         qualifiers.reference_year, qualifiers.year_basis = previous.reference_year, "reviewer"
@@ -391,6 +394,57 @@ def normalize_claim(claim: FieldClaim, definition: FieldDefinition | None, index
         qualifiers.evidence_class = "MACHINE_VERIFIED" if any(
             loc.chunk is not None for _, loc in located) else None
     return _finish(claim, uid, normalized, qualifiers, checks)
+
+_SENTENCE_END = re.compile(r"(?<=[.!?;])\s+|\n+")
+
+def _sentence_at(text: str, start: int) -> str:
+    """The sentence of ``text`` containing position ``start``."""
+    bounds = [0, *(m.end() for m in _SENTENCE_END.finditer(text)), len(text)]
+    for a, b in itertools.pairwise(bounds):
+        if a <= start < b:
+            return text[a:b]
+    return text
+
+def geo_notes(definition: FieldDefinition, located: list[tuple[EvidenceRef, Located]],
+              index: EvidenceIndex, research: CityResearchState) -> dict[str, Any] | None:
+    """Where each cited passage is (the quote's sentence, else its section), a source's stated
+    location, and signals for review. Informational: approved identity only (None without
+    one), never read by a check, rule or acceptance decision."""
+    from water_source_research.services.geo_match import index_scope, matcher_for
+    matcher = matcher_for(research.city_name, research.country)
+    if matcher is None or not located:
+        return None
+    passages, locations, statuses = [], [], []
+    for ref, loc in located:
+        if loc.chunk is None:
+            continue
+        text = loc.chunk.text
+        pos = ref.char_start if ref.char_start is not None else max(0, text.find(
+            (ref.passage or "")[:40]))
+        sentence = _sentence_at(text, pos) if pos >= 0 else ref.passage
+        scope = index_scope(matcher, index, ref.url)
+        place = matcher.match_place(sentence, scope)
+        status, reason = place.status, place.reason
+        if status in ("NONE", "AMBIGUOUS"):
+            local = matcher.section_place(text, pos, scope)
+            if local is not None:
+                status, reason = "SECTION", local.reason
+        statuses.append(status)
+        passages.append({"url": ref.url, "chunk_id": loc.chunk.chunk_id, "place": status,
+                         "reason": reason[:160]})
+        if definition.key in SOURCE_FIELDS:
+            locations += [f.place for f in matcher.feature_locations(sentence)]
+    if not passages:
+        return None
+    signals = []
+    if any(s in ("HOMONYM", "OTHER_PLACE") for s in statuses):
+        signals.append("PASSAGE_OTHER_PLACE")
+    if not any(s in ("CONFIRMED", "PROBABLE", "SECTION") for s in statuses):
+        signals.append("PASSAGE_PLACE_UNCERTAIN")
+    if locations:
+        signals.append("OUTSIDE_SOURCE_LOCATED")
+    return {"passages": passages, "source_locations": list(dict.fromkeys(locations)),
+            "signals": signals}
 
 # Checks that test the evidence against the run's acquired text: for a reviewer-supplied
 # source they can't pass, which means "not machine-verified", not "invalid".

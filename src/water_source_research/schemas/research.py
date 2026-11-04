@@ -154,6 +154,10 @@ class ClaimQualifiers(BaseModel):
     # Other documents carrying the same passage, whose copy of the quote was verified verbatim
     # and attached as evidence (the model was shown the passage once; context_manager dedupe).
     corroborating_urls: list[str] = Field(default_factory=list)
+    # Informational geographic notes (normalization.geo_notes; approved identity only): each
+    # cited passage's place, a source's stated location, and signals PASSAGE_OTHER_PLACE /
+    # PASSAGE_PLACE_UNCERTAIN / OUTSIDE_SOURCE_LOCATED. No check or rule reads them.
+    geo: dict[str, Any] | None = None
     # How the claim's evidence is established:
     #   MACHINE_VERIFIED   the quote was found in an acquired chunk (normal extraction, or a
     #                      reviewer correction quoting the run's evidence)
