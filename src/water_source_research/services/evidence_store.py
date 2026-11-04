@@ -305,12 +305,15 @@ class EvidenceRepository:
                         for ref in claim.evidence:
                             doc_id, chunk_id = _match_chunk(chunks, ref.url, ref.page_number,
                                                             ref.passage)
+                            exact = ref.chunk_id is not None and ref.chunk_id == chunk_id
                             session.add(ClaimCitationRecord(
                                 claim_id=row.id, run_id=run_id, document_id=doc_id,
                                 chunk_id=chunk_id, url=ref.url[:2048],
                                 title=(ref.title or None) and ref.title[:1000],
                                 page_number=ref.page_number, quote=ref.passage,
-                                retrieved_at=ref.retrieved_at))
+                                retrieved_at=ref.retrieved_at,
+                                char_start=ref.char_start if exact else None,
+                                char_end=ref.char_end if exact else None))
                     else:
                         _set_claim_columns(row, claim, uid in selected)
                     stored += 1
@@ -566,6 +569,7 @@ def _doc_dict(r: SourceDocumentRecord) -> dict[str, Any]:
 
 def _citation_dict(c: ClaimCitationRecord, doc: SourceDocumentRecord | None) -> dict[str, Any]:
     return {"url": c.url, "title": c.title, "page_number": c.page_number, "quote": c.quote,
+            "char_start": c.char_start, "char_end": c.char_end,
             "retrieved_at": c.retrieved_at, "chunk_id": c.chunk_id,
             "document_id": c.document_id,
             "source_type": doc.source_type if doc else None,

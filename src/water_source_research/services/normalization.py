@@ -67,6 +67,41 @@ class IndexedChunk:
     norm_text: str
     source_type: str | None
 
+def exact_span(text: str, quote: str) -> tuple[int, int] | None:
+    """(start, end) of the first verbatim occurrence of ``quote`` in ``text``, else None (an
+    elided, re-spaced or re-cased quote has no exact span: none is estimated)."""
+    q = quote or ""
+    if not q or "…" in q or "..." in q:
+        return None
+    i = text.find(q)
+    return (i, i + len(q)) if i >= 0 else None
+
+def ground_ref(ref: EvidenceRef, loc: "Located") -> None:
+    """Record where a located citation is: its chunk, and its span when exact."""
+    if loc.chunk is None:
+        return
+    ref.chunk_id = loc.chunk.chunk_id
+    span = exact_span(loc.chunk.text, ref.passage)
+    ref.char_start, ref.char_end = span if span else (None, None)
+
+def ground_relation(rel: dict, index: "EvidenceIndex") -> None:
+    """A claim relation's quote located on any page of its document: chunk id, page and, when
+    exact, span (keys left out when it isn't found)."""
+    url, quote = rel.get("url"), rel.get("quote")
+    if not url or not quote or rel.get("chunk_id"):
+        return
+    segments = quote_segments(quote)
+    for (u, page), chunks in index.by_key.items():
+        if u != url:
+            continue
+        for c in chunks:
+            if segments and _contains_in_order(c.norm_text, segments):
+                rel["chunk_id"], rel["page_number"] = c.chunk_id, page
+                span = exact_span(c.text, quote)
+                if span:
+                    rel["char_start"], rel["char_end"] = span
+                return
+
 @dataclass
 class Located:
     chunk: IndexedChunk | None  # chunk whose text contains the quote (or where it starts)
@@ -551,6 +586,10 @@ def _check_citations(claim: FieldClaim, index: EvidenceIndex, checks: _Checks,
         return []
     checks.add("EVIDENCE_PRESENT", CheckResult.PASS)
     located = [(ref, index.locate(ref)) for ref in claim.evidence]
+    for ref, loc in located:
+        ground_ref(ref, loc)
+    for rel in qualifiers.relations or []:  # stated relations: their own chunk and span
+        ground_relation(rel, index)
     linked = [loc for _, loc in located if loc.chunk is not None]
     failed_docs = [ref.url for ref, loc in located
                    if loc.document is not None and loc.document.get("status") not in (None, "OK")]

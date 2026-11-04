@@ -10,6 +10,12 @@ class EvidenceRef(BaseModel):
     page_number: int | None = None
     passage: str
     retrieved_at: str | None = None
+    # Set by validation when the quote is found in the run's evidence (normalization.locate):
+    # the chunk holding it and, only when the quote occurs there verbatim, its character
+    # span in that chunk's text. Never estimated: an elided or re-spaced quote gets no span.
+    chunk_id: str | None = None
+    char_start: int | None = None
+    char_end: int | None = None
 
 class EvidenceChunk(BaseModel):
     """A retrievable slice of an acquired document; the unit the context manager selects."""

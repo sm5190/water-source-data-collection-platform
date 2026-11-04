@@ -121,6 +121,9 @@ class ClaimCitationRecord(Base):
     page_number: Mapped[int | None] = mapped_column(Integer)
     quote: Mapped[str] = mapped_column(Text)
     retrieved_at: Mapped[str | None] = mapped_column(String(40))
+    # The quote's verbatim span in the chunk's text (validation; None when not exact)
+    char_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    char_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 class FieldResolutionRecord(Base):
     """Append-only log of resolution decisions per (run, field, entity); the latest row per
