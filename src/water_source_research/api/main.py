@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
@@ -265,12 +266,22 @@ def create_app(queue: ResearchQueue | None = None,
                 "exports": records.exports(run_id)}
 
     @app.get("/research/runs/{run_id}/relationships")
-    async def get_relationships(run_id: str, policy_version: str | None = None):
+    async def get_relationships(run_id: str, policy_version: str | None = None,
+                                build: bool = False):
         """The run's water-supply relationship graph (provenance only): every relationship
         with its status, basis and evidence (URL, document, chunk, page, quote, span,
-        predicate, passage geography, temporal context), plus the rejected statements."""
+        predicate, passage geography, temporal context), plus the rejected statements.
+        A run not finalized yet (e.g. awaiting review) has none stored: with build=true it is
+        built now from the run's stored evidence, read only and not stored."""
         require_run(run_id)
-        return evidence.relationships(run_id, policy_version)
+        stored = evidence.relationships(run_id, policy_version)
+        if stored["relationships"] or stored["rejected"] or not build:
+            return {**stored, "built_on_request": False}
+        from water_source_research.services.relationship_view import build_from_store
+        g = await asyncio.to_thread(build_from_store, queue.engine, run_id)
+        return {"policy_version": g["policy_version"], "versions": [], "geo_basis":
+                g["geo_basis"], "identity": g["identity"], "relationships": g["relationships"],
+                "rejected": g["rejected"], "built_on_request": True}
 
     @app.get("/research/runs/{run_id}/records/{record_key}/trace")
     async def trace_value(run_id: str, record_key: str, field_key: str):

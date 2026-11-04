@@ -8,7 +8,8 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src" / "water_source_research"
 GRAPH_MODULES = ("water_source_research.services.supply_relationships",
                  "water_source_research.services.affiliation",
-                 "water_source_research.schemas.relationships")
+                 "water_source_research.schemas.relationships",
+                 "water_source_research.services.relationship_view")
 DECIDING = ["services/normalization.py", "services/resolution.py", "services/semantics.py",
             "services/review.py", "services/supply_records.py", "services/export.py",
             "services/places.py", "services/utility_registry.py", "services/geo_match.py",

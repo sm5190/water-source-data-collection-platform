@@ -105,6 +105,21 @@ def test_api_submission_processed_by_worker_and_exposed(engine):
     assert graph_view["policy_version"] == RELATIONSHIP_POLICY_VERSION
     for r in graph_view["relationships"]:
         assert r["evidence"] and all(e["quote"] and e["url"] for e in r["evidence"])
+    assert graph_view["relationships"] and graph_view["built_on_request"] is False
+    # a run with no stored graph (e.g. awaiting review): built on request, read only
+    from sqlalchemy import delete
+    from water_source_research.db.evidence_models import RunSupplyRelationshipRecord
+    with Session(engine) as s:
+        s.execute(delete(RunSupplyRelationshipRecord).where(
+            RunSupplyRelationshipRecord.run_id == run_id))
+        s.commit()
+    empty = client.get(f"/research/runs/{run_id}/relationships").json()
+    assert empty["relationships"] == [] and empty["built_on_request"] is False
+    built = client.get(f"/research/runs/{run_id}/relationships", params={"build": True}).json()
+    assert built["built_on_request"] is True
+    assert ({r["key"] for r in built["relationships"]}
+            == {r["key"] for r in graph_view["relationships"]})
+    assert count(engine, RunSupplyRelationshipRecord, run_id=run_id) == 0  # nothing stored
 
     stored = client.get(f"/research/runs/{run_id}/claims").json()
     withdrawal = next(c for c in stored["claims"]

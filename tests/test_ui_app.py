@@ -6,6 +6,7 @@ import pytest
 
 pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest
+from water_source_research.ui.client import ApiError
 
 APP = str(Path(__file__).resolve().parents[1] / "src" / "water_source_research" / "ui" / "app.py")
 
@@ -442,3 +443,63 @@ def test_a_correction_can_carry_its_reporting_year():
     save(at).click().run()
     [(_, [body])] = client.decisions
     assert body["evidence"] == {"url": "https://toronto.ca/report.pdf", "reference_year": 2023}
+
+# --- E6: geography, entity type and relationship evidence on review cards ------------------
+
+def _source_item():
+    cand = {**REVIEW_ITEM["payload"]["candidates"][0], "value": "Lake Example",
+            "normalized_value": "Lake Example",
+            "qualifiers": {"source_kind": "lake", "geo": {
+                "passages": [{"url": "https://example.gov/a", "chunk_id": "k", "place":
+                              "SECTION", "reason": "heading"}],
+                "source_locations": ["Polk County"],
+                "signals": ["OUTSIDE_SOURCE_LOCATED"]}},
+            "validation": {"outcome": "VALID", "checks": []}}
+    return {**REVIEW_ITEM, "field_key": "water_source",
+            "payload": {**REVIEW_ITEM["payload"], "candidates": [cand],
+                        "field": {"key": "water_source", "type": "text"}}}
+
+def _rel(status, subject, obj, kind="SOURCE_SUPPLIES_CITY", obj_kind=None):
+    return {"key": f"{kind}|{subject}|{obj}", "kind": kind, "status": status,
+            "subject": {"entity_id": "source:x", "type": "source", "name": subject,
+                        "kind": "lake_unspecified"},
+            "object": {"entity_id": "city:x", "type": "city", "name": obj, "kind": obj_kind},
+            "evidence": [{"url": "https://example.gov/a", "host": "example.gov",
+                          "quote": f"{subject} supplies {obj}."}]}
+
+class GraphReviewClient(ReviewClient):
+    def __init__(self, rels, **kw):
+        super().__init__(item=_source_item(), **kw)
+        self.rels, self.calls = rels, 0
+
+    def relationships(self, run_id, build=True):
+        self.calls += 1
+        assert build is True
+        return {"relationships": self.rels, "built_on_request": True}
+
+def test_review_card_shows_geography_type_and_relationships_by_status():
+    client = GraphReviewClient([_rel("CANDIDATE", "Lake Example", "Toronto"),
+                                _rel("VERIFIED", "Lake Example", "Toronto",
+                                     kind="SOURCE_PART_OF_SYSTEM"),
+                                _rel("VERIFIED", "Other River", "Toronto")])
+    at = app(client)
+    assert not at.exception, at.exception
+    text = all_text(at)
+    assert "the section it is in is about the city" in text
+    assert "The source is located in:** Polk County" in text
+    assert "lake (not shown to be natural; it may be a reservoir)" in text
+    assert "the source is located outside the city" in text
+    rel = next(e for e in at.expander if e.label.startswith("Relationships found"))
+    assert rel.label == "Relationships found (2)"  # Other River is not this value
+    lines = [m.value for m in rel.markdown if "Lake Example**" in m.value]
+    assert lines[0].startswith("✅ Verified") and lines[1].startswith("⚪ Candidate")
+    assert "Source: [example.gov](https://example.gov/a)" in text
+    assert client.calls == 1  # fetched once per screen
+
+def test_review_card_without_a_graph_still_renders():
+    class NoGraph(ReviewClient):
+        def relationships(self, run_id, build=True):
+            raise ApiError("down")
+    at = app(NoGraph(item=_source_item()))
+    assert not at.exception, at.exception
+    assert not any(e.label.startswith("Relationships found") for e in at.expander)

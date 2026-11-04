@@ -103,6 +103,117 @@ def show_value(value: Any, unit: str | None = None) -> str:
                    "percent": "%"}.get(unit or "", "")
     return f"{text} {pretty_unit}".strip()
 
+# --- context for the reviewer: geography, entity type, relationships (information only) ------
+
+PLACE_TEXT = {
+    "CONFIRMED": "names the city (with its region or country)",
+    "PROBABLE": "probably about the city",
+    "SECTION": "the section it is in is about the city",
+    "AMBIGUOUS": "names the city, but another place has the same name",
+    "HOMONYM": "seems to be about another place with the same name",
+    "OTHER_PLACE": "seems to be about another place",
+    "NONE": "doesn't name the city",
+}
+SIGNAL_TEXT = {
+    "PASSAGE_OTHER_PLACE": "a cited passage seems to be about another place",
+    "PASSAGE_PLACE_UNCERTAIN": "no cited passage clearly places this in the city",
+    "OUTSIDE_SOURCE_LOCATED": "the source is located outside the city (normal for distant "
+                              "or upstream sources: check it supplies the city)",
+}
+KIND_TEXT = {
+    "river": "river", "spring": "spring", "aquifer": "aquifer (groundwater)",
+    "natural_lake": "natural lake", "lake": "lake", "wellfield": "wellfield (groundwater)",
+    "groundwater": "groundwater (general)", "sea": "sea", "reclaimed": "reclaimed water",
+    "desalination": "desalinated water",
+    "lake_unspecified": "lake (not shown to be natural; it may be a reservoir)",
+    "reservoir": "reservoir (man-made; not a natural source)",
+    "infrastructure": "infrastructure (plant, intake or pipeline; not a water source)",
+    "supply_system": "supply system (not a single water source)",
+    "region": "region or area (not a water source)",
+}
+STATUS_TEXT = {
+    "VERIFIED": "✅ Verified (government or regulator statement)",
+    "SUPPORTED": "🟡 Supported (one source, or the organisation's own description)",
+    "CANDIDATE": "⚪ Candidate (not confirmed)",
+    "HISTORICAL": "🕰 Historical (no longer current)",
+    "CONTRADICTED": "⛔ Contradicted",
+}
+RELATION_TEXT = {
+    "UTILITY_SERVES_CITY": "serves", "SUPPLIES_WHOLESALE_TO": "supplies water wholesale to",
+    "SOURCE_SUPPLIES_UTILITY": "supplies", "SOURCE_SUPPLIES_CITY": "supplies",
+    "SOURCE_PART_OF_SYSTEM": "is part of", "PREDECESSOR_OF": "was succeeded by",
+    "DEPARTMENT_OF": "is a department of", "SOURCE_LOCATED_IN": "is located in",
+}
+STATUS_ORDER = {"VERIFIED": 0, "SUPPORTED": 1, "CANDIDATE": 2, "HISTORICAL": 3,
+                "CONTRADICTED": 4}
+
+def _norm(text: Any) -> str:
+    return " ".join(str(text or "").casefold().split())
+
+def related(value: Any, relationships: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Relationships whose subject or object is the candidate value (same name, case and
+    spacing aside), best status first. Nothing is merged or inferred."""
+    v = _norm(value)
+    if not v:
+        return []
+    found = [r for r in relationships
+             if v in (_norm(r["subject"]["name"]), _norm(r["object"]["name"]))]
+    return sorted(found, key=lambda r: STATUS_ORDER.get(r["status"], 9))
+
+def entity_kind(value: Any, q: dict[str, Any], relationships: list[dict[str, Any]]
+                ) -> str | None:
+    """The graph's type for this entity (explicit evidence), else the claim's source kind."""
+    v = _norm(value)
+    for r in relationships:
+        for e in (r["subject"], r["object"]):
+            if _norm(e["name"]) == v and e.get("type") == "source" and e.get("kind"):
+                return e["kind"]
+    return q.get("source_kind")
+
+def render_context(c: dict[str, Any], relationships: list[dict[str, Any]]) -> None:
+    """Where the cited passages are, the entity's type and its relationships, in plain words.
+    Information for the reviewer only: none of it accepted or rejected anything."""
+    q = c.get("qualifiers") or {}
+    geo = q.get("geo") or {}
+    lines = []
+    places = [PLACE_TEXT.get(p["place"], p["place"]) for p in geo.get("passages") or []]
+    if places:
+        lines.append("**Where the passage is:** " + "; ".join(dict.fromkeys(places)))
+    if geo.get("source_locations"):
+        lines.append("**The source is located in:** " + ", ".join(geo["source_locations"]))
+    value = candidate_value(c)
+    kind = entity_kind(value, q, relationships) if isinstance(value, str) else None
+    if kind:
+        lines.append("**Type:** " + KIND_TEXT.get(kind, kind.replace("_", " ")))
+    if lines:
+        st.caption("  \n".join(lines))
+    for s in geo.get("signals") or []:
+        if s in SIGNAL_TEXT:
+            st.caption(f"Note: {SIGNAL_TEXT[s]}.")
+    rels = related(value, relationships) if isinstance(value, str) else []
+    if rels:
+        with st.expander(f"Relationships found ({len(rels)})"):
+            for r in rels:
+                st.markdown(f"{STATUS_TEXT.get(r['status'], r['status'])}: **{r['subject']['name']}**"
+                            f" {RELATION_TEXT.get(r['kind'], r['kind'])} "
+                            f"**{r['object']['name']}**"
+                            + (f" — {r['temporal_scope']}" if r.get("temporal_scope") else ""))
+                for ev in (r.get("evidence") or [])[:2]:
+                    st.markdown("> " + ev["quote"].replace("\n", " ")[:300])
+                    st.caption(f"Source: [{ev.get('host') or ev['url']}]({ev['url']})")
+
+def run_relationships(client: Any, run_id: str) -> list[dict[str, Any]]:
+    """The run's relationship graph, fetched once per review screen (built on request for a
+    run awaiting review); an unavailable graph just shows no relationships."""
+    key = f"relationships:{run_id}"
+    if key not in st.session_state:
+        try:
+            st.session_state[key] = (client.relationships(run_id, build=True)
+                                     .get("relationships") or [])
+        except (ApiError, AttributeError):
+            st.session_state[key] = []
+    return st.session_state[key]
+
 def candidate_value(c: dict[str, Any]) -> Any:
     value = c.get("normalized_value")
     return c.get("value") if value is None else value
@@ -146,11 +257,12 @@ def render_simple_review(client: Any, run: dict[str, Any], reviewer: str,
     show = st.radio("Show", ["All", "To do", "Done"], horizontal=True,
                     key=f"review_filter:{run_id}", label_visibility="collapsed")
     multi_source = len({i.get("label") for i in items if i.get("label")}) > 1
+    relationships = run_relationships(client, run_id)
     for item in items:
         done = bool(item.get("decision"))
         if (show == "To do" and done) or (show == "Done" and not done):
             continue
-        render_card(client, run_id, item, reviewer, multi_source)
+        render_card(client, run_id, item, reviewer, multi_source, relationships)
 
     st.divider()
     remaining = len(items) - len(decided)
@@ -170,7 +282,7 @@ def render_simple_review(client: Any, run: dict[str, Any], reviewer: str,
         advanced()
 
 def render_card(client: Any, run_id: str, item: dict[str, Any], reviewer: str,
-                multi_source: bool) -> None:
+                multi_source: bool, relationships: list[dict[str, Any]] | None = None) -> None:
     p = item["payload"]
     current = item.get("decision")
     title = field_label(item["field_key"])
@@ -186,17 +298,18 @@ def render_card(client: Any, run_id: str, item: dict[str, Any], reviewer: str,
         if cands:
             proposed, others = cands[0], cands[1:]
             st.markdown("**Proposed value**")
-            render_candidate(proposed, unit, big=True)
+            render_candidate(proposed, unit, big=True, relationships=relationships)
             if others:
                 st.markdown(f"**Other values found ({len(others)})**")
                 for c in others:
-                    render_candidate(c, unit)
+                    render_candidate(c, unit, relationships=relationships)
         else:
             proposed, others = None, []
             st.info("Nothing was found in the sources for this field.")
         decision_controls(client, run_id, item, reviewer, proposed, others)
 
-def render_candidate(c: dict[str, Any], unit: str | None, big: bool = False) -> None:
+def render_candidate(c: dict[str, Any], unit: str | None, big: bool = False,
+                     relationships: list[dict[str, Any]] | None = None) -> None:
     q = c.get("qualifiers") or {}
     year = q.get("reference_year")
     value = show_value(candidate_value(c), unit)
@@ -218,6 +331,7 @@ def render_candidate(c: dict[str, Any], unit: str | None, big: bool = False) -> 
             st.markdown("> " + cite["quote"].replace("\n", " ")[:600])
         page = f", page {cite['page_number']}" if cite.get("page_number") is not None else ""
         st.markdown(f"Source: [{cite.get('title') or cite['url']}]({cite['url']}){page}")
+    render_context(c, relationships or [])
 
 def decision_controls(client: Any, run_id: str, item: dict[str, Any], reviewer: str,
                       proposed: dict[str, Any] | None, others: list[dict[str, Any]]) -> None:

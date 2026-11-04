@@ -48,6 +48,9 @@ class ResearchApiClient:
 
     # --- human review ---------------------------------------------------------------------
 
+    def relationships(self, run_id: str, build: bool = True) -> dict[str, Any]:
+        return self._get(f"/research/runs/{run_id}/relationships", build=str(build).lower())
+
     def review_pending(self, run_id: str) -> dict[str, Any]:
         return self._get(f"/research/runs/{run_id}/review/pending")
 
