@@ -2,11 +2,21 @@
 
 No OCR: scanned PDFs without a text layer yield empty pages (the document is then EMPTY).
 Docling remains the planned richer parser (tables/layout) behind the ``docs`` extra.
+
+PDFium is not thread-safe: concurrent parses from threads of one process failed with "Failed
+to load document (PDFium: Data format error)" (2026-11-04: 16 PDFs in runs parsing in
+parallel; reproduced with the stored copies: 0/9 errors sequential, 20/27 with 2 threads, and
+0/108 with 3 separate processes each parsing sequentially). Each process loads its own PDFium
+and parses from memory (no files), so the whole PDFium session is serialized per process.
 """
 
 import hashlib
 import re
+import threading
 from .base import AcquiredDocument
+
+# One PDFium session at a time in this process (open -> pages -> metadata -> close).
+_PDFIUM_LOCK = threading.Lock()
 
 _PDF_DATE = re.compile(r"D:(\d{4})(\d{2})?(\d{2})?")
 _HYPHEN_BREAK = re.compile(r"(\w)-\r?\n(\w)")
@@ -17,23 +27,24 @@ def is_pdf(body: bytes, content_type: str = "") -> bool:
 def parse_pdf(url: str, body: bytes, max_pages: int = 150) -> AcquiredDocument:
     import pypdfium2 as pdfium  # imported lazily: native library
 
-    pdf = pdfium.PdfDocument(body)
-    try:
-        pages: list[tuple[int, str]] = []
-        for index in range(min(len(pdf), max_pages)):
-            page = pdf[index]
-            textpage = page.get_textpage()
-            try:
-                text = textpage.get_text_range()
-            finally:
-                textpage.close()
-                page.close()
-            text = _clean(text)
-            if text:
-                pages.append((index + 1, text))
-        meta = pdf.get_metadata_dict(skip_empty=True)
-    finally:
-        pdf.close()
+    with _PDFIUM_LOCK:  # errors propagate unchanged (recorded as PARSE_ERROR by the caller)
+        pdf = pdfium.PdfDocument(body)
+        try:
+            pages: list[tuple[int, str]] = []
+            for index in range(min(len(pdf), max_pages)):
+                page = pdf[index]
+                textpage = page.get_textpage()
+                try:
+                    text = textpage.get_text_range()
+                finally:
+                    textpage.close()
+                    page.close()
+                text = _clean(text)
+                if text:
+                    pages.append((index + 1, text))
+            meta = pdf.get_metadata_dict(skip_empty=True)
+        finally:
+            pdf.close()
     title = (meta.get("Title") or "").strip() or None
     return AcquiredDocument(
         url=url,

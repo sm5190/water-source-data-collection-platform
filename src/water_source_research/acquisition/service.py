@@ -311,6 +311,12 @@ class AcquisitionService:
                     await self._store_raw(record, response)
                 if record["status"] == DocStatus.OK:
                     acquired |= {record["canonical_url"], final_key}
+            elif (record.get("error_kind") == FetchErrorKind.PARSE_ERROR.value
+                  and response is not None and self.artifacts is not None):
+                # Keep the bytes of a document that could not be parsed, so the failure can be
+                # replayed exactly (content addressed: a later success shares the object).
+                record["content_sha256"] = hashlib.sha256(response.body).hexdigest()
+                await self._store_raw(record, response)
             outcome.records.append(record)
         if self.firecrawl is not None and run_id:
             await self._escalate(run_id, round_no, outcome, acquired, hashes)
