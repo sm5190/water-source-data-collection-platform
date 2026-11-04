@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import re
+from water_source_research.context_manager.topic import decide as topic_decide
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -38,9 +39,10 @@ from water_source_research.services.places import place_patterns as _place_patte
 # Bump whenever selection behaviour changes in a way configuration doesn't capture (scoring
 # formula, weights/factors below, excerpting, rendering). Stored bundles built under another
 # version are never reused.
-RETRIEVAL_POLICY_VERSION = "12"  # 10: City + Region + Country identity (geo_match)
+RETRIEVAL_POLICY_VERSION = "13"  # 10: City + Region + Country identity (geo_match)
 # 12: feature location (a source's place never makes a passage about another place)
 # 11: publisher apart from document subject, MIXED documents, AMBIGUOUS foreign mentions
+# 13: topical half of the extraction gate (context_manager/topic.py)
 
 class ContextPurpose(StrEnum):
     PLAN = "PLAN"
@@ -159,6 +161,9 @@ class ContextItem:
     # judged (hand-built bundles), which counts as relevant.
     locality: dict[str, str] | None = None
     relevance: dict[str, list[str]] | None = None
+    # EXTRACT evidence only: the topical decision per field (context_manager/topic.py:
+    # PASS / UNCERTAIN / CLEARLY_IRRELEVANT); None = not judged, which counts as on topic.
+    topic: dict[str, str] | None = None
     # Near-duplicate copies of this passage in other documents (shown once, every location
     # kept): chunk_id, url, title, page_number, retrieved_at, source_type, passage.
     also_found_in: list[dict[str, Any]] | None = None
@@ -244,8 +249,19 @@ class ContextBundle:
             return list(self.target_fields)
         ok = {k for i in self.items if i.kind == "evidence" for k in i.field_keys
               if (i.relevance is None or i.relevance.get(k))
+              and (i.topic is None or i.topic.get(k) != "CLEARLY_IRRELEVANT")
               and not (i.repeat_of and k in i.repeat_of)}
         return [k for k in self.target_fields if k in ok]
+
+    def off_topic(self, field_key: str) -> bool:
+        """Held back only because every geographically relevant passage for the field is
+        clearly off its topic (the topical half of the gate)."""
+        geo = [i for i in self.items if i.kind == "evidence" and field_key in i.field_keys
+               and (i.relevance is None or i.relevance.get(field_key))
+               and not (i.repeat_of and field_key in i.repeat_of)]
+        return bool(geo) and all(i.topic is not None
+                                 and i.topic.get(field_key) == "CLEARLY_IRRELEVANT"
+                                 for i in geo)
 
     @property
     def status(self) -> ContextStatus:
@@ -750,11 +766,14 @@ class ContextManager:
                           if (seen_id := _repeat_of(chunk, k, repeats)) is not None}
                 if repeat:
                     stats["repeats_of_seen"] += 1
+                rules = {k: relevance.rules(chunk, locality[k], passage, self.fields[k])
+                         for k in keys}
                 bundle.items.append(ContextItem(
                     "evidence", passage, sid, round(scores[i][keys[0]], 4), keys,
                     chunk.chunk_id, cost, locality=locality,
-                    relevance={k: relevance.rules(chunk, locality[k], passage, self.fields[k])
-                               for k in keys},
+                    relevance=rules,
+                    topic={k: topic_decide(chunk, passage, self.fields[k], rules[k])[0]
+                           for k in keys},
                     also_found_in=also.get(pos), repeat_of=repeat or None,
                     geo=relevance.geo_note(chunk),
                 ))
@@ -866,9 +885,14 @@ class ContextManager:
         relevance = self.relevance_context(state, everything)
         _, meta = self._score(chunks, [field_key], terms, tf, state, set(), relevance)
         field = self.fields[field_key]
-        return [c.chunk_id for c, m, row in zip(chunks, meta, tf, strict=True)
-                if (m["hydronym_local"] or row)
-                and relevance.rules(c, m["locality"].get(field_key), c.text, field)]
+        out = []
+        for c, m, row in zip(chunks, meta, tf, strict=True):
+            if not (m["hydronym_local"] or row):
+                continue
+            rules = relevance.rules(c, m["locality"].get(field_key), c.text, field)
+            if rules and topic_decide(c, c.text, field, rules)[0] != "CLEARLY_IRRELEVANT":
+                out.append(c.chunk_id)
+        return out
 
     def _terms(self, key: str) -> list[str]:
         d = self.fields[key]

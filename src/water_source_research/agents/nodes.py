@@ -707,9 +707,11 @@ def make_extract_node(context_service: ContextService, gateway: LLMGateway, *,
                                             **context_attrs(bundle, field_key),
                                             **llm_usage(calls)}
                 if bundle.status is ContextStatus.NO_RELEVANT_EVIDENCE:
-                    attrs.update(skip_reason="no new passage about the city or its water "
-                                             "system (other places, or content already sent)",
-                                 **relevance_attrs(bundle, field_key))
+                    reason = ("OFF_TOPIC: every passage about the city is clearly off the "
+                              "field's drinking-water topic" if bundle.off_topic(field_key)
+                              else "no new passage about the city or its water system (other "
+                                   "places, or content already sent)")
+                    attrs.update(skip_reason=reason, **relevance_attrs(bundle, field_key))
                 if re_run:
                     attrs.update(reextraction=reextractions.get(field_key, 0),
                                  new_chunks=again[field_key])
@@ -837,6 +839,9 @@ def relevance_attrs(bundle: ContextBundle, field_key: str) -> dict[str, object]:
         localities[loc] = localities.get(loc, 0) + 1
         for r in (i.relevance or {}).get(field_key, []):
             rules[r] = rules.get(r, 0) + 1
+        topic = (i.topic or {}).get(field_key)
+        if topic and (i.relevance or {}).get(field_key):  # topic of geo-relevant passages
+            rules[f"TOPIC_{topic}"] = rules.get(f"TOPIC_{topic}", 0) + 1
         if i.repeat_of and field_key in i.repeat_of:  # already sent for this field
             rules["REPEAT_OF_SEEN"] = rules.get("REPEAT_OF_SEEN", 0) + 1
     fmt = lambda d: ",".join(f"{k}:{v}" for k, v in sorted(d.items())) or "none"
