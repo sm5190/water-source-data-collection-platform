@@ -417,3 +417,19 @@ def test_usage_summary_keeps_estimated_and_unknown_actual_credits_apart():
                                                                 credits_estimated=None)])
     assert u["credit_calls"] == 2 and u["credits_estimated"] == 3.0
     assert u["credits_actual"] is None and u["unknown_actual_credit_calls"] == 2
+
+def test_a_reported_charge_is_recorded_apart_and_the_budget_takes_the_higher(tmp_path,
+                                                                             monkeypatch):
+    rows = []
+    monkeypatch.setattr(escalation_module, "record_usage", rows.append)
+    url = "https://city.example/water"
+    site = Site().html(url, BARE)
+    fake = FakeFirecrawl().ok(url, creditsUsed=2, proxyUsed="basic")
+    svc, store, _ = build(tmp_path, site, fake)
+    out = run(svc, [url])
+    esc = by_attempt(out.records, "firecrawl")[0]["escalation"]
+    assert esc["credits_estimated"] == 1.0 and esc["credits_actual"] == 2.0
+    assert esc["proxy_used"] == "basic"
+    assert store.used("run-1") == 2.0
+    assert rows[0]["credits"] == 2.0 and rows[0]["credits_estimated"] == 1.0
+    assert rows[0]["attempt_errors"] is None

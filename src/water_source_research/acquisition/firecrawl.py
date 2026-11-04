@@ -63,6 +63,13 @@ class FirecrawlResult:
         return self.metadata.get("url") or self.metadata.get("sourceURL")
 
     @property
+    def credits_used(self) -> float | None:
+        """``metadata.creditsUsed`` when the response carries it (seen live 2026-11-04, not in
+        the published schema); None otherwise, never 0."""
+        v = self.metadata.get("creditsUsed")
+        return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+
+    @property
     def status_code(self) -> int | None:
         code = self.metadata.get("statusCode")
         return int(code) if isinstance(code, int | float) else None

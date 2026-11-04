@@ -177,11 +177,17 @@ class FirecrawlEscalator:
         with get_tracer().start_as_current_span("acquisition.firecrawl") as span:
             span.set_attribute("acquisition.url", safe_url(url))
             span.set_attribute("acquisition.retry_reason", reason)
-            doc, estimate, uncertain, error_kind = None, None, False, None
+            doc, estimate, uncertain, error_kind, actual = None, None, False, None, None
             try:
                 async with self._sem:
                     result = await self.client.scrape(url, pdf_max_pages=max_pages)
                 fc["escalation"]["attempts"] = result.attempts
+                actual = result.credits_used
+                fc["escalation"]["proxy_used"] = result.metadata.get("proxyUsed")
+                if actual is not None:
+                    fc["escalation"]["credits_actual"] = actual
+                    fc["escalation"]["credits_actual_basis"] = (
+                        "metadata.creditsUsed in the response (not in the published schema)")
                 doc, estimate = await self._document(fc, result, max_pages)
             except FirecrawlError as exc:
                 fc["escalation"]["attempts"] = fc["escalation"]["attempts"] or 1
@@ -201,6 +207,9 @@ class FirecrawlEscalator:
             latency = round((time.perf_counter() - started) * 1000, 1)
             fc["duration_ms"] = latency
             fc["escalation"]["credits_estimated"] = estimate
+            # The budget counts the higher of the estimate and a reported charge.
+            charged = (max(estimate, actual) if estimate is not None and actual is not None
+                       else actual if actual is not None else estimate)
             span.set_attribute("acquisition.status", fc["status"])
             span.set_attribute("firecrawl.recovery_status",
                                fc["escalation"]["recovery_status"] or "")
@@ -208,10 +217,10 @@ class FirecrawlEscalator:
             if estimate is not None:
                 span.set_attribute("firecrawl.credits_estimated", estimate)
         await asyncio.to_thread(
-            self.store.settle, attempt_id, uncertain=uncertain or estimate is None,
-            estimated=estimate, outcome=fc["escalation"]["recovery_status"] or "FAILED",
+            self.store.settle, attempt_id, uncertain=uncertain or charged is None,
+            estimated=charged, outcome=fc["escalation"]["recovery_status"] or "FAILED",
             error_kind=error_kind or fc.get("error_kind"))
-        if estimate is None:
+        if charged is None:
             fc["escalation"]["credits_note"] = ("outcome uncertain or charge not derivable: "
                                                 "the reservation is kept")
         record_usage({"run_id": run_id, "category": "acquisition", "kind": "CRAWL",
@@ -219,8 +228,8 @@ class FirecrawlEscalator:
                       "requests": fc["escalation"]["attempts"] or 1,
                       "retries": max(0, (fc["escalation"]["attempts"] or 1) - 1),
                       "cache_hit": False, "error": error_kind,
-                      "attempt_errors": 1 if error_kind else 0,
-                      "credits": None, "credits_estimated": estimate if estimate is not None
+                      "attempt_errors": {error_kind: 1} if error_kind else None,
+                      "credits": actual, "credits_estimated": estimate if estimate is not None
                       else reserve, "latency_ms": latency, "cost_usd": None,
                       "cost_basis": "estimated" if estimate is not None else "reserved"})
         return fc, doc
