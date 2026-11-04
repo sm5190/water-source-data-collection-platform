@@ -175,7 +175,7 @@ def test_ranking_demotes_a_homonym_within_its_tier():
                                        "https://www.example.org/cali"]
     assert ranked[1].geo_status == "HOMONYM"
 
-def test_ranking_is_unchanged_without_an_identity():
+def test_ranking_is_unchanged_without_an_identity(no_identity):
     cali = web("Agua potable en Santiago de Cali", "https://www.example.org/cali", 1,
                source_type="TECHNICAL")
     chile = web("Agua potable en Santiago", "https://www.example.org/chile", 2,

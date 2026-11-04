@@ -57,12 +57,14 @@ sources:
     - https://query.wikidata.org/sparql
     - https://www.wikidata.org/wiki/Special:EntityData/<QID>.json
 approval:
-  approved_by: null
-  approved_at: null
+  approved_by: project owner (sm5190)
+  approved_at: '2026-11-03T23:49:39+00:00'
+  note: 7 entries APPROVED (Luanda, Vienna, Toronto, Santiago, Hyderabad, Nairobi, Houston); the rest
+    stay DRAFT. Per-entry approval metadata on each entry.
 cities:
 - city: Luanda
   country: Angola
-  status: DRAFT
+  status: APPROVED
   region:
     name: Luanda Province
     iso_3166_2: AO-LUA
@@ -107,6 +109,22 @@ cities:
     cctld: ao
     languages:
     - pt
+  official_websites:
+  - host: luanda.gov.ao
+    url: https://luanda.gov.ao/
+    level: PROVINCIAL
+    note: Governo Provincial de Luanda (provincial government; site title 2026-11-03). Not the city's
+      municipal website, which stays UNKNOWN
+    sources:
+    - source: person
+      id: review
+      property: government website
+      detail: project owner review, 2026-11-03
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '2240449'
     wikidata: Q3897
@@ -255,7 +273,7 @@ cities:
       property: cities500
 - city: Vienna
   country: Austria
-  status: DRAFT
+  status: APPROVED
   region:
     name: Vienna
     iso_3166_2: AT-9
@@ -323,6 +341,11 @@ cities:
     - source: wikidata
       id: Q1741
       property: P856
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '2761369'
     wikidata: Q1741
@@ -820,7 +843,7 @@ cities:
       detail: alternateNameId 1081943
 - city: Toronto
   country: Canada
-  status: DRAFT
+  status: APPROVED
   region:
     name: Ontario
     iso_3166_2: CA-ON
@@ -866,6 +889,11 @@ cities:
     - source: wikidata
       id: Q172
       property: P856
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '6167865'
     wikidata: Q172
@@ -991,7 +1019,7 @@ cities:
       property: cities500
 - city: Santiago
   country: Chile
-  status: DRAFT
+  status: APPROVED
   region:
     name: Santiago Metropolitan Region
     iso_3166_2: CL-RM
@@ -1059,10 +1087,39 @@ cities:
   official_websites:
   - host: gobiernosantiago.cl
     url: https://www.gobiernosantiago.cl/
+    level: REGIONAL
+    note: regional government website, not the Santiago municipality's (reviewer); kept for provenance,
+      never used for affiliation
     sources:
-    - source: wikidata
-      id: Q2887
-      property: P856
+    - source: person
+      id: review
+      property: government website
+      detail: project owner review, 2026-11-03
+  - host: munistgo.cl
+    url: https://www.munistgo.cl/
+    verified: false
+    note: 'municipal portal per reviewer; site titles itself ''Ilustre Municipalidad de Santiago'' (2026-11-03).
+      Self-description is not independent: pending confirmation from Chile''s official municipal directory'
+    sources:
+    - source: person
+      id: review
+      property: government website
+      detail: project owner review, 2026-11-03
+  - host: municipalidaddesantiago.cl
+    url: https://www.municipalidaddesantiago.cl/
+    verified: false
+    note: listed in Chile's official municipal directory per reviewer; did not respond to an HTTPS check
+      on 2026-11-03. Pending independent confirmation
+    sources:
+    - source: person
+      id: review
+      property: government website
+      detail: project owner review, 2026-11-03
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '3871336'
     wikidata: Q2887
@@ -3476,7 +3533,7 @@ cities:
       property: alias:bn
 - city: Hyderabad
   country: India
-  status: DRAFT
+  status: APPROVED
   region:
     name: Telangana
     iso_3166_2: IN-TS
@@ -3537,6 +3594,11 @@ cities:
     - source: wikidata
       id: Q1361
       property: P856
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '1269843'
     wikidata: Q1361
@@ -5540,7 +5602,7 @@ cities:
       property: cities500
 - city: Nairobi
   country: Kenya
-  status: DRAFT
+  status: APPROVED
   region:
     name: Nairobi City County
     iso_3166_2: KE-30
@@ -5607,6 +5669,11 @@ cities:
     - source: wikidata
       id: Q3870
       property: P856
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '184745'
     wikidata: Q3870
@@ -8683,7 +8750,7 @@ cities:
       detail: part of (P361/P527/P150); metropolitan statistical area
 - city: Houston
   country: United States of America
-  status: DRAFT
+  status: APPROVED
   region:
     name: Texas
     iso_3166_2: US-TX
@@ -8765,6 +8832,11 @@ cities:
     - source: wikidata
       id: Q16555
       property: P856
+  approval:
+    approved_by: project owner (sm5190)
+    approved_at: '2026-11-03T23:49:39+00:00'
+    basis: canonical city, admin1 region, country and ISO codes reviewed (reports/eval/geo31/phase2/IDENTITY_REVIEW.md,
+      approval addendum); government websites recorded apart
   ids:
     geonames: '4699066'
     wikidata: Q16555

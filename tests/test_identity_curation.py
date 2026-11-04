@@ -72,4 +72,6 @@ def test_the_identity_file_has_no_metropolitan_alias_as_a_name_and_nothing_appro
         ident = CityIdentity.model_validate(entry)
         for n in [*ident.names, *ident.unverified_names]:
             assert not builder._metro_alias(n.name, ident.catalog_names()), (ident.city, n.name)
-    assert doc["approval"]["approved_by"] is None
+    # approval is only ever recorded by scripts/approve_identity.py, never by curation
+    approved = [e for e in doc["cities"] if e.get("status") == "APPROVED"]
+    assert all(e.get("approval", {}).get("approved_by") for e in approved)

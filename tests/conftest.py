@@ -67,3 +67,15 @@ def identity_approved(monkeypatch):
     geo_match._matcher.cache_clear()
     yield
     geo_match._matcher.cache_clear()
+
+@pytest.fixture
+def no_identity(monkeypatch):
+    """Run as production does for a city without an approved identity (49 of the 56 catalog
+    cities): catalog city and country only, name-only geography. Seven pilot identities are
+    APPROVED in config/city_identity.yaml, so name-only regressions need this explicitly."""
+    from water_source_research.services import city_identity, geo_match
+    monkeypatch.delenv("CITY_IDENTITY_ALLOW_DRAFT", raising=False)
+    monkeypatch.setattr(city_identity, "load_city_identities", lambda *a, **k: ())
+    geo_match._matcher.cache_clear()
+    yield
+    geo_match._matcher.cache_clear()

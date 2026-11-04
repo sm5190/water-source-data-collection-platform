@@ -149,7 +149,7 @@ def test_claims_validated_before_normalize_6_read_their_source_types():
     c.qualifiers = ClaimQualifiers(source_types=["UTILITY"], official_types=[])
     assert not _official(c, FIELDS[W], ResolutionPolicy())
 
-def test_without_an_approved_identity_a_bare_city_name_is_only_supporting():
+def test_without_an_approved_identity_a_bare_city_name_is_only_supporting(no_identity):
     """Production until the identity file is approved: the city's country can't be read from
     the .ca host, so "...drinking water to Toronto." is one supporting statement and the
     utility goes to review (with the country named, it verifies alone)."""

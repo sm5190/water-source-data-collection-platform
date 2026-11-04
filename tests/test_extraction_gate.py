@@ -4,6 +4,7 @@ upstream, city-website or verified-utility evidence. Cases follow the Santiago r
 company pages and other countries' reports in later rounds."""
 
 import asyncio
+import pytest
 from water_source_research.agents.nodes import make_extract_node, reextraction_targets
 from water_source_research.context_manager import (
     ContextManager, ContextPurpose, ContextService, ContextStatus, ContextTask,
@@ -15,6 +16,10 @@ from water_source_research.context_manager.relevance import (
 from water_source_research.schemas.common import FieldResolutionStatus
 from water_source_research.schemas.research import EvidenceChunk, EvidenceRef, FieldClaim
 from water_source_research.services.field_state import initialize_city_state
+
+# Milestone 2 regressions of the gate itself, under name-only geography (a city without an
+# approved identity); the approved-identity gate is covered by test_geo_relevance.py.
+pytestmark = pytest.mark.usefixtures("no_identity")
 
 def chunk(cid, text, url, page=None, source_type="UTILITY"):
     return EvidenceChunk(chunk_id=cid, url=url, text=text, title=cid, page_number=page,

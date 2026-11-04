@@ -141,11 +141,16 @@ def test_vienna_virginia_is_a_homonym(vienna):
 
 def test_no_matcher_without_an_approved_identity(monkeypatch):
     monkeypatch.delenv("CITY_IDENTITY_ALLOW_DRAFT", raising=False)
-    assert matcher_for("Santiago", "Chile") is None  # the file is still a draft
-    assert identity_signature("Santiago", "Chile") == "catalog-only"
+    from water_source_research.services import geo_match
+    geo_match._matcher.cache_clear()
+    assert matcher_for("Madrid", "Spain") is None  # still a draft
+    assert identity_signature("Madrid", "Spain") == "catalog-only"
+    assert matcher_for("Santiago", "Chile") is not None  # approved (2026-11-03)
     monkeypatch.setenv("CITY_IDENTITY_ALLOW_DRAFT", "1")
-    assert matcher_for("Santiago", "Chile") is not None
-    assert identity_signature("Santiago", "Chile") != "catalog-only"
+    geo_match._matcher.cache_clear()
+    assert matcher_for("Madrid", "Spain") is not None
+    assert identity_signature("Madrid", "Spain") != "catalog-only"
+    geo_match._matcher.cache_clear()
 
 def test_a_city_host_with_another_state_code_is_another_region(houston):
     """houstonms.gov (Houston, Mississippi) was fetched on a fresh Houston run."""

@@ -174,7 +174,7 @@ def bootstrap_queries(matcher: GeoMatcher, affiliations: Sequence[Affiliation],
     ``site:<official host> "<organisation>"`` (discovery only; at most one per round)."""
     if any(matcher.official_host(u) for u in acquired_urls):
         return []
-    sites = [s.host for s in matcher.identity.official_websites]
+    sites = [s.host for s in matcher.identity.official_websites if s.municipal_authority]
     if not sites:
         return []
     done = {q.casefold() for q in already_run}

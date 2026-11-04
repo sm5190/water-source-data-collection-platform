@@ -378,11 +378,20 @@ class GeoMatcher:
         if not host:
             return None
         for site in self.identity.official_websites:
+            if not (host == site.host or host.endswith("." + site.host)):
+                continue
+            if not site.municipal_authority:
+                return None  # recorded as regional/provincial, or municipal but unverified
             if host == site.host or host.endswith("." + site.host):
-                return f"official website {site.host} (Wikidata P856)"
+                return f"official website {site.host} ({site.sources[0].source} "                        f"{site.sources[0].property})"
         labels = host.split(".")
         key = fold(self.identity.catalog_names()[0]).replace(" ", "").replace("-", "")
         if len(labels) < 2 or len(key) < 3:
+            return None
+        # When the region carries the city's name (Luanda Province), a government host
+        # spelling the name can't tell the city's government from the region's: only an
+        # explicitly recorded website counts then.
+        if any(key in fold(r).replace(" ", "").replace("-", "") for r in self.region_names):
             return None
         tld, second = labels[-1], labels[-2]
         state_codes = set(self.region_host_labels) & US_STATE_CODES

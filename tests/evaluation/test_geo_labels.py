@@ -72,12 +72,8 @@ def test_invalid_place_rejected(tmp_path):
     with pytest.raises(ValueError):
         _labelled(tmp_path, {INCLUDED: ["NEARBY", "TARGET"], EXCLUDED: ["TARGET", "TARGET"]})
 
-def test_without_an_identity_nothing_is_excluded(monkeypatch):
-    monkeypatch.delenv("CITY_IDENTITY_ALLOW_DRAFT", raising=False)
-    from water_source_research.services import geo_match
-    geo_match._matcher.cache_clear()
+def test_without_an_identity_nothing_is_excluded(no_identity):
     assert geo_decision(_doc(1)) == (INCLUDED, "NAME_ONLY")
-    geo_match._matcher.cache_clear()
 
 def test_homonym_document_is_excluded(identity_approved):
     doc = {**_doc(1), "url": "https://msdh.ms.gov/page", "title": "Houston, Mississippi water",

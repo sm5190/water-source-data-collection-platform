@@ -101,11 +101,27 @@ class Homonym(BaseModel):
     sources: list[NameSource] = Field(min_length=1)
 
 class OfficialWebsite(BaseModel):
-    """The city government's own website (Wikidata P856 of the city item): the only hosts
-    whose pages can corroborate that an organisation is a city department."""
+    """A government website related to the city (Wikidata P856 of the city item, or a
+    person's review). Only a VERIFIED MUNICIPAL site can corroborate that an organisation is a
+    city department; regional or provincial government sites are recorded, never used for
+    that. Kept apart from the geographic identity: a missing or unverified municipal site
+    never blocks approving the identity."""
     host: str  # lower case, without "www."
     url: str
+    level: Literal["MUNICIPAL", "REGIONAL", "PROVINCIAL", "NATIONAL", "UNKNOWN"] = "MUNICIPAL"
+    verified: bool = True  # False: recorded, pending independent confirmation
+    note: str | None = None
     sources: list[NameSource] = Field(min_length=1)
+
+    @property
+    def municipal_authority(self) -> bool:
+        return self.level == "MUNICIPAL" and self.verified
+
+class EntryApproval(BaseModel):
+    """Who approved an identity entry, when, and on what basis."""
+    approved_by: str
+    approved_at: str
+    basis: str = ""
 
 class CityIdentity(BaseModel):
     city: str  # the catalog's city name
@@ -114,6 +130,7 @@ class CityIdentity(BaseModel):
     region: Region | None = None
     country_info: CountryInfo | None = None
     official_websites: list[OfficialWebsite] = Field(default_factory=list)
+    approval: EntryApproval | None = None
     ids: dict[str, str] = Field(default_factory=dict)
     names: list[IdentityName] = Field(default_factory=list)
     unverified_names: list[IdentityName] = Field(default_factory=list)

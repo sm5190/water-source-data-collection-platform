@@ -25,11 +25,9 @@ def identity_on(monkeypatch):
     geo_match._matcher.cache_clear()
 
 @pytest.fixture
-def identity_off(monkeypatch):
-    monkeypatch.delenv("CITY_IDENTITY_ALLOW_DRAFT", raising=False)
-    geo_match._matcher.cache_clear()
+def identity_off(no_identity):
+    """Name-only geography (a city without an approved identity)."""
     yield
-    geo_match._matcher.cache_clear()
 
 def chunk(cid, text, url, page=None, source_type="GOVERNMENT", title=None):
     return EvidenceChunk(chunk_id=cid, url=url, text=text, title=title or cid,
